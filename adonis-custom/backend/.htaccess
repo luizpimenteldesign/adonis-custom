@@ -1,0 +1,17 @@
+# Habilitar rewrite
+RewriteEngine On
+
+# Redirecionar tudo para HTTPS (em produção)
+# RewriteCond %{HTTPS} off
+# RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+# API Routes
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^api/(.*)$ api/$1.php [L,QSA]
+
+# Proteger arquivos sensíveis
+<FilesMatch "\.(env|json|config|sql)$">
+    Order allow,deny
+    Deny from all
+</FilesMatch>

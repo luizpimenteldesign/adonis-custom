@@ -1,0 +1,49 @@
+const API_URL = '../backend/api';
+
+class ApiService {
+    async request(endpoint, options = {}) {
+        const url = \`\${API_URL}\${endpoint}\`;
+        const config = {
+            headers: { 'Content-Type': 'application/json', ...options.headers },
+            ...options
+        };
+
+        const token = localStorage.getItem('token');
+const API_URL = '../backend/api';
+        if (token) config.headers['Authorization'] = \`Bearer \${token}\`;
+
+        try {
+            const response = await fetch(url, config);
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.message || 'Erro na requisição');
+            return data;
+        } catch (error) {
+            console.error('API Error:', error);
+            throw error;
+        }
+    }
+
+    async login(email, senha) {
+        return this.request('/login.php', {
+            method: 'POST',
+            body: JSON.stringify({ email, senha })
+        });
+    }
+
+    async listarServicos() {
+        return this.request('/servicos.php', { method: 'GET' });
+    }
+
+    async criarPreOS(dados) {
+        return this.request('/pre-os.php', {
+            method: 'POST',
+            body: JSON.stringify(dados)
+        });
+    }
+
+    async listarPreOS() {
+        return this.request('/pre-os.php', { method: 'GET' });
+    }
+}
+
+const api = new ApiService();
