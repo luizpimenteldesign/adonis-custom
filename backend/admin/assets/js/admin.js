@@ -1,7 +1,7 @@
 /**
  * SISTEMA ADONIS - PAINEL ADMINISTRATIVO
  * JavaScript centralizado
- * Versão: 1.0
+ * Versão: 1.1
  * Data: 26/01/2026
  */
 
@@ -122,13 +122,12 @@ async function aprovarPedido(pedidoId) {
     try {
         showToast('Processando aprovação...', 'info');
         
-        const response = await fetch(`${ADONIS_ADMIN.apiUrl}preos.php?action=aprovar&id=${pedidoId}`, {
+        const response = await fetch(`${ADONIS_ADMIN.apiUrl}acoes.php?action=aprovar&id=${pedidoId}`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                status: 'aprovado',
                 pedido_id: pedidoId
             })
         });
@@ -144,7 +143,7 @@ async function aprovarPedido(pedidoId) {
         
     } catch (error) {
         console.error('Erro ao aprovar pedido:', error);
-        showToast('❌ Erro ao aprovar pedido: ' + error.message, 'error');
+        showToast('❌ Erro ao aprovar pedido: ' + error.message, 'error', 5000);
     }
 }
 
@@ -167,13 +166,12 @@ async function reprovarPedido(pedidoId) {
     try {
         showToast('Processando reprovação...', 'info');
         
-        const response = await fetch(`${ADONIS_ADMIN.apiUrl}preos.php?action=reprovar&id=${pedidoId}`, {
+        const response = await fetch(`${ADONIS_ADMIN.apiUrl}acoes.php?action=reprovar&id=${pedidoId}`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                status: 'reprovado',
                 pedido_id: pedidoId,
                 motivo: motivo.trim()
             })
@@ -190,7 +188,7 @@ async function reprovarPedido(pedidoId) {
         
     } catch (error) {
         console.error('Erro ao reprovar pedido:', error);
-        showToast('❌ Erro ao reprovar pedido: ' + error.message, 'error');
+        showToast('❌ Erro ao reprovar pedido: ' + error.message, 'error', 5000);
     }
 }
 
