@@ -1,7 +1,7 @@
 <?php
 /**
  * LOGIN ADMINISTRATIVO - SISTEMA ADONIS
- * Versão: 1.1
+ * Versão: 1.2
  * Data: 26/01/2026
  */
 
@@ -132,5 +132,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <p><a href="../../frontend/index.php">← Voltar para o site</a></p>
         </div>
     </div>
+    
+    <script src="assets/js/admin.js"></script>
 </body>
 </html>

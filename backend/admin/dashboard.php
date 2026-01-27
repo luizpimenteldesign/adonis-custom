@@ -1,7 +1,7 @@
 <?php
 /**
  * DASHBOARD ADMINISTRATIVO - SISTEMA ADONIS
- * Versão: 1.1
+ * Versão: 1.2
  * Data: 26/01/2026
  */
 
@@ -191,5 +191,7 @@ function formatarData($data) {
             <?php endif; ?>
         </div>
     </div>
+    
+    <script src="assets/js/admin.js"></script>
 </body>
 </html>
