@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pedido Enviado com Sucesso - Adonis Luthieria</title>
+    
+    <!-- CSS -->
+    <link rel="stylesheet" href="public/assets/css/style.css">
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    
+    <!-- HEADER -->
+    <header class="header">
+        <div class="header-container">
+            <div class="header-logo">
+                <img src="https://adns.luizpimentel.com/adonis-custom/frontend/public/assets/img/Logo-Adonis3.png" alt="Adonis Custom">
+            </div>
+            <div class="header-title">
+                Pedido Enviado com Sucesso
+            </div>
+        </div>
+    </header>
+
+    <!-- CONTEÚDO PRINCIPAL -->
+    <main>
+        <div class="main-container" style="max-width: 800px; margin: 0 auto; padding: 40px 20px; text-align: center;">
+            
+            <!-- Ícone de Sucesso -->
+            <div style="margin-bottom: 32px;">
+                <svg width="100" height="100" viewBox="0 0 24 24" fill="none" style="color: #4caf50;">
+                    <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" fill="none"/>
+                    <path d="M9 12l2 2 4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </div>
+            
+            <h1 style="font-size: 32px; color: #333; margin-bottom: 16px;">
+                Pedido Enviado com Sucesso!
+            </h1>
+            
+            <p style="font-size: 18px; color: #666; margin-bottom: 40px;">
+                Seu pedido de orçamento foi recebido e está sendo processado.
+            </p>
+            
+            <!-- Card com informações -->
+            <div style="background: #fff; border: 2px solid #4caf50; border-radius: 12px; padding: 32px; margin-bottom: 32px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                
+                <h2 style="font-size: 20px; color: #333; margin-bottom: 24px;">
+                    Seu Código de Acompanhamento
+                </h2>
+                
+                <div style="background: #f5f5f5; border-radius: 8px; padding: 20px; margin-bottom: 24px;">
+                    <p style="font-family: 'Courier New', monospace; font-size: 18px; font-weight: bold; color: #ff6b35; word-break: break-all;" id="codigo-token">
+                        Carregando...
+                    </p>
+                </div>
+                
+                <button onclick="copiarCodigo()" style="background: #ff6b35; color: white; border: none; padding: 12px 24px; border-radius: 8px; font-size: 16px; font-weight: 500; cursor: pointer; transition: all 0.3s ease;">
+                    📋 Copiar Código
+                </button>
+                
+                <hr style="margin: 32px 0; border: none; border-top: 1px solid #ddd;">
+                
+                <div style="text-align: left;">
+                    <h3 style="font-size: 18px; color: #333; margin-bottom: 16px;">
+                        Detalhes do Pedido
+                    </h3>
+                    
+                    <p style="margin-bottom: 8px;">
+                        <strong>Pedido:</strong> <span id="numero-pedido">-</span>
+                    </p>
+                    
+                    <p style="margin-bottom: 8px;">
+                        <strong>Instrumento:</strong> <span id="tipo-instrumento">-</span>
+                    </p>
+                    
+                    <p style="margin-bottom: 8px; color: #666; font-size: 14px;">
+                        Guarde este código para acompanhar o andamento do seu pedido.
+                    </p>
+                </div>
+            </div>
+            
+            <!-- Próximos Passos -->
+            <div style="background: #f9f9f9; border-radius: 12px; padding: 32px; margin-bottom: 32px; text-align: left;">
+                <h3 style="font-size: 20px; color: #333; margin-bottom: 16px;">
+                    📋 Próximos Passos
+                </h3>
+                
+                <ol style="padding-left: 20px; line-height: 1.8;">
+                    <li>Em breve você receberá uma confirmação por <strong>WhatsApp</strong> e <strong>e-mail</strong></li>
+                    <li>Nossa equipe irá avaliar seu pedido e enviar o orçamento detalhado</li>
+                    <li>Use o código de acompanhamento para consultar o status do seu pedido</li>
+                    <li>Após aprovação, agendaremos a data para recebimento do instrumento</li>
+                </ol>
+            </div>
+            
+            <!-- Botões de Ação -->
+            <div style="display: flex; gap: 16px; justify-content: center; flex-wrap: wrap;">
+                <a href="index.php" style="display: inline-block; padding: 12px 24px; background: #ff6b35; color: white; text-decoration: none; border-radius: 8px; font-weight: 500; transition: all 0.3s ease;">
+                    ← Fazer Novo Pedido
+                </a>
+                
+                <a href="https://wa.me/5527999999999" target="_blank" style="display: inline-block; padding: 12px 24px; background: #25d366; color: white; text-decoration: none; border-radius: 8px; font-weight: 500; transition: all 0.3s ease;">
+                    💬 Falar no WhatsApp
+                </a>
+            </div>
+        </div>
+    </main>
+
+    <!-- FOOTER -->
+    <footer class="footer">
+        <div class="footer-container">
+            <p class="footer-text">© 2026 Adonis Custom Luthieria. Todos os direitos reservados.</p>
+            <div class="footer-links">
+                <a href="#" class="footer-link">Política de Privacidade</a>
+                <a href="#" class="footer-link">Termos de Uso</a>
+                <a href="#" class="footer-link">Contato</a>
+            </div>
+        </div>
+    </footer>
+
+    <!-- JAVASCRIPT -->
+    <script>
+        // Extrair parâmetros da URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const token = urlParams.get('token');
+        const pedidoId = urlParams.get('pedido');
+        const instrumento = urlParams.get('instrumento');
+        
+        console.log('Token recebido:', token);
+        console.log('Pedido ID recebido:', pedidoId);
+        console.log('Instrumento recebido:', instrumento);
+        
+        // Validar parâmetros
+        if (!token || token === 'undefined' || token === 'null') {
+            document.getElementById('codigo-token').innerHTML = '<span style="color: #f44336;">❌ Erro: Token não encontrado</span>';
+            console.error('Token inválido ou não encontrado na URL');
+        } else {
+            document.getElementById('codigo-token').textContent = token;
+        }
+        
+        if (!pedidoId || pedidoId === 'undefined' || pedidoId === 'null') {
+            document.getElementById('numero-pedido').innerHTML = '<span style="color: #f44336;">Erro ao carregar</span>';
+            console.error('Pedido ID inválido ou não encontrado na URL');
+        } else {
+            document.getElementById('numero-pedido').textContent = '#' + pedidoId;
+        }
+        
+        if (instrumento && instrumento !== 'undefined' && instrumento !== 'null') {
+            document.getElementById('tipo-instrumento').textContent = instrumento;
+        }
+        
+        // Função para copiar código
+        function copiarCodigo() {
+            const codigoElement = document.getElementById('codigo-token');
+            const codigo = codigoElement.textContent;
+            
+            if (codigo && codigo !== 'Carregando...' && !codigo.includes('Erro')) {
+                navigator.clipboard.writeText(codigo).then(() => {
+                    alert('✅ Código copiado para a área de transferência!');
+                }).catch(err => {
+                    console.error('Erro ao copiar:', err);
+                    // Fallback para navegadores antigos
+                    const textarea = document.createElement('textarea');
+                    textarea.value = codigo;
+                    document.body.appendChild(textarea);
+                    textarea.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(textarea);
+                    alert('✅ Código copiado!');
+                });
+            } else {
+                alert('❌ Não há código válido para copiar');
+            }
+        }
+    </script>
+</body>
+</html>
