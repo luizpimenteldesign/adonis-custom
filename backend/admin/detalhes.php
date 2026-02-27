@@ -1,7 +1,7 @@
 <?php
 /**
  * DETALHES DO PEDIDO - SISTEMA ADONIS
- * Versão: 3.0
+ * Versão: 3.1
  * Data: 27/02/2026
  */
 
@@ -47,6 +47,14 @@ try {
     $stmt_servicos->execute([':pre_os_id' => $preos_id]);
     $servicos = $stmt_servicos->fetchAll(PDO::FETCH_ASSOC);
 
+    // Totais dos serviços
+    $total_valor = 0;
+    $total_prazo = 0;
+    foreach ($servicos as $s) {
+        $total_valor += (float)$s['valor_base'];
+        $total_prazo += (int)$s['prazo_base'];
+    }
+
     $fotos = [];
     if (!empty($pedido['instrumento_id'])) {
         $stmt_fotos = $conn->prepare("
@@ -57,7 +65,6 @@ try {
         $fotos = $stmt_fotos->fetchAll(PDO::FETCH_ASSOC);
     }
 
-    // Histórico de status
     $historico = [];
     try {
         $stmt_hist = $conn->prepare("
@@ -68,7 +75,7 @@ try {
         ");
         $stmt_hist->execute([':id' => $preos_id]);
         $historico = $stmt_hist->fetchAll(PDO::FETCH_ASSOC);
-    } catch (PDOException $e) { /* tabela pode ainda não existir */ }
+    } catch (PDOException $e) {}
 
 } catch (PDOException $e) {
     error_log('Erro detalhes: ' . $e->getMessage());
@@ -101,7 +108,6 @@ $v = time();
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="assets/css/admin.css?v=<?php echo $v; ?>">
     <style>
-        /* Modal */
         .modal-overlay {
             display: none; position: fixed; inset: 0;
             background: rgba(0,0,0,.5); z-index: 1000;
@@ -119,36 +125,32 @@ $v = time();
             border-radius: 8px; font-size: 14px; box-sizing: border-box;
             transition: border-color .2s; font-family: inherit;
         }
-        .modal-box input[type=number]:focus, .modal-box textarea:focus {
-            outline: none; border-color: #0d9488;
-        }
+        .modal-box input[type=number]:focus, .modal-box textarea:focus { outline: none; border-color: #0d9488; }
         .modal-box textarea { resize: vertical; min-height: 100px; }
         .modal-actions { display:flex; gap:12px; margin-top:20px; justify-content:flex-end; }
-        /* Linha do tempo */
+        /* Timeline */
         .timeline { list-style: none; padding: 0; margin: 0; position: relative; }
-        .timeline::before {
-            content: ''; position: absolute; left: 18px; top: 0; bottom: 0;
-            width: 2px; background: #e0e0e0;
+        .timeline::before { content:''; position:absolute; left:18px; top:0; bottom:0; width:2px; background:#e0e0e0; }
+        .timeline-item { display:flex; gap:16px; padding:0 0 24px 0; position:relative; }
+        .timeline-dot { width:36px; height:36px; border-radius:50%; background:#0d9488; color:#fff; display:flex; align-items:center; justify-content:center; font-size:16px; flex-shrink:0; z-index:1; }
+        .timeline-content { flex:1; padding-top:4px; }
+        .timeline-status { font-weight:600; font-size:15px; color:#333; }
+        .timeline-meta { font-size:12px; color:#888; margin-top:2px; }
+        .timeline-detalhe { margin-top:6px; padding:8px 12px; border-radius:6px; font-size:13px; }
+        .timeline-detalhe.valor  { background:#e8f5e9; color:#2e7d32; }
+        .timeline-detalhe.motivo { background:#ffebee; color:#c62828; }
+        /* Totais serviços */
+        table tfoot td {
+            font-weight: 700;
+            font-size: 14px;
+            border-top: 2px solid #e0e0e0;
+            background: #f9f9f9;
+            padding: 12px 16px;
         }
-        .timeline-item {
-            display: flex; gap: 16px; padding: 0 0 24px 0;
-            position: relative;
-        }
-        .timeline-dot {
-            width: 36px; height: 36px; border-radius: 50%;
-            background: #0d9488; color: #fff; display: flex;
-            align-items: center; justify-content: center;
-            font-size: 16px; flex-shrink: 0; z-index: 1;
-        }
-        .timeline-content { flex: 1; padding-top: 4px; }
-        .timeline-status { font-weight: 600; font-size: 15px; color: #333; }
-        .timeline-meta { font-size: 12px; color: #888; margin-top: 2px; }
-        .timeline-detalhe {
-            margin-top: 6px; padding: 8px 12px; border-radius: 6px;
-            font-size: 13px;
-        }
-        .timeline-detalhe.valor { background: #e8f5e9; color: #2e7d32; }
-        .timeline-detalhe.motivo { background: #ffebee; color: #c62828; }
+        .totais-row td:first-child { color: #555; }
+        .total-valor { color: #2e7d32; font-size: 15px; }
+        .total-prazo { color: #1565c0; font-size: 15px; }
+        .total-obs   { font-size: 11px; color: #999; font-weight: 400; display:block; margin-top:2px; }
     </style>
 </head>
 <body>
@@ -266,17 +268,32 @@ $v = time();
                 <div style="padding:20px;color:#888;">Nenhum serviço selecionado</div>
             <?php else: ?>
                 <table>
-                    <thead><tr><th>Serviço</th><th>Descrição</th><th>Valor Base</th><th>Prazo</th></tr></thead>
+                    <thead>
+                        <tr><th>Serviço</th><th>Descrição</th><th>Valor Base</th><th>Prazo</th></tr>
+                    </thead>
                     <tbody>
                         <?php foreach ($servicos as $s): ?>
                         <tr>
                             <td><strong><?php echo htmlspecialchars($s['nome']); ?></strong></td>
                             <td><?php echo htmlspecialchars($s['descricao']); ?></td>
                             <td>R$ <?php echo number_format($s['valor_base'], 2, ',', '.'); ?></td>
-                            <td><?php echo $s['prazo_base']; ?> dias</td>
+                            <td><?php echo (int)$s['prazo_base']; ?> dias</td>
                         </tr>
                         <?php endforeach; ?>
                     </tbody>
+                    <tfoot>
+                        <tr class="totais-row">
+                            <td colspan="2">Totais estimados (<?php echo count($servicos); ?> serviço<?php echo count($servicos) > 1 ? 's' : ''; ?>)</td>
+                            <td class="total-valor">
+                                R$ <?php echo number_format($total_valor, 2, ',', '.'); ?>
+                                <span class="total-obs">soma dos valores base</span>
+                            </td>
+                            <td class="total-prazo">
+                                <?php echo $total_prazo; ?> dias
+                                <span class="total-obs">prazo acumulado estimado</span>
+                            </td>
+                        </tr>
+                    </tfoot>
                 </table>
             <?php endif; ?>
         </div>
@@ -312,19 +329,13 @@ $v = time();
                 <ul class="timeline">
                 <?php
                 $icones = [
-                    'Pre-OS'               => '🗒️',
-                    'Em analise'           => '🔍',
-                    'Orcada'               => '💰',
-                    'Aguardando aprovacao' => '⏳',
-                    'Aprovada'             => '✅',
-                    'Reprovada'            => '❌',
-                    'Cancelada'            => '🚫',
+                    'Pre-OS'=>'🗒️','Em analise'=>'🔍','Orcada'=>'💰',
+                    'Aguardando aprovacao'=>'⏳','Aprovada'=>'✅','Reprovada'=>'❌','Cancelada'=>'🚫'
                 ];
                 foreach ($historico as $h):
-                    $icone = $icones[$h['status']] ?? '•';
                 ?>
                 <li class="timeline-item">
-                    <div class="timeline-dot"><?php echo $icone; ?></div>
+                    <div class="timeline-dot"><?php echo $icones[$h['status']] ?? '•'; ?></div>
                     <div class="timeline-content">
                         <div class="timeline-status"><?php echo htmlspecialchars($h['status']); ?></div>
                         <div class="timeline-meta">
@@ -383,7 +394,6 @@ $v = time();
 
     <script>
     const _pedidoId = <?php echo $preos_id; ?>;
-
     const _statusLabels = {
         'Pre-OS':'🗒️ Pré-OS','Em analise':'🔍 Em Análise','Orcada':'💰 Orçada',
         'Aguardando aprovacao':'⏳ Aguardando Aprovação','Aprovada':'✅ Aprovada',
@@ -402,11 +412,9 @@ $v = time();
         document.body.appendChild(el);
         setTimeout(() => el.remove(), 3500);
     }
-
-    function abrirModal(id) { document.getElementById(id).classList.add('aberto'); }
+    function abrirModal(id)  { document.getElementById(id).classList.add('aberto'); }
     function fecharModal(id) { document.getElementById(id).classList.remove('aberto'); }
-
-    function abrirModalOrcamento()  { abrirModal('modal-orcamento'); document.getElementById('input-valor').focus(); }
+    function abrirModalOrcamento()  { abrirModal('modal-orcamento');  document.getElementById('input-valor').focus(); }
     function abrirModalReprovacao() { abrirModal('modal-reprovacao'); document.getElementById('input-motivo').focus(); }
 
     function confirmarOrcamento() {
@@ -415,19 +423,16 @@ $v = time();
         fecharModal('modal-orcamento');
         _enviar('Orcada', { valor_orcamento: valor });
     }
-
     function confirmarReprovacao() {
         const motivo = document.getElementById('input-motivo').value.trim();
         if (!motivo) { _toast('Informe o motivo da reprovação', false); return; }
         fecharModal('modal-reprovacao');
         _enviar('Reprovada', { motivo });
     }
-
     function atualizarStatus(novoStatus) {
         if (!confirm('Alterar status para "' + _statusLabels[novoStatus] + '"?')) return;
         _enviar(novoStatus, {});
     }
-
     function _enviar(status, extras) {
         fetch('atualizar_status.php', {
             method: 'POST',
@@ -449,12 +454,8 @@ $v = time();
         })
         .catch(() => _toast('❌ Erro de conexão', false));
     }
-
-    // Fechar modal clicando fora
-    document.querySelectorAll('.modal-overlay').forEach(overlay => {
-        overlay.addEventListener('click', e => {
-            if (e.target === overlay) overlay.classList.remove('aberto');
-        });
+    document.querySelectorAll('.modal-overlay').forEach(o => {
+        o.addEventListener('click', e => { if (e.target === o) o.classList.remove('aberto'); });
     });
     </script>
 
