@@ -1,7 +1,7 @@
 <?php
 /**
  * DASHBOARD ADMINISTRATIVO - SISTEMA ADONIS
- * Versão: 2.0
+ * Versão: 2.1
  * Data: 27/02/2026
  */
 
@@ -11,7 +11,6 @@ require_once '../config/Database.php';
 $db   = new Database();
 $conn = $db->getConnection();
 
-// Filtros via GET
 $filtro_status = isset($_GET['status']) ? trim($_GET['status']) : '';
 $filtro_busca  = isset($_GET['busca'])  ? trim($_GET['busca'])  : '';
 
@@ -19,32 +18,29 @@ $status_validos = ['Pre-OS','Em analise','Orcada','Aguardando aprovacao','Aprova
 if (!in_array($filtro_status, $status_validos)) $filtro_status = '';
 
 try {
-    // Cards de estatísticas (sempre totais reais, sem filtro)
-    $total_preos     = $conn->query("SELECT COUNT(*) FROM pre_os")->fetchColumn();
-    $total_pendentes = $conn->query("SELECT COUNT(*) FROM pre_os WHERE status IN ('Pre-OS','Em analise','Orcada','Aguardando aprovacao')")->fetchColumn();
-    $total_aprovados = $conn->query("SELECT COUNT(*) FROM pre_os WHERE status = 'Aprovada'")->fetchColumn();
-    $total_encerrados= $conn->query("SELECT COUNT(*) FROM pre_os WHERE status IN ('Reprovada','Cancelada')")->fetchColumn();
+    $total_preos      = $conn->query("SELECT COUNT(*) FROM pre_os")->fetchColumn();
+    $total_pendentes  = $conn->query("SELECT COUNT(*) FROM pre_os WHERE status IN ('Pre-OS','Em analise','Orcada','Aguardando aprovacao')")->fetchColumn();
+    $total_aprovados  = $conn->query("SELECT COUNT(*) FROM pre_os WHERE status = 'Aprovada'")->fetchColumn();
+    $total_encerrados = $conn->query("SELECT COUNT(*) FROM pre_os WHERE status IN ('Reprovada','Cancelada')")->fetchColumn();
 
-    // Query base com filtros
     $where  = [];
     $params = [];
 
     if ($filtro_status !== '') {
-        $where[]  = 'p.status = :status';
+        $where[]           = 'p.status = :status';
         $params[':status'] = $filtro_status;
     }
 
     if ($filtro_busca !== '') {
-        $where[]  = '(c.nome LIKE :busca OR i.marca LIKE :busca2 OR i.modelo LIKE :busca3)';
+        $where[]           = '(c.nome LIKE :busca OR i.marca LIKE :busca2 OR i.modelo LIKE :busca3)';
         $params[':busca']  = '%' . $filtro_busca . '%';
         $params[':busca2'] = '%' . $filtro_busca . '%';
         $params[':busca3'] = '%' . $filtro_busca . '%';
     }
 
-    $sql_where = count($where) ? 'WHERE ' . implode(' AND ', $where) : '';
-
+    $sql_where  = count($where) ? 'WHERE ' . implode(' AND ', $where) : '';
     $stmt_lista = $conn->prepare("
-        SELECT 
+        SELECT
             p.id, p.status, p.public_token, p.criado_em,
             c.nome as cliente_nome, c.telefone as cliente_telefone,
             i.tipo as instrumento_tipo, i.marca as instrumento_marca, i.modelo as instrumento_modelo
@@ -81,13 +77,14 @@ function formatarData($data) {
     return date('d/m/Y H:i', strtotime($data));
 }
 
-// URL base para filtros
 function urlFiltro($status = '') {
     $params = [];
-    if ($status)                              $params['status'] = $status;
-    if (!empty($_GET['busca']))               $params['busca']  = $_GET['busca'];
+    if ($status)              $params['status'] = $status;
+    if (!empty($_GET['busca'])) $params['busca'] = $_GET['busca'];
     return 'dashboard.php' . ($params ? '?' . http_build_query($params) : '');
 }
+
+$v = time();
 ?>
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -98,13 +95,12 @@ function urlFiltro($status = '') {
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="assets/css/admin.css">
+    <link rel="stylesheet" href="assets/css/admin.css?v=<?php echo $v; ?>">
     <style>
-        .stat-card { cursor: pointer; transition: transform .15s, box-shadow .15s; }
-        .stat-card:hover { transform: translateY(-3px); box-shadow: 0 6px 20px rgba(0,0,0,.12); }
-        .stat-card.ativo { outline: 3px solid #667eea; }
+        .stat-card.ativo { outline: 3px solid #0d9488; }
         .filtros-bar { display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-bottom:16px; }
         .filtros-bar input[type=text] { flex:1; min-width:200px; padding:8px 14px; border:1px solid #ddd; border-radius:8px; font-size:14px; }
+        .filtros-bar select { padding:8px 14px; border:1px solid #ddd; border-radius:8px; font-size:14px; background:#fff; }
         .filtros-bar .btn-limpar { color:#888; font-size:13px; text-decoration:none; white-space:nowrap; }
         .filtros-bar .btn-limpar:hover { color:#e53e3e; }
         .resultado-info { font-size:13px; color:#666; margin-bottom:8px; }
@@ -127,7 +123,7 @@ function urlFiltro($status = '') {
 
     <div class="container">
 
-        <!-- CARDS CLICAVEIS -->
+        <!-- CARDS DE ESTATÍSTICAS -->
         <div class="stats-grid">
             <a href="<?php echo urlFiltro(); ?>" style="text-decoration:none">
                 <div class="stat-card <?php echo $filtro_status === '' ? 'ativo' : ''; ?>">
@@ -155,7 +151,7 @@ function urlFiltro($status = '') {
             </a>
         </div>
 
-        <!-- TABELA -->
+        <!-- TABELA DE PEDIDOS -->
         <div class="table-container">
             <div class="table-header">
                 <h2 class="table-title">
@@ -167,10 +163,9 @@ function urlFiltro($status = '') {
                 </h2>
             </div>
 
-            <!-- BARRA DE BUSCA E FILTRO DE STATUS -->
-            <form method="GET" action="dashboard.php" class="filtros-bar" style="padding:0 0 0 0;">
+            <form method="GET" action="dashboard.php" class="filtros-bar">
                 <input type="text" name="busca" placeholder="🔍 Buscar cliente ou instrumento..." value="<?php echo htmlspecialchars($filtro_busca); ?>">
-                <select name="status" onchange="this.form.submit()" style="padding:8px 14px;border:1px solid #ddd;border-radius:8px;font-size:14px;background:#fff;">
+                <select name="status" onchange="this.form.submit()">
                     <option value="">Todos os status</option>
                     <?php foreach (['Pre-OS','Em analise','Orcada','Aguardando aprovacao','Aprovada','Reprovada','Cancelada'] as $s): ?>
                     <option value="<?php echo $s; ?>" <?php echo $filtro_status === $s ? 'selected' : ''; ?>>
@@ -178,9 +173,9 @@ function urlFiltro($status = '') {
                     </option>
                     <?php endforeach; ?>
                 </select>
-                <button type="submit" class="btn btn-primary" style="padding:8px 18px;">Buscar</button>
+                <button type="submit" class="btn btn-primary">Buscar</button>
                 <?php if ($filtro_status || $filtro_busca): ?>
-                <a href="dashboard.php" class="btn-limpar">× Limpar filtros</a>
+                    <a href="dashboard.php" class="btn-limpar">× Limpar filtros</a>
                 <?php endif; ?>
             </form>
 
@@ -231,6 +226,6 @@ function urlFiltro($status = '') {
         </div>
     </div>
 
-    <script src="assets/js/admin.js"></script>
+    <script src="assets/js/admin.js?v=<?php echo $v; ?>"></script>
 </body>
 </html>
