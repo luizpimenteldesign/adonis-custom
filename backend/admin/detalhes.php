@@ -1,7 +1,7 @@
 <?php
 /**
  * DETALHES DO PEDIDO - SISTEMA ADONIS
- * Versão: 2.1
+ * Versão: 2.2
  * Data: 27/02/2026
  */
 
@@ -19,7 +19,6 @@ if (!isset($_GET['id']) || !is_numeric($_GET['id'])) {
 $preos_id = (int)$_GET['id'];
 
 try {
-    // Dados principais da pré-OS
     $stmt = $conn->prepare("
         SELECT 
             p.*,
@@ -49,7 +48,6 @@ try {
         exit;
     }
 
-    // Serviços solicitados
     $stmt_servicos = $conn->prepare("
         SELECT s.id, s.nome, s.descricao, s.valor_base, s.prazo_base
         FROM pre_os_servicos ps
@@ -60,7 +58,6 @@ try {
     $stmt_servicos->execute();
     $servicos = $stmt_servicos->fetchAll(PDO::FETCH_ASSOC);
 
-    // Fotos do instrumento (tabela correta: instrumento_fotos)
     $fotos = [];
     if (!empty($pedido['instrumento_id'])) {
         $stmt_fotos = $conn->prepare("
@@ -121,7 +118,6 @@ function formatarStatusDetalhes($status) {
 
     <div class="container">
 
-        <!-- STATUS E AÇÕES -->
         <div class="card">
             <div class="card-header">
                 <div>
@@ -148,7 +144,6 @@ function formatarStatusDetalhes($status) {
             </div>
         </div>
 
-        <!-- CLIENTE -->
         <div class="card">
             <div class="card-header"><h2 class="card-title">👤 Dados do Cliente</h2></div>
             <div class="info-grid">
@@ -183,7 +178,6 @@ function formatarStatusDetalhes($status) {
             </div>
         </div>
 
-        <!-- INSTRUMENTO -->
         <div class="card">
             <div class="card-header"><h2 class="card-title">🎸 Dados do Instrumento</h2></div>
             <div class="info-grid">
@@ -202,7 +196,6 @@ function formatarStatusDetalhes($status) {
             </div>
         </div>
 
-        <!-- SERVIÇOS -->
         <div class="card">
             <div class="card-header"><h2 class="card-title">🔧 Serviços Solicitados</h2></div>
             <?php if (empty($servicos)): ?>
@@ -224,7 +217,6 @@ function formatarStatusDetalhes($status) {
             <?php endif; ?>
         </div>
 
-        <!-- FOTOS -->
         <?php if (!empty($fotos)): ?>
         <div class="card">
             <div class="card-header"><h2 class="card-title">📷 Fotos do Instrumento</h2></div>
@@ -238,72 +230,20 @@ function formatarStatusDetalhes($status) {
         </div>
         <?php endif; ?>
 
-        <!-- OBSERVAÇÕES -->
         <?php if (!empty($pedido['observacoes'])): ?>
         <div class="card">
             <div class="card-header"><h2 class="card-title">📝 Observações do Cliente</h2></div>
-            <div class="observacoes" style="padding:16px;"><?php echo nl2br(htmlspecialchars($pedido['observacoes'])); ?></div>
+            <div class="observacoes"><?php echo nl2br(htmlspecialchars($pedido['observacoes'])); ?></div>
         </div>
         <?php endif; ?>
 
-        <!-- TOKEN -->
         <div class="card">
             <div class="card-header"><h2 class="card-title">🔑 Código de Acompanhamento</h2></div>
-            <div class="token-box" style="padding:16px;font-family:monospace;font-size:16px;letter-spacing:2px;"><?php echo htmlspecialchars($pedido['public_token']); ?></div>
+            <div class="token-box"><?php echo htmlspecialchars($pedido['public_token']); ?></div>
         </div>
 
     </div>
 
-    <div id="toast" style="display:none;position:fixed;bottom:24px;right:24px;background:#333;color:#fff;padding:12px 20px;border-radius:8px;font-size:14px;z-index:9999;"></div>
-
-    <script>
-    const pedidoId = <?php echo $preos_id; ?>;
-    const statusLabels = {
-        'Pre-OS':               '🗒️ Pré-OS',
-        'Em analise':           '🔍 Em Análise',
-        'Orcada':               '💰 Orçada',
-        'Aguardando aprovacao': '⏳ Aguardando Aprovação',
-        'Aprovada':             '✅ Aprovada',
-        'Reprovada':            '❌ Reprovada',
-        'Cancelada':            '🚫 Cancelada',
-    };
-    const statusClasses = {
-        'Pre-OS':               'badge-new',
-        'Em analise':           'badge-info',
-        'Orcada':               'badge-warning',
-        'Aguardando aprovacao': 'badge-warning',
-        'Aprovada':             'badge-success',
-        'Reprovada':            'badge-danger',
-        'Cancelada':            'badge-dark',
-    };
-    function toast(msg, ok = true) {
-        const el = document.getElementById('toast');
-        el.textContent = msg;
-        el.style.background = ok ? '#2d7a2d' : '#a00';
-        el.style.display = 'block';
-        setTimeout(() => el.style.display = 'none', 3000);
-    }
-    function atualizarStatus(novoStatus) {
-        if (!confirm('Alterar status para "' + statusLabels[novoStatus] + '"?')) return;
-        fetch('atualizar_status.php', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({id: pedidoId, status: novoStatus})
-        })
-        .then(r => r.json())
-        .then(data => {
-            if (data.sucesso) {
-                document.getElementById('status-badge').innerHTML =
-                    '<span class="badge ' + statusClasses[novoStatus] + '">' + statusLabels[novoStatus] + '</span>';
-                document.getElementById('atualizado-em').textContent = data.atualizado_em;
-                toast('✅ Status atualizado!');
-            } else {
-                toast('❌ Erro: ' + data.erro, false);
-            }
-        })
-        .catch(() => toast('❌ Erro de conexão', false));
-    }
-    </script>
     <script src="assets/js/admin.js"></script>
 </body>
 </html>
