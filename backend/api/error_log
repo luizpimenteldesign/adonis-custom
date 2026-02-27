@@ -1,0 +1,138 @@
+[21-Jan-2026 23:03:36 America/Sao_Paulo] PHP Fatal error:  Uncaught Exception: Erro BD: SQLSTATE[HY000] [1045] Access denied for user 'luizpi39_adns'@'localhost' (using password: YES) in /home1/luizpi39/adns.luizpimentel.com/adonis-custom/backend/models/Database.php:25
+Stack trace:
+#0 /home1/luizpi39/adns.luizpimentel.com/adonis-custom/backend/models/Servico.php(10): Database->getConnection()
+#1 /home1/luizpi39/adns.luizpimentel.com/adonis-custom/backend/controllers/ServicoController.php(9): Servico->__construct()
+#2 /home1/luizpi39/adns.luizpimentel.com/adonis-custom/backend/api/servicos.php(4): ServicoController->__construct()
+#3 {main}
+  thrown in /home1/luizpi39/adns.luizpimentel.com/adonis-custom/backend/models/Database.php on line 25
+[21-Jan-2026 23:04:03 America/Sao_Paulo] PHP Fatal error:  Uncaught Exception: Erro BD: SQLSTATE[HY000] [1045] Access denied for user 'luizpi39_adns'@'localhost' (using password: YES) in /home1/luizpi39/adns.luizpimentel.com/adonis-custom/backend/models/Database.php:25
+Stack trace:
+#0 /home1/luizpi39/adns.luizpimentel.com/adonis-custom/backend/models/Servico.php(10): Database->getConnection()
+#1 /home1/luizpi39/adns.luizpimentel.com/adonis-custom/backend/controllers/ServicoController.php(9): Servico->__construct()
+#2 /home1/luizpi39/adns.luizpimentel.com/adonis-custom/backend/api/servicos.php(4): ServicoController->__construct()
+#3 {main}
+  thrown in /home1/luizpi39/adns.luizpimentel.com/adonis-custom/backend/models/Database.php on line 25
+[23-Jan-2026 16:44:09 America/Sao_Paulo] PHP Deprecated:  strip_tags(): Passing null to parameter #1 ($string) of type string is deprecated in /home1/luizpi39/adns.luizpimentel.com/adonis-custom/backend/models/Instrumento.php on line 58
+[23-Jan-2026 16:44:09 America/Sao_Paulo] PHP Warning:  http_response_code(): Cannot set response code - headers already sent (output started at /home1/luizpi39/adns.luizpimentel.com/adonis-custom/backend/models/Instrumento.php:58) in /home1/luizpi39/adns.luizpimentel.com/adonis-custom/backend/api/preos.php on line 256
+[23-Jan-2026 16:47:30 America/Sao_Paulo] PHP Deprecated:  strip_tags(): Passing null to parameter #1 ($string) of type string is deprecated in /home1/luizpi39/adns.luizpimentel.com/adonis-custom/backend/models/Instrumento.php on line 58
+[23-Jan-2026 16:47:30 America/Sao_Paulo] PHP Warning:  http_response_code(): Cannot set response code - headers already sent (output started at /home1/luizpi39/adns.luizpimentel.com/adonis-custom/backend/models/Instrumento.php:58) in /home1/luizpi39/adns.luizpimentel.com/adonis-custom/backend/api/preos.php on line 256
+[23-Jan-2026 19:17:48 America/Fortaleza] PHP Warning:  require_once(../config/database.php): Failed to open stream: No such file or directory in /home1/luizpi39/adns.luizpimentel.com/adonis-custom/backend/api/os.php on line 7
+[23-Jan-2026 19:17:48 America/Fortaleza] PHP Fatal error:  Uncaught Error: Failed opening required '../config/database.php' (include_path='.:/opt/cpanel/ea-php83/root/usr/share/pear') in /home1/luizpi39/adns.luizpimentel.com/adonis-custom/backend/api/os.php:7
+Stack trace:
+#0 {main}
+  thrown in /home1/luizpi39/adns.luizpimentel.com/adonis-custom/backend/api/os.php on line 7
+[23-Jan-2026 23:21:52 America/Fortaleza] PHP Warning:  require_once(../config/database.php): Failed to open stream: No such file or directory in /home1/luizpi39/adns.luizpimentel.com/adonis-custom/backend/api/os.php on line 7
+[23-Jan-2026 23:21:52 America/Fortaleza] PHP Fatal error:  Uncaught Error: Failed opening required '../config/database.php' (include_path='.:/opt/cpanel/ea-php83/root/usr/share/pear') in /home1/luizpi39/adns.luizpimentel.com/adonis-custom/backend/api/os.php:7
+Stack trace:
+#0 {main}
+  thrown in /home1/luizpi39/adns.luizpimentel.com/adonis-custom/backend/api/os.php on line 7
+[24-Jan-2026 12:02:40 America/Fortaleza] PHP Warning:  require_once(../config/database.php): Failed to open stream: No such file or directory in /home1/luizpi39/adns.luizpimentel.com/adonis-custom/backend/api/os.php on line 7
+[24-Jan-2026 12:02:40 America/Fortaleza] PHP Fatal error:  Uncaught Error: Failed opening required '../config/database.php' (include_path='.:/opt/cpanel/ea-php83/root/usr/share/pear') in /home1/luizpi39/adns.luizpimentel.com/adonis-custom/backend/api/os.php:7
+Stack trace:
+#0 {main}
+  thrown in /home1/luizpi39/adns.luizpimentel.com/adonis-custom/backend/api/os.php on line 7
+[24-Jan-2026 12:03:02 America/Fortaleza] PHP Warning:  require_once(../config/database.php): Failed to open stream: No such file or directory in /home1/luizpi39/adns.luizpimentel.com/adonis-custom/backend/api/os.php on line 7
+[24-Jan-2026 12:03:02 America/Fortaleza] PHP Fatal error:  Uncaught Error: Failed opening required '../config/database.php' (include_path='.:/opt/cpanel/ea-php83/root/usr/share/pear') in /home1/luizpi39/adns.luizpimentel.com/adonis-custom/backend/api/os.php:7
+Stack trace:
+#0 {main}
+  thrown in /home1/luizpi39/adns.luizpimentel.com/adonis-custom/backend/api/os.php on line 7
+[24-Jan-2026 12:03:04 America/Fortaleza] PHP Warning:  require_once(../config/database.php): Failed to open stream: No such file or directory in /home1/luizpi39/adns.luizpimentel.com/adonis-custom/backend/api/os.php on line 7
+[24-Jan-2026 12:03:04 America/Fortaleza] PHP Fatal error:  Uncaught Error: Failed opening required '../config/database.php' (include_path='.:/opt/cpanel/ea-php83/root/usr/share/pear') in /home1/luizpi39/adns.luizpimentel.com/adonis-custom/backend/api/os.php:7
+Stack trace:
+#0 {main}
+  thrown in /home1/luizpi39/adns.luizpimentel.com/adonis-custom/backend/api/os.php on line 7
+[24-Jan-2026 12:06:35 America/Fortaleza] PHP Warning:  require_once(../config/database.php): Failed to open stream: No such file or directory in /home1/luizpi39/adns.luizpimentel.com/adonis-custom/backend/api/os.php on line 7
+[24-Jan-2026 12:06:35 America/Fortaleza] PHP Fatal error:  Uncaught Error: Failed opening required '../config/database.php' (include_path='.:/opt/cpanel/ea-php83/root/usr/share/pear') in /home1/luizpi39/adns.luizpimentel.com/adonis-custom/backend/api/os.php:7
+Stack trace:
+#0 {main}
+  thrown in /home1/luizpi39/adns.luizpimentel.com/adonis-custom/backend/api/os.php on line 7
+[24-Jan-2026 12:06:45 America/Fortaleza] PHP Warning:  require_once(../config/database.php): Failed to open stream: No such file or directory in /home1/luizpi39/adns.luizpimentel.com/adonis-custom/backend/api/os.php on line 7
+[24-Jan-2026 12:06:45 America/Fortaleza] PHP Fatal error:  Uncaught Error: Failed opening required '../config/database.php' (include_path='.:/opt/cpanel/ea-php83/root/usr/share/pear') in /home1/luizpi39/adns.luizpimentel.com/adonis-custom/backend/api/os.php:7
+Stack trace:
+#0 {main}
+  thrown in /home1/luizpi39/adns.luizpimentel.com/adonis-custom/backend/api/os.php on line 7
+[24-Jan-2026 12:08:59 America/Fortaleza] PHP Warning:  require_once(../config/database.php): Failed to open stream: No such file or directory in /home1/luizpi39/adns.luizpimentel.com/adonis-custom/backend/api/os.php on line 7
+[24-Jan-2026 12:08:59 America/Fortaleza] PHP Fatal error:  Uncaught Error: Failed opening required '../config/database.php' (include_path='.:/opt/cpanel/ea-php83/root/usr/share/pear') in /home1/luizpi39/adns.luizpimentel.com/adonis-custom/backend/api/os.php:7
+Stack trace:
+#0 {main}
+  thrown in /home1/luizpi39/adns.luizpimentel.com/adonis-custom/backend/api/os.php on line 7
+[24-Jan-2026 12:11:16 America/Fortaleza] PHP Warning:  require_once(../config/database.php): Failed to open stream: No such file or directory in /home1/luizpi39/adns.luizpimentel.com/adonis-custom/backend/api/os.php on line 7
+[24-Jan-2026 12:11:16 America/Fortaleza] PHP Fatal error:  Uncaught Error: Failed opening required '../config/database.php' (include_path='.:/opt/cpanel/ea-php83/root/usr/share/pear') in /home1/luizpi39/adns.luizpimentel.com/adonis-custom/backend/api/os.php:7
+Stack trace:
+#0 {main}
+  thrown in /home1/luizpi39/adns.luizpimentel.com/adonis-custom/backend/api/os.php on line 7
+[24-Jan-2026 12:11:18 America/Fortaleza] PHP Warning:  require_once(../config/database.php): Failed to open stream: No such file or directory in /home1/luizpi39/adns.luizpimentel.com/adonis-custom/backend/api/os.php on line 7
+[24-Jan-2026 12:11:18 America/Fortaleza] PHP Fatal error:  Uncaught Error: Failed opening required '../config/database.php' (include_path='.:/opt/cpanel/ea-php83/root/usr/share/pear') in /home1/luizpi39/adns.luizpimentel.com/adonis-custom/backend/api/os.php:7
+Stack trace:
+#0 {main}
+  thrown in /home1/luizpi39/adns.luizpimentel.com/adonis-custom/backend/api/os.php on line 7
+[24-Jan-2026 12:11:27 America/Fortaleza] PHP Warning:  require_once(../config/database.php): Failed to open stream: No such file or directory in /home1/luizpi39/adns.luizpimentel.com/adonis-custom/backend/api/os.php on line 7
+[24-Jan-2026 12:11:27 America/Fortaleza] PHP Fatal error:  Uncaught Error: Failed opening required '../config/database.php' (include_path='.:/opt/cpanel/ea-php83/root/usr/share/pear') in /home1/luizpi39/adns.luizpimentel.com/adonis-custom/backend/api/os.php:7
+Stack trace:
+#0 {main}
+  thrown in /home1/luizpi39/adns.luizpimentel.com/adonis-custom/backend/api/os.php on line 7
+[24-Jan-2026 12:11:30 America/Fortaleza] PHP Warning:  require_once(../config/database.php): Failed to open stream: No such file or directory in /home1/luizpi39/adns.luizpimentel.com/adonis-custom/backend/api/os.php on line 7
+[24-Jan-2026 12:11:30 America/Fortaleza] PHP Fatal error:  Uncaught Error: Failed opening required '../config/database.php' (include_path='.:/opt/cpanel/ea-php83/root/usr/share/pear') in /home1/luizpi39/adns.luizpimentel.com/adonis-custom/backend/api/os.php:7
+Stack trace:
+#0 {main}
+  thrown in /home1/luizpi39/adns.luizpimentel.com/adonis-custom/backend/api/os.php on line 7
+[24-Jan-2026 12:14:25 America/Fortaleza] PHP Warning:  require_once(../config/database.php): Failed to open stream: No such file or directory in /home1/luizpi39/adns.luizpimentel.com/adonis-custom/backend/api/os.php on line 7
+[24-Jan-2026 12:14:25 America/Fortaleza] PHP Fatal error:  Uncaught Error: Failed opening required '../config/database.php' (include_path='.:/opt/cpanel/ea-php83/root/usr/share/pear') in /home1/luizpi39/adns.luizpimentel.com/adonis-custom/backend/api/os.php:7
+Stack trace:
+#0 {main}
+  thrown in /home1/luizpi39/adns.luizpimentel.com/adonis-custom/backend/api/os.php on line 7
+[24-Jan-2026 12:15:48 America/Sao_Paulo] PHP Fatal error:  Uncaught Error: Call to undefined method Database::getInstance() in /home1/luizpi39/adns.luizpimentel.com/adonis-custom/backend/api/os.php:36
+Stack trace:
+#0 /home1/luizpi39/adns.luizpimentel.com/adonis-custom/backend/api/os.php(17): listarPreOS()
+#1 {main}
+  thrown in /home1/luizpi39/adns.luizpimentel.com/adonis-custom/backend/api/os.php on line 36
+[24-Jan-2026 12:16:35 America/Sao_Paulo] PHP Fatal error:  Uncaught Error: Call to a member function query() on null in /home1/luizpi39/adns.luizpimentel.com/adonis-custom/backend/api/os.php:36
+Stack trace:
+#0 /home1/luizpi39/adns.luizpimentel.com/adonis-custom/backend/api/os.php(16): listarPreOS()
+#1 {main}
+  thrown in /home1/luizpi39/adns.luizpimentel.com/adonis-custom/backend/api/os.php on line 36
+[24-Jan-2026 12:16:39 America/Sao_Paulo] PHP Fatal error:  Uncaught Error: Call to a member function query() on null in /home1/luizpi39/adns.luizpimentel.com/adonis-custom/backend/api/os.php:36
+Stack trace:
+#0 /home1/luizpi39/adns.luizpimentel.com/adonis-custom/backend/api/os.php(16): listarPreOS()
+#1 {main}
+  thrown in /home1/luizpi39/adns.luizpimentel.com/adonis-custom/backend/api/os.php on line 36
+[24-Jan-2026 13:10:21 America/Fortaleza] PHP Warning:  require_once(../config/database.php): Failed to open stream: No such file or directory in /home1/luizpi39/adns.luizpimentel.com/adonis-custom/backend/api/preos.php on line 7
+[24-Jan-2026 13:10:21 America/Fortaleza] PHP Fatal error:  Uncaught Error: Failed opening required '../config/database.php' (include_path='.:/opt/cpanel/ea-php83/root/usr/share/pear') in /home1/luizpi39/adns.luizpimentel.com/adonis-custom/backend/api/preos.php:7
+Stack trace:
+#0 {main}
+  thrown in /home1/luizpi39/adns.luizpimentel.com/adonis-custom/backend/api/preos.php on line 7
+[24-Jan-2026 13:17:12 America/Fortaleza] PHP Warning:  require_once(../config/database.php): Failed to open stream: No such file or directory in /home1/luizpi39/adns.luizpimentel.com/adonis-custom/backend/api/preos.php on line 7
+[24-Jan-2026 13:17:12 America/Fortaleza] PHP Fatal error:  Uncaught Error: Failed opening required '../config/database.php' (include_path='.:/opt/cpanel/ea-php83/root/usr/share/pear') in /home1/luizpi39/adns.luizpimentel.com/adonis-custom/backend/api/preos.php:7
+Stack trace:
+#0 {main}
+  thrown in /home1/luizpi39/adns.luizpimentel.com/adonis-custom/backend/api/preos.php on line 7
+[24-Jan-2026 13:17:54 America/Fortaleza] PHP Warning:  require_once(../config/database.php): Failed to open stream: No such file or directory in /home1/luizpi39/adns.luizpimentel.com/adonis-custom/backend/api/preos.php on line 7
+[24-Jan-2026 13:17:54 America/Fortaleza] PHP Fatal error:  Uncaught Error: Failed opening required '../config/database.php' (include_path='.:/opt/cpanel/ea-php83/root/usr/share/pear') in /home1/luizpi39/adns.luizpimentel.com/adonis-custom/backend/api/preos.php:7
+Stack trace:
+#0 {main}
+  thrown in /home1/luizpi39/adns.luizpimentel.com/adonis-custom/backend/api/preos.php on line 7
+[24-Jan-2026 13:18:32 America/Fortaleza] PHP Warning:  require_once(../config/database.php): Failed to open stream: No such file or directory in /home1/luizpi39/adns.luizpimentel.com/adonis-custom/backend/api/preos.php on line 7
+[24-Jan-2026 13:18:32 America/Fortaleza] PHP Fatal error:  Uncaught Error: Failed opening required '../config/database.php' (include_path='.:/opt/cpanel/ea-php83/root/usr/share/pear') in /home1/luizpi39/adns.luizpimentel.com/adonis-custom/backend/api/preos.php:7
+Stack trace:
+#0 {main}
+  thrown in /home1/luizpi39/adns.luizpimentel.com/adonis-custom/backend/api/preos.php on line 7
+[24-Jan-2026 13:21:48 America/Sao_Paulo] PHP Fatal error:  Uncaught Error: Call to undefined function getDBConnection() in /home1/luizpi39/adns.luizpimentel.com/adonis-custom/backend/api/preos.php:9
+Stack trace:
+#0 {main}
+  thrown in /home1/luizpi39/adns.luizpimentel.com/adonis-custom/backend/api/preos.php on line 9
+[24-Jan-2026 13:22:25 America/Sao_Paulo] PHP Fatal error:  Uncaught Error: Call to undefined function getDBConnection() in /home1/luizpi39/adns.luizpimentel.com/adonis-custom/backend/api/preos.php:9
+Stack trace:
+#0 {main}
+  thrown in /home1/luizpi39/adns.luizpimentel.com/adonis-custom/backend/api/preos.php on line 9
+[24-Jan-2026 13:22:40 America/Sao_Paulo] PHP Fatal error:  Uncaught Error: Call to undefined function getDBConnection() in /home1/luizpi39/adns.luizpimentel.com/adonis-custom/backend/api/preos.php:9
+Stack trace:
+#0 {main}
+  thrown in /home1/luizpi39/adns.luizpimentel.com/adonis-custom/backend/api/preos.php on line 9
+[24-Jan-2026 13:22:54 America/Sao_Paulo] PHP Fatal error:  Uncaught Error: Call to undefined function getDBConnection() in /home1/luizpi39/adns.luizpimentel.com/adonis-custom/backend/api/preos.php:9
+Stack trace:
+#0 {main}
+  thrown in /home1/luizpi39/adns.luizpimentel.com/adonis-custom/backend/api/preos.php on line 9
+[24-Jan-2026 13:23:15 America/Sao_Paulo] PHP Fatal error:  Uncaught Error: Call to undefined function getDBConnection() in /home1/luizpi39/adns.luizpimentel.com/adonis-custom/backend/api/preos.php:9
+Stack trace:
+#0 {main}
+  thrown in /home1/luizpi39/adns.luizpimentel.com/adonis-custom/backend/api/preos.php on line 9

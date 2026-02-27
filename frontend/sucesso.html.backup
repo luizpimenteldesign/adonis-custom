@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pedido Enviado com Sucesso - Adonis Luthieria</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .success-card {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            max-width: 600px;
+            width: 100%;
+            padding: 40px;
+            text-align: center;
+        }
+        .success-icon {
+            background: #4caf50;
+            color: white;
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 20px;
+            animation: scaleIn 0.5s ease-out;
+        }
+        @keyframes scaleIn {
+            from { transform: scale(0); }
+            to { transform: scale(1); }
+        }
+        .token-display {
+            background: #f5f5f5;
+            border: 2px dashed #ff6b35;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 30px 0;
+            font-family: 'Courier New', monospace;
+        }
+        .token-value {
+            font-size: 18px;
+            font-weight: bold;
+            color: #ff6b35;
+            word-break: break-all;
+        }
+        .info-box {
+            background: #e3f2fd;
+            border-left: 4px solid #2196f3;
+            padding: 15px;
+            margin: 20px 0;
+            text-align: left;
+        }
+        .btn-copy {
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="success-card">
+        <div class="success-icon">
+            <span class="material-icons" style="font-size: 48px;">check_circle</span>
+        </div>
+        
+        <h2 class="mb-3">Pedido Enviado com Sucesso!</h2>
+        <p class="text-muted">Seu pedido de orçamento foi recebido e está sendo analisado.</p>
+        
+        <div class="token-display">
+            <p class="mb-2"><strong>Código de Acompanhamento:</strong></p>
+            <div class="token-value" id="codigo-acompanhamento">Carregando...</div>
+            <button class="btn btn-sm btn-outline-primary btn-copy" onclick="copiarCodigo()">
+                <span class="material-icons" style="font-size: 16px; vertical-align: middle;">content_copy</span>
+                Copiar Código
+            </button>
+        </div>
+        
+        <div class="info-box">
+            <p class="mb-2"><strong><span class="material-icons" style="font-size: 18px; vertical-align: middle;">info</span> Informações do Pedido:</strong></p>
+            <p class="mb-1"><strong>Número:</strong> <span id="numero-pedido">-</span></p>
+            <p class="mb-1"><strong>Instrumento:</strong> <span id="tipo-instrumento">-</span></p>
+            <p class="mb-0"><strong>Status:</strong> <span class="badge bg-primary" id="status-pedido">Pré-OS</span></p>
+        </div>
+        
+        <div class="alert alert-warning mt-3">
+            <span class="material-icons" style="font-size: 20px; vertical-align: middle;">schedule</span>
+            <strong>Próximos Passos:</strong><br>
+            Entraremos em contato em até 24 horas para confirmar seu orçamento.
+        </div>
+        
+        <div class="d-grid gap-2 mt-4">
+            <a href="index.html" class="btn btn-primary">
+                <span class="material-icons" style="font-size: 18px; vertical-align: middle;">home</span>
+                Voltar para Página Inicial
+            </a>
+            <button class="btn btn-outline-secondary" onclick="window.print()">
+                <span class="material-icons" style="font-size: 18px; vertical-align: middle;">print</span>
+                Imprimir Comprovante
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // Função para extrair parâmetros da URL
+        function obterParametrosURL() {
+            const params = new URLSearchParams(window.location.search);
+            return {
+                token: params.get('token'),
+                pedido: params.get('pedido'),
+                instrumento: params.get('instrumento')
+            };
+        }
+
+        // Função para exibir os dados
+        function carregarDados() {
+            const dados = obterParametrosURL();
+            
+            console.log('Parâmetros recebidos:', dados);
+            
+            // Código de acompanhamento (token)
+            const elementoCodigo = document.getElementById('codigo-acompanhamento');
+            if (dados.token) {
+                elementoCodigo.textContent = dados.token;
+            } else {
+                elementoCodigo.textContent = 'Token não encontrado';
+                elementoCodigo.style.color = '#f44336';
+            }
+            
+            // Número do pedido
+            const elementoPedido = document.getElementById('numero-pedido');
+            if (dados.pedido) {
+                elementoPedido.textContent = `#${dados.pedido}`;
+            } else {
+                elementoPedido.textContent = 'Não informado';
+            }
+            
+            // Tipo de instrumento
+            const elementoInstrumento = document.getElementById('tipo-instrumento');
+            if (dados.instrumento) {
+                elementoInstrumento.textContent = dados.instrumento;
+            } else {
+                elementoInstrumento.textContent = 'Não informado';
+            }
+        }
+
+        // Função para copiar código
+        function copiarCodigo() {
+            const codigo = document.getElementById('codigo-acompanhamento').textContent;
+            
+            if (navigator.clipboard) {
+                navigator.clipboard.writeText(codigo).then(() => {
+                    alert('✅ Código copiado para a área de transferência!');
+                }).catch(err => {
+                    console.error('Erro ao copiar:', err);
+                    copiarFallback(codigo);
+                });
+            } else {
+                copiarFallback(codigo);
+            }
+        }
+
+        // Fallback para navegadores antigos
+        function copiarFallback(texto) {
+            const textarea = document.createElement('textarea');
+            textarea.value = texto;
+            textarea.style.position = 'fixed';
+            textarea.style.opacity = '0';
+            document.body.appendChild(textarea);
+            textarea.select();
+            
+            try {
+                document.execCommand('copy');
+                alert('✅ Código copiado!');
+            } catch (err) {
+                alert('❌ Não foi possível copiar automaticamente. Por favor, copie manualmente.');
+            }
+            
+            document.body.removeChild(textarea);
+        }
+
+        // Carregar dados ao abrir a página
+        document.addEventListener('DOMContentLoaded', carregarDados);
+    </script>
+</body>
+</html>

@@ -1,6 +1,3 @@
-<?php
-// index.php - Formulário de Solicitação de Orçamento
-?>
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -9,7 +6,7 @@
     <meta name="description" content="Solicite orçamento para manutenção e customização de instrumentos musicais">
     <title>Solicitar Orçamento - Adonis Luthieria</title>
 
-    <!-- FAVICON -->
+    <!-- FAVICON CORRIGIDO -->
     <link rel="icon" type="image/x-icon" href="public/assets/img/favicon.ico">
     <link rel="shortcut icon" type="image/x-icon" href="public/assets/img/favicon.ico">
 
