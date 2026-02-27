@@ -1,7 +1,7 @@
 /**
  * SISTEMA ADONIS - PAINEL ADMINISTRATIVO
  * Estilos centralizados
- * Versão: 1.1
+ * Versão: 1.2
  * Data: 27/02/2026
  */
 
@@ -88,10 +88,10 @@ body {
    ======================================== */
 
 .header {
-    background: linear-gradient(135deg, #1e293b 0%, #334155 50%, #0f172a 100%);
     color: white;
+    background-color: #000000;
     padding: 16px 24px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
     display: flex;
     justify-content: space-between;
     align-items: center;
