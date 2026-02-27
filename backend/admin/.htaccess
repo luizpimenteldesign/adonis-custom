@@ -1,0 +1,14 @@
+# Bloquear acesso direto a arquivos sensíveis
+<FilesMatch "^(error_log|auth\.php|config\.php|\.env)$">
+    Order Allow,Deny
+    Deny from all
+</FilesMatch>
+
+# Bloquear listagem de diretório
+Options -Indexes
+
+# Bloquear acesso a arquivos de utilitário após uso
+<FilesMatch "criar_tabela_historico\.php$">
+    Order Allow,Deny
+    Deny from all
+</FilesMatch>

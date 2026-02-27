@@ -1,14 +1,14 @@
 <?php
 /**
  * DETALHES DO PEDIDO - SISTEMA ADONIS
- * Versão: 2.3
+ * Versão: 3.0
  * Data: 27/02/2026
  */
 
 require_once 'auth.php';
 require_once '../config/Database.php';
 
-$db = new Database();
+$db   = new Database();
 $conn = $db->getConnection();
 
 if (!isset($_GET['id']) || !is_numeric($_GET['id'])) {
@@ -20,61 +20,59 @@ $preos_id = (int)$_GET['id'];
 
 try {
     $stmt = $conn->prepare("
-        SELECT 
+        SELECT
             p.*,
-            c.nome as cliente_nome,
-            c.telefone as cliente_telefone,
-            c.email as cliente_email,
-            c.endereco as cliente_endereco,
-            i.id as instrumento_id,
-            i.tipo as instrumento_tipo,
-            i.marca as instrumento_marca,
-            i.modelo as instrumento_modelo,
-            i.referencia as instrumento_referencia,
-            i.cor as instrumento_cor,
+            c.nome as cliente_nome, c.telefone as cliente_telefone,
+            c.email as cliente_email, c.endereco as cliente_endereco,
+            i.id as instrumento_id, i.tipo as instrumento_tipo,
+            i.marca as instrumento_marca, i.modelo as instrumento_modelo,
+            i.referencia as instrumento_referencia, i.cor as instrumento_cor,
             i.numero_serie as instrumento_serie
         FROM pre_os p
         LEFT JOIN clientes c ON p.cliente_id = c.id
         LEFT JOIN instrumentos i ON p.instrumento_id = i.id
-        WHERE p.id = :id
-        LIMIT 1
+        WHERE p.id = :id LIMIT 1
     ");
     $stmt->bindParam(':id', $preos_id);
     $stmt->execute();
     $pedido = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    if (!$pedido) {
-        header('Location: dashboard.php?erro=nao_encontrado');
-        exit;
-    }
+    if (!$pedido) { header('Location: dashboard.php?erro=nao_encontrado'); exit; }
 
     $stmt_servicos = $conn->prepare("
         SELECT s.id, s.nome, s.descricao, s.valor_base, s.prazo_base
-        FROM pre_os_servicos ps
-        JOIN servicos s ON ps.servico_id = s.id
+        FROM pre_os_servicos ps JOIN servicos s ON ps.servico_id = s.id
         WHERE ps.pre_os_id = :pre_os_id
     ");
-    $stmt_servicos->bindParam(':pre_os_id', $preos_id);
-    $stmt_servicos->execute();
+    $stmt_servicos->execute([':pre_os_id' => $preos_id]);
     $servicos = $stmt_servicos->fetchAll(PDO::FETCH_ASSOC);
 
     $fotos = [];
     if (!empty($pedido['instrumento_id'])) {
         $stmt_fotos = $conn->prepare("
-            SELECT caminho, ordem
-            FROM instrumento_fotos
-            WHERE instrumento_id = :instrumento_id
-            ORDER BY ordem ASC
+            SELECT caminho, ordem FROM instrumento_fotos
+            WHERE instrumento_id = :instrumento_id ORDER BY ordem ASC
         ");
-        $stmt_fotos->bindParam(':instrumento_id', $pedido['instrumento_id']);
-        $stmt_fotos->execute();
+        $stmt_fotos->execute([':instrumento_id' => $pedido['instrumento_id']]);
         $fotos = $stmt_fotos->fetchAll(PDO::FETCH_ASSOC);
     }
 
+    // Histórico de status
+    $historico = [];
+    try {
+        $stmt_hist = $conn->prepare("
+            SELECT h.status, h.valor_orcamento, h.motivo, h.criado_em, a.nome as admin_nome
+            FROM status_historico h
+            LEFT JOIN admins a ON h.admin_id = a.id
+            WHERE h.pre_os_id = :id ORDER BY h.criado_em ASC
+        ");
+        $stmt_hist->execute([':id' => $preos_id]);
+        $historico = $stmt_hist->fetchAll(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) { /* tabela pode ainda não existir */ }
+
 } catch (PDOException $e) {
-    error_log('Erro ao buscar detalhes: ' . $e->getMessage());
-    header('Location: dashboard.php?erro=banco');
-    exit;
+    error_log('Erro detalhes: ' . $e->getMessage());
+    header('Location: dashboard.php?erro=banco'); exit;
 }
 
 function formatarStatusDetalhes($status) {
@@ -89,6 +87,8 @@ function formatarStatusDetalhes($status) {
     ];
     return $badges[$status] ?? '<span class="badge badge-secondary">' . htmlspecialchars($status) . '</span>';
 }
+
+$v = time();
 ?>
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -99,7 +99,57 @@ function formatarStatusDetalhes($status) {
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="assets/css/admin.css?v=<?php echo time(); ?>">
+    <link rel="stylesheet" href="assets/css/admin.css?v=<?php echo $v; ?>">
+    <style>
+        /* Modal */
+        .modal-overlay {
+            display: none; position: fixed; inset: 0;
+            background: rgba(0,0,0,.5); z-index: 1000;
+            justify-content: center; align-items: center;
+        }
+        .modal-overlay.aberto { display: flex; }
+        .modal-box {
+            background: #fff; border-radius: 12px; padding: 32px;
+            width: 100%; max-width: 440px; box-shadow: 0 8px 32px rgba(0,0,0,.2);
+        }
+        .modal-title { font-size: 18px; font-weight: 600; margin-bottom: 20px; color: #333; }
+        .modal-box label { display:block; font-size:13px; font-weight:600; color:#555; margin-bottom:6px; }
+        .modal-box input[type=number], .modal-box textarea {
+            width: 100%; padding: 10px 14px; border: 2px solid #e0e0e0;
+            border-radius: 8px; font-size: 14px; box-sizing: border-box;
+            transition: border-color .2s; font-family: inherit;
+        }
+        .modal-box input[type=number]:focus, .modal-box textarea:focus {
+            outline: none; border-color: #0d9488;
+        }
+        .modal-box textarea { resize: vertical; min-height: 100px; }
+        .modal-actions { display:flex; gap:12px; margin-top:20px; justify-content:flex-end; }
+        /* Linha do tempo */
+        .timeline { list-style: none; padding: 0; margin: 0; position: relative; }
+        .timeline::before {
+            content: ''; position: absolute; left: 18px; top: 0; bottom: 0;
+            width: 2px; background: #e0e0e0;
+        }
+        .timeline-item {
+            display: flex; gap: 16px; padding: 0 0 24px 0;
+            position: relative;
+        }
+        .timeline-dot {
+            width: 36px; height: 36px; border-radius: 50%;
+            background: #0d9488; color: #fff; display: flex;
+            align-items: center; justify-content: center;
+            font-size: 16px; flex-shrink: 0; z-index: 1;
+        }
+        .timeline-content { flex: 1; padding-top: 4px; }
+        .timeline-status { font-weight: 600; font-size: 15px; color: #333; }
+        .timeline-meta { font-size: 12px; color: #888; margin-top: 2px; }
+        .timeline-detalhe {
+            margin-top: 6px; padding: 8px 12px; border-radius: 6px;
+            font-size: 13px;
+        }
+        .timeline-detalhe.valor { background: #e8f5e9; color: #2e7d32; }
+        .timeline-detalhe.motivo { background: #ffebee; color: #c62828; }
+    </style>
 </head>
 <body>
     <header class="header">
@@ -118,17 +168,28 @@ function formatarStatusDetalhes($status) {
 
     <div class="container">
 
+        <!-- STATUS E AÇÕES -->
         <div class="card">
             <div class="card-header">
                 <div>
                     <h2 class="card-title">Status do Pedido</h2>
-                    <div id="status-badge"><?php echo formatarStatusDetalhes($pedido['status']); ?></div>
+                    <div id="status-badge" style="margin-top:8px"><?php echo formatarStatusDetalhes($pedido['status']); ?></div>
+                    <?php if (!empty($pedido['valor_orcamento'])): ?>
+                    <div style="margin-top:8px;font-size:14px;color:#2e7d32;font-weight:600">
+                        💰 Orçamento: R$ <?php echo number_format($pedido['valor_orcamento'], 2, ',', '.'); ?>
+                    </div>
+                    <?php endif; ?>
+                    <?php if (!empty($pedido['motivo_reprovacao'])): ?>
+                    <div style="margin-top:8px;font-size:13px;color:#c62828;background:#ffebee;padding:8px 12px;border-radius:6px">
+                        ❌ Motivo: <?php echo htmlspecialchars($pedido['motivo_reprovacao']); ?>
+                    </div>
+                    <?php endif; ?>
                 </div>
                 <div class="actions">
                     <button class="btn btn-info"    onclick="atualizarStatus('Em analise')">🔍 Analisar</button>
-                    <button class="btn btn-warning" onclick="atualizarStatus('Orcada')">💰 Orçar</button>
+                    <button class="btn btn-warning" onclick="abrirModalOrcamento()">💰 Orçar</button>
                     <button class="btn btn-success" onclick="atualizarStatus('Aprovada')">✅ Aprovar</button>
-                    <button class="btn btn-danger"  onclick="atualizarStatus('Reprovada')">❌ Reprovar</button>
+                    <button class="btn btn-danger"  onclick="abrirModalReprovacao()">❌ Reprovar</button>
                     <button class="btn btn-dark"    onclick="atualizarStatus('Cancelada')">🚫 Cancelar</button>
                 </div>
             </div>
@@ -144,6 +205,7 @@ function formatarStatusDetalhes($status) {
             </div>
         </div>
 
+        <!-- DADOS DO CLIENTE -->
         <div class="card">
             <div class="card-header"><h2 class="card-title">👤 Dados do Cliente</h2></div>
             <div class="info-grid">
@@ -178,6 +240,7 @@ function formatarStatusDetalhes($status) {
             </div>
         </div>
 
+        <!-- DADOS DO INSTRUMENTO -->
         <div class="card">
             <div class="card-header"><h2 class="card-title">🎸 Dados do Instrumento</h2></div>
             <div class="info-grid">
@@ -196,10 +259,11 @@ function formatarStatusDetalhes($status) {
             </div>
         </div>
 
+        <!-- SERVIÇOS -->
         <div class="card">
             <div class="card-header"><h2 class="card-title">🔧 Serviços Solicitados</h2></div>
             <?php if (empty($servicos)): ?>
-                <div class="empty-state" style="padding:20px;color:#888;">Nenhum serviço selecionado</div>
+                <div style="padding:20px;color:#888;">Nenhum serviço selecionado</div>
             <?php else: ?>
                 <table>
                     <thead><tr><th>Serviço</th><th>Descrição</th><th>Valor Base</th><th>Prazo</th></tr></thead>
@@ -217,6 +281,7 @@ function formatarStatusDetalhes($status) {
             <?php endif; ?>
         </div>
 
+        <!-- FOTOS -->
         <?php if (!empty($fotos)): ?>
         <div class="card">
             <div class="card-header"><h2 class="card-title">📷 Fotos do Instrumento</h2></div>
@@ -230,6 +295,7 @@ function formatarStatusDetalhes($status) {
         </div>
         <?php endif; ?>
 
+        <!-- OBSERVAÇÕES -->
         <?php if (!empty($pedido['observacoes'])): ?>
         <div class="card">
             <div class="card-header"><h2 class="card-title">📝 Observações do Cliente</h2></div>
@@ -237,35 +303,96 @@ function formatarStatusDetalhes($status) {
         </div>
         <?php endif; ?>
 
+        <!-- HISTÓRICO DE STATUS -->
         <div class="card">
-            <div class="card-header"><h2 class="card-title">🔑 Código de Acompanhamento</h2></div>
+            <div class="card-header"><h2 class="card-title">🕓 Histórico de Status</h2></div>
+            <?php if (empty($historico)): ?>
+                <div style="color:#888;font-size:14px;padding:8px 0">Nenhuma alteração registrada ainda.</div>
+            <?php else: ?>
+                <ul class="timeline">
+                <?php
+                $icones = [
+                    'Pre-OS'               => '🗒️',
+                    'Em analise'           => '🔍',
+                    'Orcada'               => '💰',
+                    'Aguardando aprovacao' => '⏳',
+                    'Aprovada'             => '✅',
+                    'Reprovada'            => '❌',
+                    'Cancelada'            => '🚫',
+                ];
+                foreach ($historico as $h):
+                    $icone = $icones[$h['status']] ?? '•';
+                ?>
+                <li class="timeline-item">
+                    <div class="timeline-dot"><?php echo $icone; ?></div>
+                    <div class="timeline-content">
+                        <div class="timeline-status"><?php echo htmlspecialchars($h['status']); ?></div>
+                        <div class="timeline-meta">
+                            <?php echo date('d/m/Y H:i', strtotime($h['criado_em'])); ?>
+                            <?php if (!empty($h['admin_nome'])): ?> &mdash; <?php echo htmlspecialchars($h['admin_nome']); ?><?php endif; ?>
+                        </div>
+                        <?php if (!empty($h['valor_orcamento'])): ?>
+                        <div class="timeline-detalhe valor">💰 Orçamento: R$ <?php echo number_format($h['valor_orcamento'], 2, ',', '.'); ?></div>
+                        <?php endif; ?>
+                        <?php if (!empty($h['motivo'])): ?>
+                        <div class="timeline-detalhe motivo">Motivo: <?php echo htmlspecialchars($h['motivo']); ?></div>
+                        <?php endif; ?>
+                    </div>
+                </li>
+                <?php endforeach; ?>
+                </ul>
+            <?php endif; ?>
+        </div>
+
+        <!-- TOKEN -->
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title">🔑 Código de Acompanhamento</h2>
+                <a href="../../frontend/public/acompanhar.php?token=<?php echo urlencode($pedido['public_token']); ?>" target="_blank" class="btn btn-primary">👁️ Ver página do cliente</a>
+            </div>
             <div class="token-box"><?php echo htmlspecialchars($pedido['public_token']); ?></div>
         </div>
 
     </div>
 
-    <!-- JS inline: garante que atualizarStatus esteja sempre disponível independente do cache do admin.js -->
+    <!-- MODAL ORÇAMENTO -->
+    <div class="modal-overlay" id="modal-orcamento">
+        <div class="modal-box">
+            <div class="modal-title">💰 Definir Valor do Orçamento</div>
+            <label for="input-valor">Valor total do orçamento (R$)</label>
+            <input type="number" id="input-valor" min="0" step="0.01" placeholder="Ex: 350.00">
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="fecharModal('modal-orcamento')">Cancelar</button>
+                <button class="btn btn-warning" onclick="confirmarOrcamento()">💰 Confirmar Orçamento</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL REPROVAÇÃO -->
+    <div class="modal-overlay" id="modal-reprovacao">
+        <div class="modal-box">
+            <div class="modal-title">❌ Motivo da Reprovação</div>
+            <label for="input-motivo">Descreva o motivo da reprovação</label>
+            <textarea id="input-motivo" placeholder="Ex: Cliente desistiu do serviço..."></textarea>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="fecharModal('modal-reprovacao')">Cancelar</button>
+                <button class="btn btn-danger" onclick="confirmarReprovacao()">❌ Confirmar Reprovação</button>
+            </div>
+        </div>
+    </div>
+
     <script>
     const _pedidoId = <?php echo $preos_id; ?>;
 
     const _statusLabels = {
-        'Pre-OS':               '🗒️ Pré-OS',
-        'Em analise':           '🔍 Em Análise',
-        'Orcada':               '💰 Orçada',
-        'Aguardando aprovacao': '⏳ Aguardando Aprovação',
-        'Aprovada':             '✅ Aprovada',
-        'Reprovada':            '❌ Reprovada',
-        'Cancelada':            '🚫 Cancelada',
+        'Pre-OS':'🗒️ Pré-OS','Em analise':'🔍 Em Análise','Orcada':'💰 Orçada',
+        'Aguardando aprovacao':'⏳ Aguardando Aprovação','Aprovada':'✅ Aprovada',
+        'Reprovada':'❌ Reprovada','Cancelada':'🚫 Cancelada'
     };
-
     const _statusClasses = {
-        'Pre-OS':               'badge-new',
-        'Em analise':           'badge-info',
-        'Orcada':               'badge-warning',
-        'Aguardando aprovacao': 'badge-warning',
-        'Aprovada':             'badge-success',
-        'Reprovada':            'badge-danger',
-        'Cancelada':            'badge-dark',
+        'Pre-OS':'badge-new','Em analise':'badge-info','Orcada':'badge-warning',
+        'Aguardando aprovacao':'badge-warning','Aprovada':'badge-success',
+        'Reprovada':'badge-danger','Cancelada':'badge-dark'
     };
 
     function _toast(msg, ok) {
@@ -273,32 +400,64 @@ function formatarStatusDetalhes($status) {
         el.textContent = msg;
         el.style.cssText = 'position:fixed;bottom:24px;right:24px;padding:12px 20px;border-radius:8px;font-size:14px;z-index:9999;color:#fff;background:' + (ok ? '#2d7a2d' : '#a00');
         document.body.appendChild(el);
-        setTimeout(() => el.remove(), 3000);
+        setTimeout(() => el.remove(), 3500);
+    }
+
+    function abrirModal(id) { document.getElementById(id).classList.add('aberto'); }
+    function fecharModal(id) { document.getElementById(id).classList.remove('aberto'); }
+
+    function abrirModalOrcamento()  { abrirModal('modal-orcamento'); document.getElementById('input-valor').focus(); }
+    function abrirModalReprovacao() { abrirModal('modal-reprovacao'); document.getElementById('input-motivo').focus(); }
+
+    function confirmarOrcamento() {
+        const valor = parseFloat(document.getElementById('input-valor').value);
+        if (isNaN(valor) || valor <= 0) { _toast('Informe um valor válido', false); return; }
+        fecharModal('modal-orcamento');
+        _enviar('Orcada', { valor_orcamento: valor });
+    }
+
+    function confirmarReprovacao() {
+        const motivo = document.getElementById('input-motivo').value.trim();
+        if (!motivo) { _toast('Informe o motivo da reprovação', false); return; }
+        fecharModal('modal-reprovacao');
+        _enviar('Reprovada', { motivo });
     }
 
     function atualizarStatus(novoStatus) {
         if (!confirm('Alterar status para "' + _statusLabels[novoStatus] + '"?')) return;
+        _enviar(novoStatus, {});
+    }
+
+    function _enviar(status, extras) {
         fetch('atualizar_status.php', {
-            method:  'POST',
+            method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body:    JSON.stringify({ id: _pedidoId, status: novoStatus })
+            body: JSON.stringify({ id: _pedidoId, status, ...extras })
         })
         .then(r => r.json())
         .then(data => {
             if (data.sucesso) {
                 document.getElementById('status-badge').innerHTML =
-                    '<span class="badge ' + _statusClasses[novoStatus] + '">' + _statusLabels[novoStatus] + '</span>';
+                    '<span class="badge ' + _statusClasses[status] + '">' + _statusLabels[status] + '</span>';
                 const at = document.getElementById('atualizado-em');
                 if (at) at.textContent = data.atualizado_em;
                 _toast('✅ Status atualizado!', true);
+                setTimeout(() => location.reload(), 1500);
             } else {
                 _toast('❌ ' + (data.erro || 'Erro desconhecido'), false);
             }
         })
         .catch(() => _toast('❌ Erro de conexão', false));
     }
+
+    // Fechar modal clicando fora
+    document.querySelectorAll('.modal-overlay').forEach(overlay => {
+        overlay.addEventListener('click', e => {
+            if (e.target === overlay) overlay.classList.remove('aberto');
+        });
+    });
     </script>
 
-    <script src="assets/js/admin.js?v=<?php echo time(); ?>"></script>
+    <script src="assets/js/admin.js?v=<?php echo $v; ?>"></script>
 </body>
 </html>
