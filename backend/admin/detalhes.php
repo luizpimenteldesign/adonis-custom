@@ -1,7 +1,7 @@
 <?php
 /**
  * DETALHES DO PEDIDO - SISTEMA ADONIS
- * Versão: 2.0
+ * Versão: 2.1
  * Data: 27/02/2026
  */
 
@@ -19,6 +19,7 @@ if (!isset($_GET['id']) || !is_numeric($_GET['id'])) {
 $preos_id = (int)$_GET['id'];
 
 try {
+    // Dados principais da pré-OS
     $stmt = $conn->prepare("
         SELECT 
             p.*,
@@ -26,6 +27,7 @@ try {
             c.telefone as cliente_telefone,
             c.email as cliente_email,
             c.endereco as cliente_endereco,
+            i.id as instrumento_id,
             i.tipo as instrumento_tipo,
             i.marca as instrumento_marca,
             i.modelo as instrumento_modelo,
@@ -47,7 +49,7 @@ try {
         exit;
     }
 
-    // Buscar serviços
+    // Serviços solicitados
     $stmt_servicos = $conn->prepare("
         SELECT s.id, s.nome, s.descricao, s.valor_base, s.prazo_base
         FROM pre_os_servicos ps
@@ -58,16 +60,19 @@ try {
     $stmt_servicos->execute();
     $servicos = $stmt_servicos->fetchAll(PDO::FETCH_ASSOC);
 
-    // Buscar fotos
-    $stmt_fotos = $conn->prepare("
-        SELECT caminho, ordem
-        FROM fotos
-        WHERE pre_os_id = :pre_os_id
-        ORDER BY ordem ASC
-    ");
-    $stmt_fotos->bindParam(':pre_os_id', $preos_id);
-    $stmt_fotos->execute();
-    $fotos = $stmt_fotos->fetchAll(PDO::FETCH_ASSOC);
+    // Fotos do instrumento (tabela correta: instrumento_fotos)
+    $fotos = [];
+    if (!empty($pedido['instrumento_id'])) {
+        $stmt_fotos = $conn->prepare("
+            SELECT caminho, ordem
+            FROM instrumento_fotos
+            WHERE instrumento_id = :instrumento_id
+            ORDER BY ordem ASC
+        ");
+        $stmt_fotos->bindParam(':instrumento_id', $pedido['instrumento_id']);
+        $stmt_fotos->execute();
+        $fotos = $stmt_fotos->fetchAll(PDO::FETCH_ASSOC);
+    }
 
 } catch (PDOException $e) {
     error_log('Erro ao buscar detalhes: ' . $e->getMessage());
@@ -143,7 +148,7 @@ function formatarStatusDetalhes($status) {
             </div>
         </div>
 
-        <!-- DADOS DO CLIENTE -->
+        <!-- CLIENTE -->
         <div class="card">
             <div class="card-header"><h2 class="card-title">👤 Dados do Cliente</h2></div>
             <div class="info-grid">
@@ -201,7 +206,7 @@ function formatarStatusDetalhes($status) {
         <div class="card">
             <div class="card-header"><h2 class="card-title">🔧 Serviços Solicitados</h2></div>
             <?php if (empty($servicos)): ?>
-                <div class="empty-state">Nenhum serviço selecionado</div>
+                <div class="empty-state" style="padding:20px;color:#888;">Nenhum serviço selecionado</div>
             <?php else: ?>
                 <table>
                     <thead><tr><th>Serviço</th><th>Descrição</th><th>Valor Base</th><th>Prazo</th></tr></thead>
@@ -237,24 +242,22 @@ function formatarStatusDetalhes($status) {
         <?php if (!empty($pedido['observacoes'])): ?>
         <div class="card">
             <div class="card-header"><h2 class="card-title">📝 Observações do Cliente</h2></div>
-            <div class="observacoes"><?php echo nl2br(htmlspecialchars($pedido['observacoes'])); ?></div>
+            <div class="observacoes" style="padding:16px;"><?php echo nl2br(htmlspecialchars($pedido['observacoes'])); ?></div>
         </div>
         <?php endif; ?>
 
         <!-- TOKEN -->
         <div class="card">
             <div class="card-header"><h2 class="card-title">🔑 Código de Acompanhamento</h2></div>
-            <div class="token-box"><?php echo htmlspecialchars($pedido['public_token']); ?></div>
+            <div class="token-box" style="padding:16px;font-family:monospace;font-size:16px;letter-spacing:2px;"><?php echo htmlspecialchars($pedido['public_token']); ?></div>
         </div>
 
     </div>
 
-    <!-- TOAST FEEDBACK -->
     <div id="toast" style="display:none;position:fixed;bottom:24px;right:24px;background:#333;color:#fff;padding:12px 20px;border-radius:8px;font-size:14px;z-index:9999;"></div>
 
     <script>
     const pedidoId = <?php echo $preos_id; ?>;
-
     const statusLabels = {
         'Pre-OS':               '🗒️ Pré-OS',
         'Em analise':           '🔍 Em Análise',
@@ -264,7 +267,6 @@ function formatarStatusDetalhes($status) {
         'Reprovada':            '❌ Reprovada',
         'Cancelada':            '🚫 Cancelada',
     };
-
     const statusClasses = {
         'Pre-OS':               'badge-new',
         'Em analise':           'badge-info',
@@ -274,7 +276,6 @@ function formatarStatusDetalhes($status) {
         'Reprovada':            'badge-danger',
         'Cancelada':            'badge-dark',
     };
-
     function toast(msg, ok = true) {
         const el = document.getElementById('toast');
         el.textContent = msg;
@@ -282,10 +283,8 @@ function formatarStatusDetalhes($status) {
         el.style.display = 'block';
         setTimeout(() => el.style.display = 'none', 3000);
     }
-
     function atualizarStatus(novoStatus) {
         if (!confirm('Alterar status para "' + statusLabels[novoStatus] + '"?')) return;
-
         fetch('atualizar_status.php', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
@@ -297,7 +296,7 @@ function formatarStatusDetalhes($status) {
                 document.getElementById('status-badge').innerHTML =
                     '<span class="badge ' + statusClasses[novoStatus] + '">' + statusLabels[novoStatus] + '</span>';
                 document.getElementById('atualizado-em').textContent = data.atualizado_em;
-                toast('✅ Status atualizado com sucesso!');
+                toast('✅ Status atualizado!');
             } else {
                 toast('❌ Erro: ' + data.erro, false);
             }
