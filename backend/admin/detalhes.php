@@ -1,7 +1,7 @@
 <?php
 /**
  * DETALHES DO PEDIDO - SISTEMA ADONIS
- * Versão: 2.2
+ * Versão: 2.3
  * Data: 27/02/2026
  */
 
@@ -99,7 +99,7 @@ function formatarStatusDetalhes($status) {
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="assets/css/admin.css">
+    <link rel="stylesheet" href="assets/css/admin.css?v=<?php echo time(); ?>">
 </head>
 <body>
     <header class="header">
@@ -244,6 +244,61 @@ function formatarStatusDetalhes($status) {
 
     </div>
 
-    <script src="assets/js/admin.js"></script>
+    <!-- JS inline: garante que atualizarStatus esteja sempre disponível independente do cache do admin.js -->
+    <script>
+    const _pedidoId = <?php echo $preos_id; ?>;
+
+    const _statusLabels = {
+        'Pre-OS':               '🗒️ Pré-OS',
+        'Em analise':           '🔍 Em Análise',
+        'Orcada':               '💰 Orçada',
+        'Aguardando aprovacao': '⏳ Aguardando Aprovação',
+        'Aprovada':             '✅ Aprovada',
+        'Reprovada':            '❌ Reprovada',
+        'Cancelada':            '🚫 Cancelada',
+    };
+
+    const _statusClasses = {
+        'Pre-OS':               'badge-new',
+        'Em analise':           'badge-info',
+        'Orcada':               'badge-warning',
+        'Aguardando aprovacao': 'badge-warning',
+        'Aprovada':             'badge-success',
+        'Reprovada':            'badge-danger',
+        'Cancelada':            'badge-dark',
+    };
+
+    function _toast(msg, ok) {
+        const el = document.createElement('div');
+        el.textContent = msg;
+        el.style.cssText = 'position:fixed;bottom:24px;right:24px;padding:12px 20px;border-radius:8px;font-size:14px;z-index:9999;color:#fff;background:' + (ok ? '#2d7a2d' : '#a00');
+        document.body.appendChild(el);
+        setTimeout(() => el.remove(), 3000);
+    }
+
+    function atualizarStatus(novoStatus) {
+        if (!confirm('Alterar status para "' + _statusLabels[novoStatus] + '"?')) return;
+        fetch('atualizar_status.php', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({ id: _pedidoId, status: novoStatus })
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.sucesso) {
+                document.getElementById('status-badge').innerHTML =
+                    '<span class="badge ' + _statusClasses[novoStatus] + '">' + _statusLabels[novoStatus] + '</span>';
+                const at = document.getElementById('atualizado-em');
+                if (at) at.textContent = data.atualizado_em;
+                _toast('✅ Status atualizado!', true);
+            } else {
+                _toast('❌ ' + (data.erro || 'Erro desconhecido'), false);
+            }
+        })
+        .catch(() => _toast('❌ Erro de conexão', false));
+    }
+    </script>
+
+    <script src="assets/js/admin.js?v=<?php echo time(); ?>"></script>
 </body>
 </html>
