@@ -1,8 +1,8 @@
 <?php
 /**
  * DASHBOARD ADMINISTRATIVO - SISTEMA ADONIS
- * Versão: 1.2
- * Data: 26/01/2026
+ * Versão: 1.3
+ * Data: 27/02/2026
  */
 
 require_once 'auth.php';
@@ -14,30 +14,30 @@ $conn = $db->getConnection();
 // Buscar estatísticas
 try {
     // Total de pré-OS
-    $stmt_total = $conn->query("SELECT COUNT(*) as total FROM preos");
+    $stmt_total = $conn->query("SELECT COUNT(*) as total FROM pre_os");
     $total_preos = $stmt_total->fetch(PDO::FETCH_ASSOC)['total'];
     
-    // Pendentes (status: criado, aguardando_analise)
+    // Pendentes (status: Pre-OS, Em analise)
     $stmt_pendentes = $conn->query("
         SELECT COUNT(*) as total 
-        FROM preos 
-        WHERE status IN ('criado', 'aguardando_analise')
+        FROM pre_os 
+        WHERE status IN ('Pre-OS', 'Em analise', 'Orcada', 'Aguardando aprovacao')
     ");
     $total_pendentes = $stmt_pendentes->fetch(PDO::FETCH_ASSOC)['total'];
     
-    // Aprovados (status: aprovado)
+    // Aprovados
     $stmt_aprovados = $conn->query("
         SELECT COUNT(*) as total 
-        FROM preos 
-        WHERE status = 'aprovado'
+        FROM pre_os 
+        WHERE status = 'Aprovada'
     ");
     $total_aprovados = $stmt_aprovados->fetch(PDO::FETCH_ASSOC)['total'];
     
-    // Finalizados (status: finalizado)
+    // Finalizados / Reprovados
     $stmt_finalizados = $conn->query("
         SELECT COUNT(*) as total 
-        FROM preos 
-        WHERE status = 'finalizado'
+        FROM pre_os 
+        WHERE status IN ('Reprovada', 'Cancelada')
     ");
     $total_finalizados = $stmt_finalizados->fetch(PDO::FETCH_ASSOC)['total'];
     
@@ -45,7 +45,6 @@ try {
     $stmt_lista = $conn->query("
         SELECT 
             p.id,
-            p.numero_preos,
             p.status,
             p.public_token,
             p.criado_em,
@@ -55,7 +54,7 @@ try {
             i.tipo as instrumento_tipo,
             i.marca as instrumento_marca,
             i.modelo as instrumento_modelo
-        FROM preos p
+        FROM pre_os p
         LEFT JOIN clientes c ON p.cliente_id = c.id
         LEFT JOIN instrumentos i ON p.instrumento_id = i.id
         ORDER BY p.criado_em DESC
@@ -71,12 +70,13 @@ try {
 // Função para formatar status
 function formatarStatus($status) {
     $badges = [
-        'criado' => '<span class="badge badge-new">Novo</span>',
-        'aguardando_analise' => '<span class="badge badge-warning">Aguardando</span>',
-        'em_analise' => '<span class="badge badge-info">Em Análise</span>',
-        'aprovado' => '<span class="badge badge-success">Aprovado</span>',
-        'reprovado' => '<span class="badge badge-danger">Reprovado</span>',
-        'finalizado' => '<span class="badge badge-dark">Finalizado</span>'
+        'Pre-OS'                => '<span class="badge badge-new">Novo</span>',
+        'Em analise'            => '<span class="badge badge-info">Em Análise</span>',
+        'Orcada'                => '<span class="badge badge-warning">Orçada</span>',
+        'Aguardando aprovacao'  => '<span class="badge badge-warning">Aguardando</span>',
+        'Aprovada'              => '<span class="badge badge-success">Aprovada</span>',
+        'Reprovada'             => '<span class="badge badge-danger">Reprovada</span>',
+        'Cancelada'             => '<span class="badge badge-dark">Cancelada</span>',
     ];
     
     return $badges[$status] ?? '<span class="badge badge-secondary">' . htmlspecialchars($status) . '</span>';
@@ -135,7 +135,7 @@ function formatarData($data) {
             </div>
             
             <div class="stat-card finalizado">
-                <div class="stat-label">✔️ Finalizados</div>
+                <div class="stat-label">❌ Reprovados/Cancelados</div>
                 <div class="stat-value"><?php echo $total_finalizados; ?></div>
             </div>
         </div>
