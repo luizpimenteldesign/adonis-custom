@@ -1,7 +1,7 @@
 <?php
 /**
  * PÁGINA PÚBLICA DE ACOMPANHAMENTO DO PEDIDO
- * Versão: 3.0
+ * Versão: 3.1 - query segura (colunas opcionais)
  * Data: 27/02/2026
  */
 
@@ -18,11 +18,24 @@ if (!empty($token)) {
         $db   = new Database();
         $conn = $db->getConnection();
 
+        // Detecta colunas opcionais que podem ainda não existir
+        $has_prazo  = false;
+        $has_motivo = false;
+        try {
+            $cols = $conn->query("SHOW COLUMNS FROM pre_os")->fetchAll(PDO::FETCH_COLUMN);
+            $has_prazo  = in_array('prazo_orcamento',    $cols);
+            $has_motivo = in_array('motivo_reprovacao',  $cols);
+        } catch (PDOException $e) {}
+
+        $extra_cols = '';
+        if ($has_prazo)  $extra_cols .= ', p.prazo_orcamento';
+        if ($has_motivo) $extra_cols .= ', p.motivo_reprovacao';
+
         $stmt = $conn->prepare("
             SELECT
                 p.id, p.status, p.criado_em, p.atualizado_em,
-                p.valor_orcamento, p.prazo_orcamento,
-                p.motivo_reprovacao, p.observacoes,
+                p.valor_orcamento, p.observacoes
+                {$extra_cols},
                 c.nome as cliente_nome,
                 i.tipo as instrumento_tipo, i.marca as instrumento_marca,
                 i.modelo as instrumento_modelo, i.cor as instrumento_cor
@@ -34,9 +47,15 @@ if (!empty($token)) {
         $stmt->execute([':token' => $token]);
         $pedido = $stmt->fetch(PDO::FETCH_ASSOC);
 
-        if (!$pedido) {
-            $erro = 'Pedido não encontrado. Verifique se o código foi digitado corretamente.';
+        // Garantir chaves com valor padrão caso coluna não exista
+        if ($pedido) {
+            $pedido['prazo_orcamento']   = $pedido['prazo_orcamento']   ?? null;
+            $pedido['motivo_reprovacao'] = $pedido['motivo_reprovacao'] ?? null;
         } else {
+            $erro = 'Pedido não encontrado. Verifique se o código foi digitado corretamente.';
+        }
+
+        if ($pedido) {
             $stmt_s = $conn->prepare("
                 SELECT s.nome
                 FROM pre_os_servicos ps JOIN servicos s ON ps.servico_id = s.id
@@ -45,14 +64,26 @@ if (!empty($token)) {
             $stmt_s->execute([':id' => $pedido['id']]);
             $servicos = $stmt_s->fetchAll(PDO::FETCH_ASSOC);
 
+            // Histórico também com colunas opcionais
             try {
+                $has_hist_prazo = false;
+                try {
+                    $hcols = $conn->query("SHOW COLUMNS FROM status_historico")->fetchAll(PDO::FETCH_COLUMN);
+                    $has_hist_prazo = in_array('prazo_orcamento', $hcols);
+                } catch (PDOException $e) {}
+
+                $hist_prazo_col = $has_hist_prazo ? ', prazo_orcamento' : '';
                 $stmt_h = $conn->prepare("
-                    SELECT status, valor_orcamento, prazo_orcamento, motivo, criado_em
+                    SELECT status, valor_orcamento{$hist_prazo_col}, motivo, criado_em
                     FROM status_historico
                     WHERE pre_os_id = :id ORDER BY criado_em ASC
                 ");
                 $stmt_h->execute([':id' => $pedido['id']]);
                 $historico = $stmt_h->fetchAll(PDO::FETCH_ASSOC);
+                foreach ($historico as &$h) {
+                    $h['prazo_orcamento'] = $h['prazo_orcamento'] ?? null;
+                }
+                unset($h);
             } catch (PDOException $e) {}
         }
 
@@ -104,23 +135,19 @@ $icones_hist = ['Pre-OS'=>'🗒️','Em analise'=>'🔍','Orcada'=>'💰','Aguar
         .status-icone{font-size:52px;flex-shrink:0;line-height:1}
         .status-label{font-size:24px;font-weight:700}
         .status-desc{font-size:14px;margin-top:6px;opacity:.8;line-height:1.5}
-        /* Orçamento */
         .orc-card{border-radius:12px;padding:20px 24px;margin-bottom:20px;background:#e8f5e9;border-left:5px solid #43a047;display:flex;align-items:center;gap:20px}
         .orc-emoji{font-size:36px;flex-shrink:0}
         .orc-label{font-size:11px;color:#388e3c;font-weight:700;text-transform:uppercase;letter-spacing:.5px}
         .orc-valor{font-size:32px;font-weight:700;color:#2e7d32;line-height:1.1;margin:2px 0}
         .orc-prazo{font-size:13px;color:#388e3c;font-weight:600;margin-top:4px}
         .orc-prazo strong{color:#1b5e20}
-        /* Info grid */
         .info-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px}
         .info-item{background:#f8f9fa;border-radius:8px;padding:12px 14px}
         .info-label{font-size:10px;color:#999;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}
         .info-value{font-size:14px;color:#333;font-weight:500}
-        /* Serviços */
         .servico-item{padding:9px 0;border-bottom:1px solid #f0f0f0;font-size:14px;color:#444;display:flex;align-items:center;gap:8px}
         .servico-item:last-child{border-bottom:none}
         .servico-item::before{content:'•';color:#0d9488;font-size:18px;flex-shrink:0}
-        /* Timeline */
         .timeline{list-style:none;padding:0;margin:0;position:relative}
         .timeline::before{content:'';position:absolute;left:16px;top:6px;bottom:6px;width:2px;background:#e8e8e8}
         .tl-item{display:flex;gap:14px;padding-bottom:22px;position:relative}
@@ -132,7 +159,6 @@ $icones_hist = ['Pre-OS'=>'🗒️','Em analise'=>'🔍','Orcada'=>'💰','Aguar
         .tl-detalhe{margin-top:6px;padding:7px 11px;border-radius:6px;font-size:13px}
         .tl-detalhe.valor{background:#e8f5e9;color:#2e7d32}
         .tl-detalhe.motivo{background:#ffebee;color:#c62828}
-        /* Erro */
         .erro-box{text-align:center;padding:48px 20px}
         .erro-icone{font-size:56px;display:block;margin-bottom:14px}
         .erro-box h2{font-size:20px;color:#c62828;margin-bottom:8px}
@@ -157,7 +183,9 @@ $icones_hist = ['Pre-OS'=>'🗒️','Em analise'=>'🔍','Orcada'=>'💰','Aguar
         <h2>🔍 Consultar meu pedido</h2>
         <p>Digite o código de acompanhamento que você recebeu</p>
         <form method="GET">
-            <input type="text" name="token" placeholder="Cole seu código aqui..." value="<?php echo htmlspecialchars($token); ?>" autocomplete="off" spellcheck="false">
+            <input type="text" name="token" placeholder="Cole seu código aqui..."
+                   value="<?php echo htmlspecialchars($token); ?>"
+                   autocomplete="off" spellcheck="false">
             <button type="submit">Buscar</button>
         </form>
     </div>
@@ -173,7 +201,6 @@ $icones_hist = ['Pre-OS'=>'🗒️','Em analise'=>'🔍','Orcada'=>'💰','Aguar
         $si = $statusInfo[$pedido['status']] ?? ['label'=>$pedido['status'],'cor'=>'#666','bg'=>'#f5f5f5','icone'=>'•','desc'=>''];
     ?>
 
-        <!-- STATUS -->
         <div class="status-card" style="background:<?php echo $si['bg']; ?>;color:<?php echo $si['cor']; ?>">
             <div class="status-icone"><?php echo $si['icone']; ?></div>
             <div>
@@ -182,7 +209,6 @@ $icones_hist = ['Pre-OS'=>'🗒️','Em analise'=>'🔍','Orcada'=>'💰','Aguar
             </div>
         </div>
 
-        <!-- ORÇAMENTO (só exibe quando existir) -->
         <?php if (!empty($pedido['valor_orcamento'])): ?>
         <div class="orc-card">
             <div class="orc-emoji">💰</div>
@@ -196,7 +222,6 @@ $icones_hist = ['Pre-OS'=>'🗒️','Em analise'=>'🔍','Orcada'=>'💰','Aguar
         </div>
         <?php endif; ?>
 
-        <!-- DADOS DO PEDIDO -->
         <div class="card">
             <div class="card-title">📋 Dados do Pedido</div>
             <div class="info-grid">
@@ -205,8 +230,7 @@ $icones_hist = ['Pre-OS'=>'🗒️','Em analise'=>'🔍','Orcada'=>'💰','Aguar
                 <div class="info-item">
                     <div class="info-label">Instrumento</div>
                     <div class="info-value"><?php
-                        $inst = trim($pedido['instrumento_tipo'].' '.$pedido['instrumento_marca'].' '.$pedido['instrumento_modelo']);
-                        echo htmlspecialchars($inst);
+                        echo htmlspecialchars(trim($pedido['instrumento_tipo'].' '.$pedido['instrumento_marca'].' '.$pedido['instrumento_modelo']));
                         if (!empty($pedido['instrumento_cor'])) echo ' <span style="color:#aaa;font-size:12px">('. htmlspecialchars($pedido['instrumento_cor']).')</span>';
                     ?></div>
                 </div>
@@ -215,7 +239,6 @@ $icones_hist = ['Pre-OS'=>'🗒️','Em analise'=>'🔍','Orcada'=>'💰','Aguar
             </div>
         </div>
 
-        <!-- SERVIÇOS (apenas nomes, sem valores) -->
         <?php if (!empty($servicos)): ?>
         <div class="card">
             <div class="card-title">🔧 Serviços Solicitados</div>
@@ -225,7 +248,6 @@ $icones_hist = ['Pre-OS'=>'🗒️','Em analise'=>'🔍','Orcada'=>'💰','Aguar
         </div>
         <?php endif; ?>
 
-        <!-- HISTÓRICO -->
         <?php if (!empty($historico)): ?>
         <div class="card">
             <div class="card-title">🕓 Histórico de Atualizações</div>
@@ -237,7 +259,9 @@ $icones_hist = ['Pre-OS'=>'🗒️','Em analise'=>'🔍','Orcada'=>'💰','Aguar
                         <div class="tl-status"><?php echo htmlspecialchars($statusInfo[$h['status']]['label'] ?? $h['status']); ?></div>
                         <div class="tl-data"><?php echo date('d/m/Y às H:i', strtotime($h['criado_em'])); ?></div>
                         <?php if (!empty($h['valor_orcamento'])): ?>
-                        <div class="tl-detalhe valor">💰 R$ <?php echo number_format($h['valor_orcamento'],2,',','.'); ?><?php if (!empty($h['prazo_orcamento'])): ?> &nbsp;• <strong><?php echo (int)$h['prazo_orcamento']; ?> dias úteis</strong><?php endif; ?></div>
+                        <div class="tl-detalhe valor">💰 R$ <?php echo number_format($h['valor_orcamento'],2,',','.'); ?>
+                            <?php if (!empty($h['prazo_orcamento'])): ?> &nbsp;• <strong><?php echo (int)$h['prazo_orcamento']; ?> dias úteis</strong><?php endif; ?>
+                        </div>
                         <?php endif; ?>
                         <?php if (!empty($h['motivo'])): ?>
                         <div class="tl-detalhe motivo">⚠️ <?php echo htmlspecialchars($h['motivo']); ?></div>
@@ -249,7 +273,6 @@ $icones_hist = ['Pre-OS'=>'🗒️','Em analise'=>'🔍','Orcada'=>'💰','Aguar
         </div>
         <?php endif; ?>
 
-        <!-- OBSERVAÇÕES -->
         <?php if (!empty($pedido['observacoes'])): ?>
         <div class="card">
             <div class="card-title">📝 Suas Observações</div>
@@ -257,7 +280,6 @@ $icones_hist = ['Pre-OS'=>'🗒️','Em analise'=>'🔍','Orcada'=>'💰','Aguar
         </div>
         <?php endif; ?>
 
-        <!-- MOTIVO REPROVAÇÃO -->
         <?php if (!empty($pedido['motivo_reprovacao'])): ?>
         <div class="card" style="border-left:4px solid #ef5350">
             <div class="card-title" style="color:#c62828">❌ Motivo da Não Aprovação</div>
