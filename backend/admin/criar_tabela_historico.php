@@ -1,8 +1,7 @@
 <?php
 /**
- * UTILITÁRIO - Criar tabela status_historico e colunas extras em pre_os
- * Executar UMA VEZ pelo navegador estando logado, depois deletar este arquivo.
- * URL: /backend/admin/criar_tabela_historico.php
+ * UTILITÁRIO - Adicionar colunas em pre_os
+ * Executar UMA VEZ e depois deletar.
  */
 
 require_once 'auth.php';
@@ -13,36 +12,30 @@ header('Content-Type: text/plain; charset=utf-8');
 $db   = new Database();
 $conn = $db->getConnection();
 
-$sqls = [
-    "Tabela status_historico" => "
-        CREATE TABLE IF NOT EXISTS status_historico (
-            id           INT AUTO_INCREMENT PRIMARY KEY,
-            pre_os_id    INT          NOT NULL,
-            status       VARCHAR(50)  NOT NULL,
-            valor_orcamento DECIMAL(10,2) DEFAULT NULL,
-            motivo       TEXT         DEFAULT NULL,
-            admin_id     INT          DEFAULT NULL,
-            criado_em    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            INDEX idx_pre_os_id (pre_os_id)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-    ",
-    "Coluna valor_orcamento em pre_os" => "
-        ALTER TABLE pre_os
-        ADD COLUMN IF NOT EXISTS valor_orcamento DECIMAL(10,2) DEFAULT NULL
-    ",
-    "Coluna motivo_reprovacao em pre_os" => "
-        ALTER TABLE pre_os
-        ADD COLUMN IF NOT EXISTS motivo_reprovacao TEXT DEFAULT NULL
-    "
-];
-
-foreach ($sqls as $label => $sql) {
-    try {
-        $conn->exec(trim($sql));
-        echo "✅ $label — OK\n";
-    } catch (PDOException $e) {
-        echo "❌ $label — " . $e->getMessage() . "\n";
+// Verificar e adicionar coluna valor_orcamento
+try {
+    $col = $conn->query("SHOW COLUMNS FROM pre_os LIKE 'valor_orcamento'")->fetch();
+    if ($col) {
+        echo "⚠️ Coluna valor_orcamento já existe \u2014 pulando\n";
+    } else {
+        $conn->exec("ALTER TABLE pre_os ADD COLUMN valor_orcamento DECIMAL(10,2) DEFAULT NULL");
+        echo "✅ Coluna valor_orcamento \u2014 criada com sucesso\n";
     }
+} catch (PDOException $e) {
+    echo "❌ valor_orcamento \u2014 " . $e->getMessage() . "\n";
 }
 
-echo "\nPronto! Delete este arquivo após executar.\n";
+// Verificar e adicionar coluna motivo_reprovacao
+try {
+    $col = $conn->query("SHOW COLUMNS FROM pre_os LIKE 'motivo_reprovacao'")->fetch();
+    if ($col) {
+        echo "⚠️ Coluna motivo_reprovacao já existe \u2014 pulando\n";
+    } else {
+        $conn->exec("ALTER TABLE pre_os ADD COLUMN motivo_reprovacao TEXT DEFAULT NULL");
+        echo "✅ Coluna motivo_reprovacao \u2014 criada com sucesso\n";
+    }
+} catch (PDOException $e) {
+    echo "❌ motivo_reprovacao \u2014 " . $e->getMessage() . "\n";
+}
+
+echo "\nPronto! Você pode fechar esta página.\n";
