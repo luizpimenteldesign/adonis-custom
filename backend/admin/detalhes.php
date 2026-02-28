@@ -1,11 +1,9 @@
 <?php
 /**
  * DETALHES DO PEDIDO - SISTEMA ADONIS
- * Versão: 4.0
- * - Botões dos novos sub-status de serviço no painel admin
- * - Badges visuais para todos os sub-status
- * - Cards de pagamento para todos os tipos
- * Data: 27/02/2026
+ * Versão: 4.1
+ * - Botão wa.me para Adonis notificar cliente após mudança de status
+ * Data: 28/02/2026
  */
 
 require_once 'auth.php';
@@ -125,11 +123,9 @@ $v = time();
     <link rel="stylesheet" href="assets/css/admin.css?v=<?php echo $v; ?>">
     <style>
         .badge-purple{background:#6a1b9a;color:#fff}
-        /* Grupo de botões por fase */
         .btn-group-fase{margin-bottom:10px}
         .btn-group-fase-titulo{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#aaa;margin-bottom:6px}
         .btn-group-fase .actions{flex-wrap:wrap;gap:8px}
-        /* Modais */
         .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;justify-content:center;align-items:center;padding:20px}
         .modal-overlay.aberto{display:flex}
         .modal-box{background:#fff;border-radius:12px;padding:28px;width:100%;max-width:520px;box-shadow:0 8px 32px rgba(0,0,0,.2);max-height:90vh;overflow-y:auto}
@@ -141,7 +137,6 @@ $v = time();
         .modal-box textarea{resize:vertical;min-height:80px}
         .modal-hint{font-size:11px;color:#aaa;margin-top:4px}
         .modal-actions{display:flex;gap:12px;margin-top:20px;justify-content:flex-end}
-        /* Simulador */
         .sim-sep{border:none;border-top:2px dashed #e0e0e0;margin:20px 0}
         .sim-titulo{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#888;margin-bottom:12px}
         .sim-cards{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px}
@@ -153,7 +148,6 @@ $v = time();
         .sim-card-sub{font-size:11px;color:#666;margin-top:5px;line-height:1.4}
         .sim-card.maquina .sim-card-valor{color:#e65100}
         .sim-aviso{font-size:12px;color:#555;background:#f8f9fa;border-radius:6px;padding:10px 14px;margin-bottom:12px;line-height:1.8;border-left:3px solid #0d9488}
-        /* Card pagamento aprovado */
         .pgto-aprovado-card{border-radius:12px;padding:20px 22px;margin-bottom:20px;border:2px solid #a5d6a7;background:#f1f8e9}
         .pgto-aprovado-titulo{font-size:13px;font-weight:700;color:#2e7d32;text-transform:uppercase;letter-spacing:.5px;margin-bottom:14px;display:flex;align-items:center;gap:6px}
         .pgto-aprovado-linha{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #c8e6c9;font-size:14px}
@@ -161,7 +155,6 @@ $v = time();
         .pgto-aprovado-lbl{color:#388e3c;font-weight:500}
         .pgto-aprovado-val{font-weight:700;color:#1b5e20;font-size:15px}
         .pgto-aprovado-val.destaque{font-size:19px}
-        /* Card maquininha */
         .maq-card{background:#fff8e1;border:2px solid #ffc107;border-radius:12px;padding:20px 22px;margin-bottom:20px}
         .maq-card-titulo{font-size:13px;font-weight:700;color:#e65100;text-transform:uppercase;letter-spacing:.5px;margin-bottom:14px;display:flex;align-items:center;gap:6px}
         .maq-linha{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid #ffe082;font-size:14px}
@@ -169,7 +162,6 @@ $v = time();
         .maq-lbl{color:#795548;font-weight:500}
         .maq-val{font-weight:700;color:#e65100;font-size:16px}
         .maq-val.destaque{font-size:20px;color:#bf360c}
-        /* Timeline */
         .timeline{list-style:none;padding:0;margin:0;position:relative}
         .timeline::before{content:'';position:absolute;left:18px;top:0;bottom:0;width:2px;background:#e0e0e0}
         .timeline-item{display:flex;gap:16px;padding:0 0 24px 0}
@@ -183,6 +175,14 @@ $v = time();
         table tfoot td{font-weight:700;font-size:14px;border-top:2px solid #e0e0e0;background:#f9f9f9;padding:12px 16px}
         .total-valor{color:#2e7d32} .total-prazo{color:#1565c0}
         .total-obs{font-size:11px;color:#999;font-weight:400;display:block;margin-top:2px}
+        /* Modal wa.me */
+        .modal-wa-body{text-align:center;padding:8px 0 4px}
+        .modal-wa-status{font-size:14px;color:#555;margin-bottom:18px}
+        .modal-wa-status strong{color:#0d9488}
+        .btn-wa{display:inline-flex;align-items:center;gap:10px;background:#25d366;color:#fff;font-size:16px;font-weight:700;
+                padding:14px 28px;border-radius:10px;text-decoration:none;border:none;cursor:pointer;transition:background .2s;width:100%;justify-content:center;margin-bottom:10px}
+        .btn-wa:hover{background:#128c50}
+        .btn-wa-skip{background:none;border:none;color:#aaa;font-size:13px;cursor:pointer;text-decoration:underline;margin-top:4px}
     </style>
 </head>
 <body>
@@ -489,6 +489,22 @@ $v = time();
     </div>
 </div>
 
+<!-- MODAL WHATSAPP → CLIENTE ──────────────────────────────── -->
+<div class="modal-overlay" id="modal-wa">
+    <div class="modal-box" style="max-width:420px;text-align:center">
+        <div class="modal-title">📲 Avisar o cliente?</div>
+        <div class="modal-wa-body">
+            <div class="modal-wa-status" id="wa-status-texto">Status atualizado com sucesso!</div>
+            <a id="btn-wa-enviar" href="#" target="_blank" class="btn-wa" onclick="_fecharWaEReload()">
+                💬 Enviar mensagem no WhatsApp
+            </a>
+            <br>
+            <button class="btn-wa-skip" onclick="_fecharWaEReload()">Pular — recarregar página</button>
+        </div>
+    </div>
+</div>
+<!-- ─────────────────────────────────────────────────────────── -->
+
 <script>
 const _pedidoId  = <?php echo $preos_id; ?>;
 const _totalBase = <?php echo (float)$total_valor; ?>;
@@ -578,6 +594,20 @@ function abrirModalOrcamento(){
     setTimeout(()=>document.getElementById('input-valor').focus(),100);
 }
 function abrirModalReprovacao(){abrirModal('modal-reprovacao');document.getElementById('input-motivo').focus();}
+
+// ── Modal wa.me ──────────────────────────────────────────────
+function _fecharWaEReload(){
+    fecharModal('modal-wa');
+    setTimeout(()=>location.reload(),300);
+}
+function _abrirModalWa(waLink, statusLabel){
+    document.getElementById('wa-status-texto').innerHTML =
+        '✅ Status atualizado para <strong>' + statusLabel + '</strong>.<br>Deseja enviar a mensagem ao cliente agora?';
+    document.getElementById('btn-wa-enviar').href = waLink;
+    abrirModal('modal-wa');
+}
+// ────────────────────────────────────────────────────────────
+
 function _enviar(status,extras){
     fetch('atualizar_status.php',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:_pedidoId,status,...extras})})
     .then(r=>r.json())
@@ -587,8 +617,13 @@ function _enviar(status,extras){
             const label=_statusMap[status]||status;
             document.getElementById('status-badge').innerHTML='<span class="badge '+badge+'">'+label+'</span>';
             const at=document.getElementById('atualizado-em'); if(at) at.textContent=data.atualizado_em;
-            _toast('✅ Status atualizado!',true);
-            setTimeout(()=>location.reload(),1500);
+            // Se backend retornou wa_link → abre modal WhatsApp
+            if(data.wa_link){
+                _abrirModalWa(data.wa_link, label);
+            } else {
+                _toast('✅ Status atualizado!',true);
+                setTimeout(()=>location.reload(),1500);
+            }
         } else { _toast('❌ '+(data.erro||'Erro desconhecido'),false); }
     })
     .catch(()=>_toast('❌ Erro de conexão',false));
