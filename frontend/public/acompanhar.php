@@ -1,11 +1,12 @@
 <?php
 /**
  * PÁGINA PÚBLICA DE ACOMPANHAMENTO DO PEDIDO
- * Versão: 5.4 - endereço e PIX sempre visíveis pós-aprovação
- * Data: 27/02/2026
+ * Versão: 5.5 - botão wa.me "Falar com Adonis" + integração WhatsApp helper
+ * Data: 28/02/2026
  */
 
 require_once '../../backend/config/Database.php';
+require_once '../../backend/helpers/whatsapp.php';
 
 $token     = isset($_GET['token']) ? trim($_GET['token']) : '';
 $pedido    = null;
@@ -85,6 +86,12 @@ if (!empty($token)) {
     }
 }
 
+// Monta link wa.me para o cliente falar com o Adonis
+$wa_msg_cliente = 'Olá, Adonis! Estou acompanhando meu pedido'
+    . ($pedido ? ' #' . $pedido['id'] . ' (' . trim(($pedido['instrumento_tipo'] ?? '') . ' ' . ($pedido['instrumento_marca'] ?? '')) . ')' : '')
+    . ' e gostaria de tirar uma dúvida.';
+$wa_link_adonis = wa_link_cliente($wa_msg_cliente);
+
 $statusInfo = [
     'Pre-OS'                          => ['label'=>'Recebido',                      'cor'=>'#1565c0','bg'=>'#e3f2fd','icone'=>'🗒️', 'desc'=>'Seu pedido foi recebido e está na fila para análise.'],
     'Em analise'                      => ['label'=>'Em Análise',                    'cor'=>'#00695c','bg'=>'#e0f2f1','icone'=>'🔍', 'desc'=>'Nosso técnico está avaliando o instrumento e preparando o orçamento.'],
@@ -113,12 +120,10 @@ $icones_hist = [
 
 $pode_aprovar = $pedido && in_array($pedido['status'], ['Orcada','Aguardando aprovacao']) && !empty($pedido['valor_orcamento']);
 
-// Status após aprovação — endereço e PIX SEMPRE visíveis aqui
 $status_pos_aprovacao = ['Aprovada','Pagamento recebido','Instrumento recebido',
     'Servico iniciado','Em desenvolvimento','Servico finalizado',
     'Pronto para retirada','Aguardando pagamento retirada','Entregue'];
 $show_pos_aprovacao  = $pedido && in_array($pedido['status'], $status_pos_aprovacao);
-// Detalhes do pagamento: só quando há registro no banco
 $show_detalhe_pgto   = $show_pos_aprovacao && !empty($pagamento_aprovado);
 ?>
 <!DOCTYPE html>
@@ -143,7 +148,7 @@ $show_detalhe_pgto   = $show_pos_aprovacao && !empty($pagamento_aprovado);
         .busca-token input{flex:1;padding:11px 16px;border:2px solid #ddd;border-radius:8px;font-size:14px;font-family:inherit;letter-spacing:.5px;transition:border-color .2s}
         .busca-token input:focus{outline:none;border-color:#0d9488}
         .busca-token button{padding:11px 22px;background:#0d9488;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;white-space:nowrap}
-        .container{max-width:740px;margin:0 auto;padding:32px 20px}
+        .container{max-width:740px;margin:0 auto;padding:32px 20px 100px}
         .card{background:#fff;border-radius:12px;padding:24px;box-shadow:0 2px 8px rgba(0,0,0,.07);margin-bottom:20px}
         .card-title{font-size:15px;font-weight:700;color:#444;margin-bottom:16px;padding-bottom:10px;border-bottom:2px solid #f0f0f0;display:flex;align-items:center;gap:8px}
         .status-card{border-radius:12px;padding:24px 28px;display:flex;align-items:center;gap:20px;margin-bottom:20px;border:1px solid rgba(0,0,0,.06)}
@@ -154,17 +159,6 @@ $show_detalhe_pgto   = $show_pos_aprovacao && !empty($pagamento_aprovado);
         .orc-emoji{font-size:36px;flex-shrink:0}
         .orc-label{font-size:11px;color:#388e3c;font-weight:700;text-transform:uppercase;letter-spacing:.5px}
         .orc-valor{font-size:32px;font-weight:700;color:#2e7d32;line-height:1.1;margin:2px 0}
-        /* Card de instrução pós-aprovação */
-        .instrucao-card{border-radius:12px;padding:20px 24px;margin-bottom:20px;border:2px solid #0d9488;background:#f0fdfa}
-        .instrucao-titulo{font-size:14px;font-weight:700;color:#0d9488;text-transform:uppercase;letter-spacing:.5px;margin-bottom:14px;display:flex;align-items:center;gap:8px}
-        .instrucao-linha{display:flex;justify-content:space-between;align-items:flex-start;padding:9px 0;border-bottom:1px solid #ccf0ec;font-size:14px}
-        .instrucao-linha:last-child{border-bottom:none}
-        .instrucao-lbl{color:#555;font-weight:500;flex-shrink:0;margin-right:12px}
-        .instrucao-val{font-weight:700;color:#0d9488;text-align:right;word-break:break-all}
-        .instrucao-val.destaque{font-size:18px;color:#00695c}
-        .instrucao-copia{display:inline-flex;align-items:center;gap:6px;margin-top:6px;padding:8px 14px;background:#0d9488;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;transition:background .2s}
-        .instrucao-copia:hover{background:#0a7c72}
-        /* Bloco de endereço e PIX sempre visível */
         .pix-endereco-box{background:#f0fdfa;border-radius:12px;padding:18px 20px;margin-bottom:20px;border:2px solid #0d9488}
         .pix-endereco-titulo{font-size:13px;font-weight:700;color:#0d9488;text-transform:uppercase;letter-spacing:.5px;margin-bottom:14px;display:flex;align-items:center;gap:8px}
         .pix-row{display:flex;justify-content:space-between;align-items:flex-start;padding:9px 0;border-bottom:1px solid #ccf0ec;font-size:14px}
@@ -241,13 +235,27 @@ $show_detalhe_pgto   = $show_pos_aprovacao && !empty($pagamento_aprovado);
         .erro-icone{font-size:56px;display:block;margin-bottom:14px}
         .erro-box h2{font-size:20px;color:#c62828;margin-bottom:8px}
         .erro-box p{font-size:13px;color:#999}
+        /* ── Botão flutuante WhatsApp ── */
+        .wa-fab{
+            position:fixed;bottom:24px;right:24px;z-index:900;
+            display:flex;align-items:center;gap:10px;
+            background:#25d366;color:#fff;
+            padding:14px 20px;border-radius:50px;
+            text-decoration:none;font-size:14px;font-weight:700;
+            box-shadow:0 4px 16px rgba(37,211,102,.45);
+            transition:background .2s,transform .2s
+        }
+        .wa-fab:hover{background:#1ebe5d;transform:scale(1.04)}
+        .wa-fab svg{width:22px;height:22px;flex-shrink:0;fill:#fff}
         .footer{text-align:center;padding:28px 20px 40px;font-size:12px;color:#ccc}
         @media(max-width:520px){
             .status-card,.orc-card{flex-direction:column;text-align:center;gap:12px}
             .busca-token form,.acoes{flex-direction:column}
             .header span,.orc-emoji{display:none}
-            .instrucao-linha,.pix-row{flex-direction:column;gap:4px}
-            .instrucao-val,.pix-row-val{text-align:left}
+            .pix-row{flex-direction:column;gap:4px}
+            .pix-row-val{text-align:left}
+            .wa-fab span{display:none}
+            .wa-fab{padding:14px}
         }
     </style>
 </head>
@@ -297,10 +305,6 @@ $show_detalhe_pgto   = $show_pos_aprovacao && !empty($pagamento_aprovado);
         </div>
         <?php endif; ?>
 
-        <!-- ===================================================
-             BLOCO PÓS-APROVAÇÃO: PIX + ENDEREÇO SEMPRE VISÍVEIS
-             Aparece em TODOS os status após aprovação
-        ==================================================== -->
         <?php if ($show_pos_aprovacao): ?>
         <div class="pix-endereco-box">
             <div class="pix-endereco-titulo">📋 Informações para pagamento e entrega</div>
@@ -314,7 +318,6 @@ $show_detalhe_pgto   = $show_pos_aprovacao && !empty($pagamento_aprovado);
                 $is_entrada = stripos($fp,'entrada') !== false;
                 $is_cartao  = stripos($fp,'cart') !== false;
             ?>
-            <!-- Detalhes da forma de pagamento -->
             <div class="pix-row">
                 <span class="pix-row-lbl">Forma de pagamento</span>
                 <span class="pix-row-val"><?php echo htmlspecialchars($desc ?: $fp); ?></span>
@@ -345,11 +348,9 @@ $show_detalhe_pgto   = $show_pos_aprovacao && !empty($pagamento_aprovado);
                 <span class="pix-row-val"><?php echo $parc; ?>x de R$ <?php echo number_format($vf / $parc, 2, ',', '.'); ?></span>
             </div>
             <?php endif; ?>
-            <!-- separador -->
             <div style="border-top:1px dashed #b2dfdb;margin:14px 0"></div>
-            <?php endif; /* $show_detalhe_pgto */ ?>
+            <?php endif; ?>
 
-            <!-- CHAVE PIX — sempre visível -->
             <div class="pix-row" style="border-bottom:none;padding-bottom:4px">
                 <span class="pix-row-lbl">🟢 Chave PIX</span>
                 <span class="pix-row-val" id="chave-pix-bloco"><?php echo ADONIS_PIX; ?></span>
@@ -359,16 +360,14 @@ $show_detalhe_pgto   = $show_pos_aprovacao && !empty($pagamento_aprovado);
                 ⚠️ Após realizar o pagamento, <strong>envie o comprovante via WhatsApp</strong> para confirmarmos o recebimento.
             </div>
 
-            <!-- ENDEREÇO — sempre visível -->
             <div style="border-top:1px dashed #b2dfdb;margin-top:14px;padding-top:14px">
                 <div style="font-size:12px;font-weight:700;color:#00695c;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">📍 Endereço para entrega do instrumento</div>
                 <div style="font-size:14px;color:#333;font-weight:500"><?php echo ADONIS_ENDERECO; ?></div>
                 <a class="maps-link" href="<?php echo ADONIS_MAPS; ?>" target="_blank" rel="noopener">🗺️ Ver no Google Maps</a>
             </div>
         </div>
-        <?php endif; /* $show_pos_aprovacao */ ?>
+        <?php endif; ?>
 
-        <!-- FORMULÁRIO DE APROVAÇÃO -->
         <?php if ($pode_aprovar): ?>
         <div class="card" id="card-pagamento">
             <div class="card-title">💳 Forma de Pagamento &amp; Aprovação</div>
@@ -442,7 +441,6 @@ $show_detalhe_pgto   = $show_pos_aprovacao && !empty($pagamento_aprovado);
         </div>
         <?php endif; ?>
 
-        <!-- DADOS DO PEDIDO -->
         <div class="card">
             <div class="card-title">📋 Dados do Pedido</div>
             <div class="info-grid">
@@ -505,6 +503,14 @@ $show_detalhe_pgto   = $show_pos_aprovacao && !empty($pagamento_aprovado);
 
     <?php endif; ?>
 </div>
+
+<!-- ── Botão flutuante WhatsApp ── -->
+<a class="wa-fab" href="<?php echo htmlspecialchars($wa_link_adonis); ?>" target="_blank" rel="noopener" title="Falar com Adonis pelo WhatsApp">
+    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+    </svg>
+    <span>Falar com Adonis</span>
+</a>
 
 <div class="modal-overlay" id="modal-reprovacao">
     <div class="modal-box">
