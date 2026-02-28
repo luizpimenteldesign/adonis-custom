@@ -1,10 +1,7 @@
 <?php
 /**
  * PÁGINA PÚBLICA DE ACOMPANHAMENTO DO PEDIDO
- * Versão: 5.0
- * - Novos sub-status de serviço
- * - Mensagem pós-aprovação com instrução de pagamento (PIX/endereço)
- * - Status visuais corrigidos
+ * Versão: 5.1 - fix API_URL absoluta
  * Data: 27/02/2026
  */
 
@@ -20,6 +17,9 @@ $pagamento_aprovado = null;
 // Chave PIX e endereço do Adonis (configurar aqui)
 define('ADONIS_PIX',      'adonis@adonis.com.br');  // <<< alterar para chave PIX real
 define('ADONIS_ENDERECO', 'Rua Exemplo, 123 – Aracruz/ES'); // <<< alterar para endereço real
+
+// URL base do sistema — usada no fetch JS
+define('BASE_URL', 'https://adns.luizpimentel.com/adonis-custom');
 
 if (!empty($token)) {
     try {
@@ -59,7 +59,6 @@ if (!empty($token)) {
             $stmt_s->execute([':id' => $pedido['id']]);
             $servicos = $stmt_s->fetchAll(PDO::FETCH_ASSOC);
 
-            // Buscar dados de pagamento registrados ao aprovar
             try {
                 $stmt_pag = $conn->prepare("
                     SELECT forma_pagamento, parcelas, valor_final, por_parcela, descricao_pagamento
@@ -88,23 +87,22 @@ if (!empty($token)) {
     }
 }
 
-// Todos os status incluindo sub-status de serviço
 $statusInfo = [
-    'Pre-OS'                          => ['label'=>'Recebido',                        'cor'=>'#1565c0','bg'=>'#e3f2fd','icone'=>'🗒️', 'desc'=>'Seu pedido foi recebido e está na fila para análise.'],
-    'Em analise'                      => ['label'=>'Em Análise',                      'cor'=>'#00695c','bg'=>'#e0f2f1','icone'=>'🔍', 'desc'=>'Nosso técnico está avaliando o instrumento e preparando o orçamento.'],
-    'Orcada'                          => ['label'=>'Orçamento Pronto',                'cor'=>'#e65100','bg'=>'#fff3e0','icone'=>'💰', 'desc'=>'O orçamento está disponível. Escolha a forma de pagamento e aprove abaixo.'],
-    'Aguardando aprovacao'            => ['label'=>'Aguardando Aprovação',            'cor'=>'#f57f17','bg'=>'#fffde7','icone'=>'⏳', 'desc'=>'Aguardando sua confirmação para iniciar o serviço.'],
-    'Aprovada'                        => ['label'=>'Aguardando Pagamento',            'cor'=>'#1565c0','bg'=>'#e3f2fd','icone'=>'💳', 'desc'=>'Orçamento aprovado! Agora realize o pagamento e envie/traga seu instrumento.'],
-    'Pagamento recebido'              => ['label'=>'Pagamento Recebido',              'cor'=>'#2e7d32','bg'=>'#e8f5e9','icone'=>'✅', 'desc'=>'Pagamento confirmado! Aguardando recebimento do instrumento.'],
-    'Instrumento recebido'            => ['label'=>'Instrumento Recebido',            'cor'=>'#1b5e20','bg'=>'#e8f5e9','icone'=>'📦', 'desc'=>'Instrumento recebido! Em breve o serviço será iniciado.'],
-    'Servico iniciado'                => ['label'=>'Serviço Iniciado',                'cor'=>'#4a148c','bg'=>'#f3e5f5','icone'=>'🔧', 'desc'=>'Seu instrumento está nas mãos do técnico. O serviço foi iniciado.'],
-    'Em desenvolvimento'              => ['label'=>'Em Desenvolvimento',              'cor'=>'#6a1b9a','bg'=>'#f3e5f5','icone'=>'⚙️', 'desc'=>'Estamos trabalhando no seu instrumento com todo cuidado.'],
-    'Servico finalizado'              => ['label'=>'Serviço Finalizado',              'cor'=>'#1b5e20','bg'=>'#e8f5e9','icone'=>'🎸', 'desc'=>'Serviço concluído! Seu instrumento está pronto.'],
-    'Pronto para retirada'            => ['label'=>'Pronto para Retirada',            'cor'=>'#e65100','bg'=>'#fff3e0','icone'=>'🎉', 'desc'=>'Seu instrumento está pronto! Pode vir buscar.'],
-    'Aguardando pagamento retirada'   => ['label'=>'Pagamento Pendente (Retirada)',   'cor'=>'#f57f17','bg'=>'#fffde7','icone'=>'💵', 'desc'=>'Serviço concluído! Realize o pagamento restante (50%) para retirar.'],
-    'Entregue'                        => ['label'=>'Instrumento Entregue',            'cor'=>'#37474f','bg'=>'#eceff1','icone'=>'🏁', 'desc'=>'Instrumento entregue. Obrigado pela confiança!'],
-    'Reprovada'                       => ['label'=>'Orçamento Não Aprovado',          'cor'=>'#b71c1c','bg'=>'#ffebee','icone'=>'❌', 'desc'=>'O orçamento não foi aprovado.'],
-    'Cancelada'                       => ['label'=>'Cancelado',                       'cor'=>'#37474f','bg'=>'#eceff1','icone'=>'🚫', 'desc'=>'Este pedido foi cancelado.'],
+    'Pre-OS'                          => ['label'=>'Recebido',                      'cor'=>'#1565c0','bg'=>'#e3f2fd','icone'=>'🗒️', 'desc'=>'Seu pedido foi recebido e está na fila para análise.'],
+    'Em analise'                      => ['label'=>'Em Análise',                    'cor'=>'#00695c','bg'=>'#e0f2f1','icone'=>'🔍', 'desc'=>'Nosso técnico está avaliando o instrumento e preparando o orçamento.'],
+    'Orcada'                          => ['label'=>'Orçamento Pronto',              'cor'=>'#e65100','bg'=>'#fff3e0','icone'=>'💰', 'desc'=>'O orçamento está disponível. Escolha a forma de pagamento e aprove abaixo.'],
+    'Aguardando aprovacao'            => ['label'=>'Aguardando Aprovação',          'cor'=>'#f57f17','bg'=>'#fffde7','icone'=>'⏳', 'desc'=>'Aguardando sua confirmação para iniciar o serviço.'],
+    'Aprovada'                        => ['label'=>'Aguardando Pagamento',          'cor'=>'#1565c0','bg'=>'#e3f2fd','icone'=>'💳', 'desc'=>'Orçamento aprovado! Agora realize o pagamento e envie/traga seu instrumento.'],
+    'Pagamento recebido'              => ['label'=>'Pagamento Recebido',            'cor'=>'#2e7d32','bg'=>'#e8f5e9','icone'=>'✅', 'desc'=>'Pagamento confirmado! Aguardando recebimento do instrumento.'],
+    'Instrumento recebido'            => ['label'=>'Instrumento Recebido',          'cor'=>'#1b5e20','bg'=>'#e8f5e9','icone'=>'📦', 'desc'=>'Instrumento recebido! Em breve o serviço será iniciado.'],
+    'Servico iniciado'                => ['label'=>'Serviço Iniciado',              'cor'=>'#4a148c','bg'=>'#f3e5f5','icone'=>'🔧', 'desc'=>'Seu instrumento está nas mãos do técnico. O serviço foi iniciado.'],
+    'Em desenvolvimento'              => ['label'=>'Em Desenvolvimento',            'cor'=>'#6a1b9a','bg'=>'#f3e5f5','icone'=>'⚙️', 'desc'=>'Estamos trabalhando no seu instrumento com todo cuidado.'],
+    'Servico finalizado'              => ['label'=>'Serviço Finalizado',            'cor'=>'#1b5e20','bg'=>'#e8f5e9','icone'=>'🎸', 'desc'=>'Serviço concluído! Seu instrumento está pronto.'],
+    'Pronto para retirada'            => ['label'=>'Pronto para Retirada',          'cor'=>'#e65100','bg'=>'#fff3e0','icone'=>'🎉', 'desc'=>'Seu instrumento está pronto! Pode vir buscar.'],
+    'Aguardando pagamento retirada'   => ['label'=>'Pagamento Pendente (Retirada)', 'cor'=>'#f57f17','bg'=>'#fffde7','icone'=>'💵', 'desc'=>'Serviço concluído! Realize o pagamento restante (50%) para retirar.'],
+    'Entregue'                        => ['label'=>'Instrumento Entregue',          'cor'=>'#37474f','bg'=>'#eceff1','icone'=>'🏁', 'desc'=>'Instrumento entregue. Obrigado pela confiança!'],
+    'Reprovada'                       => ['label'=>'Orçamento Não Aprovado',        'cor'=>'#b71c1c','bg'=>'#ffebee','icone'=>'❌', 'desc'=>'O orçamento não foi aprovado.'],
+    'Cancelada'                       => ['label'=>'Cancelado',                     'cor'=>'#37474f','bg'=>'#eceff1','icone'=>'🚫', 'desc'=>'Este pedido foi cancelado.'],
 ];
 
 $icones_hist = [
@@ -117,7 +115,6 @@ $icones_hist = [
 
 $pode_aprovar = $pedido && in_array($pedido['status'], ['Orcada','Aguardando aprovacao']) && !empty($pedido['valor_orcamento']);
 
-// Verifica se deve mostrar instrução de pagamento pós-aprovação
 $status_pos_aprovacao = ['Aprovada','Pagamento recebido','Instrumento recebido',
     'Servico iniciado','Em desenvolvimento','Servico finalizado',
     'Pronto para retirada','Aguardando pagamento retirada','Entregue'];
@@ -148,19 +145,14 @@ $show_instrucao_pgto = $pedido && in_array($pedido['status'], $status_pos_aprova
         .container{max-width:740px;margin:0 auto;padding:32px 20px}
         .card{background:#fff;border-radius:12px;padding:24px;box-shadow:0 2px 8px rgba(0,0,0,.07);margin-bottom:20px}
         .card-title{font-size:15px;font-weight:700;color:#444;margin-bottom:16px;padding-bottom:10px;border-bottom:2px solid #f0f0f0;display:flex;align-items:center;gap:8px}
-        /* Status card */
         .status-card{border-radius:12px;padding:24px 28px;display:flex;align-items:center;gap:20px;margin-bottom:20px;border:1px solid rgba(0,0,0,.06)}
         .status-icone{font-size:52px;flex-shrink:0;line-height:1}
         .status-label{font-size:24px;font-weight:700}
         .status-desc{font-size:14px;margin-top:6px;opacity:.8;line-height:1.5}
-        /* Orçamento */
         .orc-card{border-radius:12px;padding:20px 24px;margin-bottom:20px;background:#e8f5e9;border-left:5px solid #43a047;display:flex;align-items:center;gap:20px}
         .orc-emoji{font-size:36px;flex-shrink:0}
         .orc-label{font-size:11px;color:#388e3c;font-weight:700;text-transform:uppercase;letter-spacing:.5px}
         .orc-valor{font-size:32px;font-weight:700;color:#2e7d32;line-height:1.1;margin:2px 0}
-        .orc-prazo{font-size:13px;color:#388e3c;font-weight:600;margin-top:4px}
-        .orc-prazo strong{color:#1b5e20}
-        /* Card instrução de pagamento pós-aprovação */
         .instrucao-card{border-radius:12px;padding:20px 24px;margin-bottom:20px;border:2px solid #0d9488;background:#f0fdfa}
         .instrucao-titulo{font-size:14px;font-weight:700;color:#0d9488;text-transform:uppercase;letter-spacing:.5px;margin-bottom:14px;display:flex;align-items:center;gap:8px}
         .instrucao-linha{display:flex;justify-content:space-between;align-items:flex-start;padding:9px 0;border-bottom:1px solid #ccf0ec;font-size:14px}
@@ -170,16 +162,13 @@ $show_instrucao_pgto = $pedido && in_array($pedido['status'], $status_pos_aprova
         .instrucao-val.destaque{font-size:18px;color:#00695c}
         .instrucao-copia{display:inline-flex;align-items:center;gap:6px;margin-top:6px;padding:8px 14px;background:#0d9488;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;transition:background .2s}
         .instrucao-copia:hover{background:#0a7c72}
-        /* Info grid */
         .info-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px}
         .info-item{background:#f8f9fa;border-radius:8px;padding:12px 14px}
         .info-label{font-size:10px;color:#999;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}
         .info-value{font-size:14px;color:#333;font-weight:500}
-        /* Serviços */
         .servico-item{padding:9px 0;border-bottom:1px solid #f0f0f0;font-size:14px;color:#444;display:flex;align-items:center;gap:8px}
         .servico-item:last-child{border-bottom:none}
         .servico-item::before{content:'•';color:#0d9488;font-size:18px;flex-shrink:0}
-        /* Pagamento */
         .pgto-opcoes{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:18px}
         .pgto-btn{border:2px solid #e0e0e0;border-radius:10px;padding:14px 10px;text-align:center;cursor:pointer;transition:all .2s;background:#fff;font-family:inherit}
         .pgto-btn:hover{border-color:#0d9488;background:#f0fdfb}
@@ -208,7 +197,6 @@ $show_instrucao_pgto = $pedido && in_array($pedido['status'], $status_pos_aprova
         .btn-aprovar:disabled{background:#bbb;cursor:not-allowed}
         .btn-reprovar{padding:14px 20px;background:#fff;color:#c62828;border:2px solid #ef9a9a;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .2s}
         .btn-reprovar:hover{background:#ffebee;border-color:#c62828}
-        /* Modal */
         .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;justify-content:center;align-items:center;padding:20px}
         .modal-overlay.aberto{display:flex}
         .modal-box{background:#fff;border-radius:12px;padding:28px;width:100%;max-width:440px;box-shadow:0 8px 32px rgba(0,0,0,.2)}
@@ -219,7 +207,6 @@ $show_instrucao_pgto = $pedido && in_array($pedido['status'], $status_pos_aprova
         .modal-actions{display:flex;gap:10px;margin-top:16px;justify-content:flex-end}
         .btn-modal-cancel{padding:10px 18px;background:#f5f5f5;border:none;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit}
         .btn-modal-confirm{padding:10px 20px;background:#c62828;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit}
-        /* Timeline */
         .timeline{list-style:none;padding:0;margin:0;position:relative}
         .timeline::before{content:'';position:absolute;left:16px;top:6px;bottom:6px;width:2px;background:#e8e8e8}
         .tl-item{display:flex;gap:14px;padding-bottom:22px;position:relative}
@@ -231,7 +218,6 @@ $show_instrucao_pgto = $pedido && in_array($pedido['status'], $status_pos_aprova
         .tl-detalhe{margin-top:6px;padding:7px 11px;border-radius:6px;font-size:13px}
         .tl-detalhe.valor{background:#e8f5e9;color:#2e7d32}
         .tl-detalhe.motivo{background:#ffebee;color:#c62828}
-        /* Prazo destaque */
         .prazo-badge{display:inline-flex;align-items:center;gap:6px;background:#e3f2fd;color:#1565c0;border-radius:8px;padding:8px 16px;font-size:14px;font-weight:600;margin-bottom:20px}
         .erro-box{text-align:center;padding:48px 20px}
         .erro-icone{font-size:56px;display:block;margin-bottom:14px}
@@ -271,7 +257,6 @@ $show_instrucao_pgto = $pedido && in_array($pedido['status'], $status_pos_aprova
         $si = $statusInfo[$pedido['status']] ?? ['label'=>$pedido['status'],'cor'=>'#666','bg'=>'#f5f5f5','icone'=>'•','desc'=>''];
     ?>
 
-        <!-- STATUS VISUAL -->
         <div class="status-card" style="background:<?php echo $si['bg']; ?>;color:<?php echo $si['cor']; ?>">
             <div class="status-icone"><?php echo $si['icone']; ?></div>
             <div>
@@ -280,12 +265,10 @@ $show_instrucao_pgto = $pedido && in_array($pedido['status'], $status_pos_aprova
             </div>
         </div>
 
-        <!-- PRAZO -->
         <?php if (!empty($pedido['prazo_orcamento'])): ?>
         <div class="prazo-badge">📅 Prazo estimado: <strong><?php echo (int)$pedido['prazo_orcamento']; ?> dias úteis</strong></div>
         <?php endif; ?>
 
-        <!-- VALOR DO ORÇAMENTO -->
         <?php if (!empty($pedido['valor_orcamento'])): ?>
         <div class="orc-card">
             <div class="orc-emoji">💰</div>
@@ -296,7 +279,6 @@ $show_instrucao_pgto = $pedido && in_array($pedido['status'], $status_pos_aprova
         </div>
         <?php endif; ?>
 
-        <!-- INSTRUÇÃO PÓS-APROVAÇÃO (PIX ou endereço) -->
         <?php if ($show_instrucao_pgto):
             $fp   = $pagamento_aprovado['forma_pagamento'] ?? '';
             $vf   = (float)($pagamento_aprovado['valor_final'] ?? 0);
@@ -308,7 +290,6 @@ $show_instrucao_pgto = $pedido && in_array($pedido['status'], $status_pos_aprova
         ?>
         <div class="instrucao-card">
             <div class="instrucao-titulo">📋 Como realizar o pagamento</div>
-
             <div class="instrucao-linha">
                 <span class="instrucao-lbl">Forma escolhida</span>
                 <span class="instrucao-val"><?php echo htmlspecialchars($desc ?: $fp); ?></span>
@@ -317,7 +298,6 @@ $show_instrucao_pgto = $pedido && in_array($pedido['status'], $status_pos_aprova
                 <span class="instrucao-lbl">Valor total</span>
                 <span class="instrucao-val destaque">R$ <?php echo number_format($vf,2,',','.'); ?></span>
             </div>
-
             <?php if ($is_pix): ?>
             <div class="instrucao-linha">
                 <span class="instrucao-lbl">Chave PIX</span>
@@ -329,7 +309,6 @@ $show_instrucao_pgto = $pedido && in_array($pedido['status'], $status_pos_aprova
             <div style="margin-top:12px;font-size:12px;color:#555;background:#e0f2f1;border-radius:6px;padding:10px 14px;line-height:1.7">
                 ⚠️ Após realizar o PIX, <strong>envie o comprovante via WhatsApp</strong> para agilizar a confirmação.
             </div>
-
             <?php elseif ($is_entrada): ?>
             <div class="instrucao-linha">
                 <span class="instrucao-lbl">Entrada (agora)</span>
@@ -343,7 +322,6 @@ $show_instrucao_pgto = $pedido && in_array($pedido['status'], $status_pos_aprova
                 💡 Pague <strong>R$ <?php echo number_format($vf * 0.5, 2, ',', '.'); ?></strong> via PIX ao trazer o instrumento.<br>
                 Chave PIX: <strong><?php echo ADONIS_PIX; ?></strong>
             </div>
-
             <?php elseif ($is_cartao): ?>
             <?php if ($parc > 0): ?>
             <div class="instrucao-linha">
@@ -355,8 +333,6 @@ $show_instrucao_pgto = $pedido && in_array($pedido['status'], $status_pos_aprova
                 💳 O pagamento no cartão será realizado <strong>na retirada do instrumento</strong>.
             </div>
             <?php endif; ?>
-
-            <!-- Sempre: endereço para entrega do instrumento -->
             <div style="margin-top:14px;padding-top:14px;border-top:1px dashed #b2dfdb">
                 <div style="font-size:12px;font-weight:700;color:#00695c;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">📍 Endereço para entrega do instrumento</div>
                 <div style="font-size:14px;color:#333;font-weight:500"><?php echo ADONIS_ENDERECO; ?></div>
@@ -364,7 +340,6 @@ $show_instrucao_pgto = $pedido && in_array($pedido['status'], $status_pos_aprova
         </div>
         <?php endif; ?>
 
-        <!-- FORMULÁRIO DE APROVAÇÃO -->
         <?php if ($pode_aprovar): ?>
         <div class="card" id="card-pagamento">
             <div class="card-title">💳 Forma de Pagamento &amp; Aprovação</div>
@@ -385,21 +360,18 @@ $show_instrucao_pgto = $pedido && in_array($pedido['status'], $status_pos_aprova
                     <span class="pgto-sub">parcelado em até 10x</span>
                 </button>
             </div>
-
             <div class="pgto-resultado" id="res-pix">
                 <div class="pgto-res-titulo">🟢 PIX ou Dinheiro — à vista</div>
                 <div class="pgto-linha"><span class="lbl">Valor do orçamento</span><span class="val" id="pix-original"></span></div>
                 <div class="pgto-linha"><span class="lbl">Desconto à vista (5%)</span><span class="val" style="color:#2e7d32" id="pix-desconto"></span></div>
                 <div class="pgto-linha destaque"><span class="lbl">Você paga</span><span class="val" id="pix-final"></span></div>
             </div>
-
             <div class="pgto-resultado" id="res-entrada">
                 <div class="pgto-res-titulo">🔑 Entrada + Pagamento na Retirada</div>
                 <div class="pgto-linha"><span class="lbl">Valor total</span><span class="val" id="ent-total"></span></div>
                 <div class="pgto-linha"><span class="lbl">Entrada (50% agora)</span><span class="val" style="color:#1565c0" id="ent-entrada"></span></div>
                 <div class="pgto-linha destaque"><span class="lbl">Na retirada (50%)</span><span class="val" id="ent-retirada"></span></div>
             </div>
-
             <div class="pgto-resultado" id="res-cartao">
                 <div class="pgto-res-titulo">📳 Cartão de Crédito</div>
                 <div style="font-size:12px;color:#999;margin-bottom:10px">Selecione a quantidade de parcelas:</div>
@@ -409,7 +381,6 @@ $show_instrucao_pgto = $pedido && in_array($pedido['status'], $status_pos_aprova
                     <span class="val" id="parc-sel-valor"></span>
                 </div>
             </div>
-
             <div class="acoes">
                 <button class="btn-aprovar" id="btn-aprovar" onclick="confirmarAprovacao()" disabled>✅ Selecione a forma de pagamento</button>
                 <button class="btn-reprovar" onclick="abrirReprovacao()">❌ Não aprovar</button>
@@ -417,7 +388,6 @@ $show_instrucao_pgto = $pedido && in_array($pedido['status'], $status_pos_aprova
         </div>
         <?php endif; ?>
 
-        <!-- DADOS DO PEDIDO -->
         <div class="card">
             <div class="card-title">📋 Dados do Pedido</div>
             <div class="info-grid">
@@ -432,7 +402,6 @@ $show_instrucao_pgto = $pedido && in_array($pedido['status'], $status_pos_aprova
             </div>
         </div>
 
-        <!-- SERVIÇOS -->
         <?php if (!empty($servicos)): ?>
         <div class="card">
             <div class="card-title">🔧 Serviços Solicitados</div>
@@ -442,7 +411,6 @@ $show_instrucao_pgto = $pedido && in_array($pedido['status'], $status_pos_aprova
         </div>
         <?php endif; ?>
 
-        <!-- HISTÓRICO -->
         <?php if (!empty($historico)): ?>
         <div class="card">
             <div class="card-title">🕓 Histórico de Atualizações</div>
@@ -466,7 +434,6 @@ $show_instrucao_pgto = $pedido && in_array($pedido['status'], $status_pos_aprova
         </div>
         <?php endif; ?>
 
-        <!-- OBSERVAÇÕES -->
         <?php if (!empty($pedido['observacoes'])): ?>
         <div class="card">
             <div class="card-title">📝 Suas Observações</div>
@@ -484,7 +451,6 @@ $show_instrucao_pgto = $pedido && in_array($pedido['status'], $status_pos_aprova
     <?php endif; ?>
 </div>
 
-<!-- MODAL REPROVAÇÃO -->
 <div class="modal-overlay" id="modal-reprovacao">
     <div class="modal-box">
         <div class="modal-title">❌ Motivo da Não Aprovação</div>
@@ -503,7 +469,7 @@ $show_instrucao_pgto = $pedido && in_array($pedido['status'], $status_pos_aprova
 <script>
 const VALOR_BASE   = <?php echo (float)$pedido['valor_orcamento']; ?>;
 const PEDIDO_TOKEN = '<?php echo htmlspecialchars($pedido['public_token']); ?>';
-const API_URL      = '../../backend/public/aprovar_orcamento.php';
+const API_URL      = '<?php echo BASE_URL; ?>/backend/public/aprovar_orcamento.php';
 const MAX_PARCELAS = 10;
 const MIN_PARCELAS = 2;
 
@@ -577,22 +543,33 @@ function enviarReprovacao() {
     enviar('Reprovada', { motivo });
 }
 function enviar(status, extras) {
-    fetch(API_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:PEDIDO_TOKEN,status,...extras})})
-    .then(r=>r.json())
-    .then(d=>{
-        if(d.sucesso){
-            document.getElementById('card-pagamento').innerHTML='<div style="text-align:center;padding:20px 0">'+(status==='Aprovada'?'✅ <strong>Orçamento aprovado!</strong><br><span style="font-size:13px;color:#555">Entraremos em contato em breve com as instruções de pagamento.</span>':'❌ <strong>Orçamento não aprovado.</strong><br><span style="font-size:13px;color:#555">Registro enviado. Obrigado pelo retorno!</span>')+'</div>';
-            setTimeout(()=>location.reload(),2500);
-        } else { alert('❌ Erro: '+(d.erro||'Tente novamente.')); }
+    fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: PEDIDO_TOKEN, status, ...extras })
     })
-    .catch(()=>alert('❌ Erro de conexão. Tente novamente.'));
+    .then(r => r.json())
+    .then(d => {
+        if (d.sucesso) {
+            document.getElementById('card-pagamento').innerHTML =
+                '<div style="text-align:center;padding:20px 0">' +
+                (status==='Aprovada'
+                    ? '✅ <strong>Orçamento aprovado!</strong><br><span style="font-size:13px;color:#555">Entraremos em contato em breve com as instruções de pagamento.</span>'
+                    : '❌ <strong>Orçamento não aprovado.</strong><br><span style="font-size:13px;color:#555">Registro enviado. Obrigado pelo retorno!</span>'
+                ) + '</div>';
+            setTimeout(() => location.reload(), 2500);
+        } else {
+            alert('❌ Erro: ' + (d.erro || 'Tente novamente.'));
+        }
+    })
+    .catch(() => alert('❌ Erro de conexão. Tente novamente.'));
 }
 function copiarPix() {
     navigator.clipboard.writeText(document.getElementById('chave-pix').textContent)
-    .then(()=>{ const b=document.querySelector('.instrucao-copia'); b.textContent='✅ Copiado!'; setTimeout(()=>b.innerHTML='📋 Copiar chave PIX',2000); })
-    .catch(()=>alert('Chave PIX: '+document.getElementById('chave-pix').textContent));
+    .then(() => { const b = document.querySelector('.instrucao-copia'); b.textContent='✅ Copiado!'; setTimeout(()=>b.innerHTML='📋 Copiar chave PIX',2000); })
+    .catch(() => alert('Chave PIX: ' + document.getElementById('chave-pix').textContent));
 }
-document.getElementById('modal-reprovacao').addEventListener('click',function(e){if(e.target===this)fecharModal();});
+document.getElementById('modal-reprovacao').addEventListener('click', function(e){ if(e.target===this) fecharModal(); });
 </script>
 <?php else: ?>
 <script>
@@ -600,8 +577,8 @@ function copiarPix() {
     const el = document.getElementById('chave-pix');
     if (!el) return;
     navigator.clipboard.writeText(el.textContent)
-    .then(()=>{ const b=document.querySelector('.instrucao-copia'); b.textContent='✅ Copiado!'; setTimeout(()=>b.innerHTML='📋 Copiar chave PIX',2000); })
-    .catch(()=>alert('Chave PIX: '+el.textContent));
+    .then(() => { const b=document.querySelector('.instrucao-copia'); b.textContent='✅ Copiado!'; setTimeout(()=>b.innerHTML='📋 Copiar chave PIX',2000); })
+    .catch(() => alert('Chave PIX: '+el.textContent));
 }
 </script>
 <?php endif; ?>
