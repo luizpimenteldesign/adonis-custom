@@ -1,10 +1,10 @@
 <?php
 /**
  * DETALHES DO PEDIDO - SISTEMA ADONIS
- * Versão: 3.6
- * - Remove botão Aprovar do painel (aprovação é exclusiva do cliente pelo link)
- * - Card de resumo de pagamento para todos os tipos (PIX, Entrada, Cartão)
- * - Card maquininha apenas quando pagamento = Cartão
+ * Versão: 4.0
+ * - Botões dos novos sub-status de serviço no painel admin
+ * - Badges visuais para todos os sub-status
+ * - Cards de pagamento para todos os tipos
  * Data: 27/02/2026
  */
 
@@ -70,7 +70,6 @@ try {
         $historico = $stmt_hist->fetchAll(PDO::FETCH_ASSOC);
     } catch (PDOException $e) {}
 
-    // Dados de pagamento registrados pelo cliente ao aprovar
     $pagamento_info = null;
     try {
         $stmt_pag = $conn->prepare("
@@ -88,17 +87,28 @@ try {
     header('Location: dashboard.php?erro=banco'); exit;
 }
 
-function formatarStatusDetalhes($status) {
-    $badges = [
-        'Pre-OS'               => '<span class="badge badge-new">🗒️ Pré-OS</span>',
-        'Em analise'           => '<span class="badge badge-info">🔍 Em Análise</span>',
-        'Orcada'               => '<span class="badge badge-warning">💰 Orçada</span>',
-        'Aguardando aprovacao' => '<span class="badge badge-warning">⏳ Aguardando Aprovação</span>',
-        'Aprovada'             => '<span class="badge badge-success">✅ Aprovada</span>',
-        'Reprovada'            => '<span class="badge badge-danger">❌ Reprovada</span>',
-        'Cancelada'            => '<span class="badge badge-dark">🚫 Cancelada</span>',
-    ];
-    return $badges[$status] ?? '<span class="badge badge-secondary">' . htmlspecialchars($status) . '</span>';
+// Mapa completo de status: label, badge CSS, ícone
+$status_map = [
+    'Pre-OS'                        => ['label'=>'Pré-OS',                       'badge'=>'badge-new',     'icone'=>'🗒️'],
+    'Em analise'                    => ['label'=>'Em Análise',                   'badge'=>'badge-info',    'icone'=>'🔍'],
+    'Orcada'                        => ['label'=>'Orçada',                       'badge'=>'badge-warning', 'icone'=>'💰'],
+    'Aguardando aprovacao'          => ['label'=>'Aguardando Aprovação',         'badge'=>'badge-warning', 'icone'=>'⏳'],
+    'Aprovada'                      => ['label'=>'Aguardando Pagamento',         'badge'=>'badge-success', 'icone'=>'💳'],
+    'Pagamento recebido'            => ['label'=>'Pagamento Recebido',           'badge'=>'badge-success', 'icone'=>'✅'],
+    'Instrumento recebido'          => ['label'=>'Instrumento Recebido',         'badge'=>'badge-success', 'icone'=>'📦'],
+    'Servico iniciado'              => ['label'=>'Serviço Iniciado',             'badge'=>'badge-purple',  'icone'=>'🔧'],
+    'Em desenvolvimento'            => ['label'=>'Em Desenvolvimento',           'badge'=>'badge-purple',  'icone'=>'⚙️'],
+    'Servico finalizado'            => ['label'=>'Serviço Finalizado',           'badge'=>'badge-success', 'icone'=>'🎸'],
+    'Pronto para retirada'          => ['label'=>'Pronto para Retirada',        'badge'=>'badge-warning', 'icone'=>'🎉'],
+    'Aguardando pagamento retirada' => ['label'=>'Pag. Pendente (Retirada)',    'badge'=>'badge-warning', 'icone'=>'💵'],
+    'Entregue'                      => ['label'=>'Entregue',                    'badge'=>'badge-dark',    'icone'=>'🏁'],
+    'Reprovada'                     => ['label'=>'Reprovada',                   'badge'=>'badge-danger',  'icone'=>'❌'],
+    'Cancelada'                     => ['label'=>'Cancelada',                   'badge'=>'badge-dark',    'icone'=>'🚫'],
+];
+
+function badgeStatus($status, $map) {
+    $info = $map[$status] ?? ['label'=>$status,'badge'=>'badge-secondary','icone'=>'•'];
+    return '<span class="badge '.$info['badge'].'">'.$info['icone'].' '.$info['label'].'</span>';
 }
 
 $v = time();
@@ -114,6 +124,11 @@ $v = time();
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="assets/css/admin.css?v=<?php echo $v; ?>">
     <style>
+        .badge-purple{background:#6a1b9a;color:#fff}
+        /* Grupo de botões por fase */
+        .btn-group-fase{margin-bottom:10px}
+        .btn-group-fase-titulo{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#aaa;margin-bottom:6px}
+        .btn-group-fase .actions{flex-wrap:wrap;gap:8px}
         /* Modais */
         .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;justify-content:center;align-items:center;padding:20px}
         .modal-overlay.aberto{display:flex}
@@ -126,7 +141,7 @@ $v = time();
         .modal-box textarea{resize:vertical;min-height:80px}
         .modal-hint{font-size:11px;color:#aaa;margin-top:4px}
         .modal-actions{display:flex;gap:12px;margin-top:20px;justify-content:flex-end}
-        /* Simulador orçamento */
+        /* Simulador */
         .sim-sep{border:none;border-top:2px dashed #e0e0e0;margin:20px 0}
         .sim-titulo{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#888;margin-bottom:12px}
         .sim-cards{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px}
@@ -138,15 +153,15 @@ $v = time();
         .sim-card-sub{font-size:11px;color:#666;margin-top:5px;line-height:1.4}
         .sim-card.maquina .sim-card-valor{color:#e65100}
         .sim-aviso{font-size:12px;color:#555;background:#f8f9fa;border-radius:6px;padding:10px 14px;margin-bottom:12px;line-height:1.8;border-left:3px solid #0d9488}
-        /* Card pagamento aprovado (todos os tipos) */
+        /* Card pagamento aprovado */
         .pgto-aprovado-card{border-radius:12px;padding:20px 22px;margin-bottom:20px;border:2px solid #a5d6a7;background:#f1f8e9}
         .pgto-aprovado-titulo{font-size:13px;font-weight:700;color:#2e7d32;text-transform:uppercase;letter-spacing:.5px;margin-bottom:14px;display:flex;align-items:center;gap:6px}
         .pgto-aprovado-linha{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #c8e6c9;font-size:14px}
         .pgto-aprovado-linha:last-child{border-bottom:none}
         .pgto-aprovado-lbl{color:#388e3c;font-weight:500}
         .pgto-aprovado-val{font-weight:700;color:#1b5e20;font-size:15px}
-        .pgto-aprovado-val.destaque{font-size:19px;color:#1b5e20}
-        /* Card maquininha (só para cartão) */
+        .pgto-aprovado-val.destaque{font-size:19px}
+        /* Card maquininha */
         .maq-card{background:#fff8e1;border:2px solid #ffc107;border-radius:12px;padding:20px 22px;margin-bottom:20px}
         .maq-card-titulo{font-size:13px;font-weight:700;color:#e65100;text-transform:uppercase;letter-spacing:.5px;margin-bottom:14px;display:flex;align-items:center;gap:6px}
         .maq-linha{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid #ffe082;font-size:14px}
@@ -190,7 +205,7 @@ $v = time();
         <div class="card-header">
             <div>
                 <h2 class="card-title">Status do Pedido</h2>
-                <div id="status-badge" style="margin-top:8px"><?php echo formatarStatusDetalhes($pedido['status']); ?></div>
+                <div id="status-badge" style="margin-top:8px"><?php echo badgeStatus($pedido['status'], $status_map); ?></div>
                 <?php if (!empty($pedido['valor_orcamento'])): ?>
                 <div style="margin-top:10px;font-size:14px;color:#2e7d32;font-weight:600">
                     💰 Orçamento: R$ <?php echo number_format($pedido['valor_orcamento'],2,',','.'); ?>
@@ -205,98 +220,106 @@ $v = time();
                 </div>
                 <?php endif; ?>
             </div>
+        </div>
+
+        <!-- FASE 1: Triagem -->
+        <div class="btn-group-fase">
+            <div class="btn-group-fase-titulo">📋 Fase 1 — Triagem</div>
             <div class="actions">
-                <button class="btn btn-info"    onclick="atualizarStatus('Em analise')">🔍 Analisar</button>
+                <button class="btn btn-info"    onclick="atualizarStatus('Em analise')">🔍 Em Análise</button>
                 <button class="btn btn-warning" onclick="abrirModalOrcamento()">💰 Orçar</button>
                 <button class="btn btn-danger"  onclick="abrirModalReprovacao()">❌ Reprovar</button>
                 <button class="btn btn-dark"    onclick="atualizarStatus('Cancelada')">🚫 Cancelar</button>
             </div>
         </div>
-        <div class="info-grid">
+
+        <!-- FASE 2: Recebimento -->
+        <div class="btn-group-fase" style="margin-top:14px">
+            <div class="btn-group-fase-titulo">💳 Fase 2 — Recebimento</div>
+            <div class="actions">
+                <button class="btn btn-success" onclick="atualizarStatus('Pagamento recebido')">✅ Pagamento Recebido</button>
+                <button class="btn btn-success" onclick="atualizarStatus('Instrumento recebido')">📦 Instrumento Recebido</button>
+            </div>
+        </div>
+
+        <!-- FASE 3: Execução -->
+        <div class="btn-group-fase" style="margin-top:14px">
+            <div class="btn-group-fase-titulo">⚙️ Fase 3 — Execução do Serviço</div>
+            <div class="actions">
+                <button class="btn btn-purple" onclick="atualizarStatus('Servico iniciado')">🔧 Serviço Iniciado</button>
+                <button class="btn btn-purple" onclick="atualizarStatus('Em desenvolvimento')">⚙️ Em Desenvolvimento</button>
+                <button class="btn btn-success" onclick="atualizarStatus('Servico finalizado')">🎸 Serviço Finalizado</button>
+            </div>
+        </div>
+
+        <!-- FASE 4: Entrega -->
+        <div class="btn-group-fase" style="margin-top:14px">
+            <div class="btn-group-fase-titulo">🎉 Fase 4 — Entrega</div>
+            <div class="actions">
+                <button class="btn btn-warning" onclick="atualizarStatus('Pronto para retirada')">🎉 Pronto p/ Retirada</button>
+                <button class="btn btn-warning" onclick="atualizarStatus('Aguardando pagamento retirada')">💵 Pag. Pendente Retirada</button>
+                <button class="btn btn-dark"    onclick="atualizarStatus('Entregue')">🏁 Entregue</button>
+            </div>
+        </div>
+
+        <div class="info-grid" style="margin-top:16px">
             <div class="info-item"><div class="info-label">Data de Criação</div><div class="info-value"><?php echo date('d/m/Y H:i', strtotime($pedido['criado_em'])); ?></div></div>
             <div class="info-item"><div class="info-label">Última Atualização</div><div class="info-value" id="atualizado-em"><?php echo date('d/m/Y H:i', strtotime($pedido['atualizado_em'])); ?></div></div>
         </div>
     </div>
 
-    <?php if ($pedido['status'] === 'Aprovada' && !empty($pagamento_info)): ?>
-
-    <?php
-        $forma       = $pagamento_info['forma_pagamento'] ?? '';
-        $vf          = (float)($pagamento_info['valor_final']  ?? 0);
-        $parcelas    = (int)  ($pagamento_info['parcelas']     ?? 0);
-        $por_parcela = (float)($pagamento_info['por_parcela']  ?? 0);
-        $descricao   = $pagamento_info['descricao_pagamento']  ?? $forma;
-
-        // Ternarios de rótulo / ícone por forma
-        $pgto_icone = '💳';
+    <!-- CARD PAGAMENTO APROVADO -->
+    <?php if (!empty($pagamento_info) && !empty($pagamento_info['forma_pagamento'])):
+        $forma       = $pagamento_info['forma_pagamento'];
+        $vf          = (float)($pagamento_info['valor_final'] ?? 0);
+        $parcelas    = (int)  ($pagamento_info['parcelas'] ?? 0);
+        $por_parcela = (float)($pagamento_info['por_parcela'] ?? 0);
+        $descricao   = $pagamento_info['descricao_pagamento'] ?? $forma;
+        $pgto_icone  = '💳';
         if (stripos($forma,'pix') !== false || stripos($forma,'dinheiro') !== false) $pgto_icone = '🟢';
         elseif (stripos($forma,'entrada') !== false) $pgto_icone = '🔑';
         elseif (stripos($forma,'cart') !== false)    $pgto_icone = '📳';
     ?>
-
-    <!-- CARD RESUMO DE PAGAMENTO -->
     <div class="pgto-aprovado-card">
         <div class="pgto-aprovado-titulo"><?php echo $pgto_icone; ?> Pagamento escolhido pelo cliente</div>
-
         <div class="pgto-aprovado-linha">
             <span class="pgto-aprovado-lbl">Forma</span>
             <span class="pgto-aprovado-val"><?php echo htmlspecialchars($descricao ?: $forma); ?></span>
         </div>
-
         <div class="pgto-aprovado-linha">
             <span class="pgto-aprovado-lbl">Valor total</span>
-            <span class="pgto-aprovado-val destaque">R$ <?php echo number_format($vf, 2, ',', '.'); ?></span>
+            <span class="pgto-aprovado-val destaque">R$ <?php echo number_format($vf,2,',','.'); ?></span>
         </div>
-
         <?php if ($parcelas > 0 && stripos($forma,'cart') !== false): ?>
         <div class="pgto-aprovado-linha">
             <span class="pgto-aprovado-lbl">Parcelas</span>
-            <span class="pgto-aprovado-val"><?php echo $parcelas; ?>x de R$ <?php echo number_format($por_parcela, 2, ',', '.'); ?></span>
+            <span class="pgto-aprovado-val"><?php echo $parcelas; ?>x de R$ <?php echo number_format($por_parcela,2,',','.'); ?></span>
         </div>
         <?php elseif (stripos($forma,'entrada') !== false): ?>
         <div class="pgto-aprovado-linha">
-            <span class="pgto-aprovado-lbl">Entrada (50% agora)</span>
-            <span class="pgto-aprovado-val">R$ <?php echo number_format($vf * 0.5, 2, ',', '.'); ?></span>
+            <span class="pgto-aprovado-lbl">Entrada</span>
+            <span class="pgto-aprovado-val">R$ <?php echo number_format($vf*0.5,2,',','.'); ?></span>
         </div>
         <div class="pgto-aprovado-linha">
-            <span class="pgto-aprovado-lbl">Na retirada (50%)</span>
-            <span class="pgto-aprovado-val">R$ <?php echo number_format($vf * 0.5, 2, ',', '.'); ?></span>
+            <span class="pgto-aprovado-lbl">Retirada</span>
+            <span class="pgto-aprovado-val">R$ <?php echo number_format($vf*0.5,2,',','.'); ?></span>
         </div>
         <?php endif; ?>
     </div>
-
-    <?php if (stripos($forma, 'cart') !== false && $parcelas > 0):
-        // Back-calculate: valor real a digitar na máquina
-        $taxa_aprox      = $vf > 2000 ? 15.38 : 21.58;
-        $maq_valor_real  = $vf / (1 + $taxa_aprox / 100);
-        $maq_por_parcela = $vf / $parcelas;
+    <?php if (stripos($forma,'cart') !== false && $parcelas > 0):
+        $taxa_aprox     = $vf > 2000 ? 15.38 : 21.58;
+        $maq_valor_real = $vf / (1 + $taxa_aprox / 100);
     ?>
-    <!-- CARD MAQUININHA (somente cartão) -->
     <div class="maq-card">
-        <div class="maq-card-titulo">📳 Instrução para cobrar na maquininha</div>
-        <div class="maq-linha">
-            <span class="maq-lbl">📳 Digite na máquina</span>
-            <span class="maq-val destaque">R$ <?php echo number_format($maq_valor_real, 2, ',', '.'); ?></span>
-        </div>
-        <div class="maq-linha">
-            <span class="maq-lbl">Parcelas a selecionar</span>
-            <span class="maq-val"><?php echo $parcelas; ?>x</span>
-        </div>
-        <div class="maq-linha">
-            <span style="font-size:12px;color:#999">→ Cliente pagará <?php echo $parcelas; ?>x de
-            R$ <?php echo number_format($maq_por_parcela, 2, ',', '.'); ?>
-            = <strong>R$ <?php echo number_format($vf, 2, ',', '.'); ?></strong></span>
-        </div>
-        <div style="margin-top:12px;font-size:12px;color:#795548;background:#fff3e0;border-radius:6px;padding:8px 12px">
-            ⚠️ Digite <strong>R$ <?php echo number_format($maq_valor_real, 2, ',', '.'); ?></strong>
-            na máquina e selecione <strong><?php echo $parcelas; ?>x</strong>.
-            A máquina aplicará a taxa e o cliente pagará exatamente
-            <strong>R$ <?php echo number_format($vf, 2, ',', '.'); ?></strong>.
+        <div class="maq-card-titulo">📳 Instrução para a maquininha</div>
+        <div class="maq-linha"><span class="maq-lbl">Digite na máquina</span><span class="maq-val destaque">R$ <?php echo number_format($maq_valor_real,2,',','.'); ?></span></div>
+        <div class="maq-linha"><span class="maq-lbl">Parcelas</span><span class="maq-val"><?php echo $parcelas; ?>x</span></div>
+        <div style="margin-top:10px;font-size:12px;color:#795548;background:#fff3e0;border-radius:6px;padding:8px 12px">
+            ⚠️ Digite <strong>R$ <?php echo number_format($maq_valor_real,2,',','.'); ?></strong> e selecione <strong><?php echo $parcelas; ?>x</strong>.
+            Cliente paga exatamente <strong>R$ <?php echo number_format($vf,2,',','.'); ?></strong>.
         </div>
     </div>
-    <?php endif; ?>
-
-    <?php endif; /* fim bloco status=Aprovada */ ?>
+    <?php endif; endif; ?>
 
     <!-- DADOS DO CLIENTE -->
     <div class="card">
@@ -329,7 +352,7 @@ $v = time();
             <div class="info-item"><div class="info-label">Modelo</div><div class="info-value"><?php echo htmlspecialchars($pedido['instrumento_modelo']); ?></div></div>
             <?php if (!empty($pedido['instrumento_cor'])): ?><div class="info-item"><div class="info-label">Cor</div><div class="info-value"><?php echo htmlspecialchars($pedido['instrumento_cor']); ?></div></div><?php endif; ?>
             <?php if (!empty($pedido['instrumento_referencia'])): ?><div class="info-item"><div class="info-label">Referência</div><div class="info-value"><?php echo htmlspecialchars($pedido['instrumento_referencia']); ?></div></div><?php endif; ?>
-            <?php if (!empty($pedido['instrumento_serie'])): ?><div class="info-item"><div class="info-label">Número de Série</div><div class="info-value"><?php echo htmlspecialchars($pedido['instrumento_serie'])); ?></div></div><?php endif; ?>
+            <?php if (!empty($pedido['instrumento_serie'])): ?><div class="info-item"><div class="info-label">Nº de Série</div><div class="info-value"><?php echo htmlspecialchars($pedido['instrumento_serie']); ?></div></div><?php endif; ?>
         </div>
     </div>
 
@@ -353,9 +376,9 @@ $v = time();
                 </tbody>
                 <tfoot>
                     <tr>
-                        <td colspan="2">Estimativa base (<?php echo count($servicos); ?> serviço<?php echo count($servicos)>1?'s':''; ?>)</td>
+                        <td colspan="2">Estimativa base</td>
                         <td class="total-valor">R$ <?php echo number_format($total_valor,2,',','.'); ?><span class="total-obs">soma dos valores base</span></td>
-                        <td class="total-prazo"><?php echo $total_prazo; ?> dias<span class="total-obs">prazo acumulado base</span></td>
+                        <td class="total-prazo"><?php echo $total_prazo; ?> dias<span class="total-obs">prazo acumulado</span></td>
                     </tr>
                 </tfoot>
             </table>
@@ -386,15 +409,16 @@ $v = time();
     <div class="card">
         <div class="card-header"><h2 class="card-title">🕓 Histórico de Status</h2></div>
         <?php if (empty($historico)): ?>
-            <div style="color:#888;font-size:14px;padding:8px 0">Nenhuma alteração registrada ainda.</div>
+            <div style="color:#888;font-size:14px;padding:8px 0">Nenhuma alteração registrada.</div>
         <?php else: ?>
             <ul class="timeline">
-            <?php $icones=['Pre-OS'=>'🗒️','Em analise'=>'🔍','Orcada'=>'💰','Aguardando aprovacao'=>'⏳','Aprovada'=>'✅','Reprovada'=>'❌','Cancelada'=>'🚫'];
-            foreach ($historico as $h): ?>
+            <?php foreach ($historico as $h):
+                $hi = $status_map[$h['status']] ?? ['icone'=>'•','label'=>$h['status']];
+            ?>
             <li class="timeline-item">
-                <div class="timeline-dot"><?php echo $icones[$h['status']] ?? '•'; ?></div>
+                <div class="timeline-dot"><?php echo $hi['icone']; ?></div>
                 <div class="timeline-content">
-                    <div class="timeline-status"><?php echo htmlspecialchars($h['status']); ?></div>
+                    <div class="timeline-status"><?php echo htmlspecialchars($hi['label']); ?></div>
                     <div class="timeline-meta"><?php echo date('d/m/Y H:i', strtotime($h['criado_em'])); ?><?php if (!empty($h['admin_nome'])): ?> &mdash; <?php echo htmlspecialchars($h['admin_nome']); ?><?php endif; ?></div>
                     <?php if (!empty($h['valor_orcamento'])): ?>
                     <div class="timeline-detalhe valor">💰 R$ <?php echo number_format($h['valor_orcamento'],2,',','.'); ?><?php if (!empty($h['prazo_orcamento'])): ?> &nbsp;📅 <?php echo (int)$h['prazo_orcamento']; ?> dias úteis<?php endif; ?></div>
@@ -424,37 +448,30 @@ $v = time();
 <div class="modal-overlay" id="modal-orcamento">
     <div class="modal-box">
         <div class="modal-title">💰 Definir Orçamento</div>
-
         <label>Valor total dos serviços (R$)</label>
-        <input type="number" id="input-valor" min="0" step="0.01" placeholder="Ex: 350.00"
-               oninput="simularValores()">
-
+        <input type="number" id="input-valor" min="0" step="0.01" placeholder="Ex: 350.00" oninput="simularValores()">
         <label>Prazo de entrega (dias úteis)</label>
         <input type="number" id="input-prazo" min="1" step="1" placeholder="Ex: 7">
         <div class="modal-hint">💡 Dias úteis (sem sábados, domingos e feriados)</div>
-
         <hr class="sim-sep">
-        <div class="sim-titulo">📊 Simulação de valores &mdash; escolha o que enviar ao cliente</div>
-
+        <div class="sim-titulo">📊 Simulação — escolha o valor a enviar ao cliente</div>
         <div class="sim-cards">
             <div class="sim-card" id="card-base" onclick="escolherValor('base')">
                 <div class="sim-card-label">Valor Base</div>
                 <div class="sim-card-valor" id="sim-base-valor">&mdash;</div>
-                <div class="sim-card-sub">Sem taxa de máquina<br>Cliente vê descontos ao escolher pagamento</div>
+                <div class="sim-card-sub">Sem taxa de máquina</div>
             </div>
             <div class="sim-card maquina" id="card-maquina" onclick="escolherValor('maquina')">
                 <div class="sim-card-label">Valor Máquina (10x)</div>
                 <div class="sim-card-valor" id="sim-maquina-valor">&mdash;</div>
-                <div class="sim-card-sub" id="sim-maquina-sub">Pior caso: Elo/Amex 10x<br>Valor arredondado para cima</div>
+                <div class="sim-card-sub" id="sim-maquina-sub">Pior caso: Elo/Amex 10x</div>
             </div>
         </div>
-
         <div class="sim-aviso" id="sim-aviso" style="display:none"></div>
         <input type="hidden" id="input-valor-final">
-
         <div class="modal-actions">
             <button class="btn btn-secondary" onclick="fecharModal('modal-orcamento')">Cancelar</button>
-            <button class="btn btn-warning" id="btn-confirmar-orc" onclick="confirmarOrcamento()" disabled>💰 Enviar Orçamento ao Cliente</button>
+            <button class="btn btn-warning" id="btn-confirmar-orc" onclick="confirmarOrcamento()" disabled>💰 Enviar Orçamento</button>
         </div>
     </div>
 </div>
@@ -464,7 +481,7 @@ $v = time();
     <div class="modal-box">
         <div class="modal-title">❌ Motivo da Reprovação</div>
         <label for="input-motivo">Descreva o motivo</label>
-        <textarea id="input-motivo" placeholder="Ex: Peça indisponível, serviço não realizável..."></textarea>
+        <textarea id="input-motivo" placeholder="Ex: Peça indisponível..."></textarea>
         <div class="modal-actions">
             <button class="btn btn-secondary" onclick="fecharModal('modal-reprovacao')">Cancelar</button>
             <button class="btn btn-danger" onclick="confirmarReprovacao()">❌ Confirmar Reprovação</button>
@@ -475,21 +492,12 @@ $v = time();
 <script>
 const _pedidoId  = <?php echo $preos_id; ?>;
 const _totalBase = <?php echo (float)$total_valor; ?>;
-const _statusLabels  = {
-    'Pre-OS':'🗒️ Pré-OS','Em analise':'🔍 Em Análise','Orcada':'💰 Orçada',
-    'Aguardando aprovacao':'⏳ Aguardando Aprovação','Aprovada':'✅ Aprovada',
-    'Reprovada':'❌ Reprovada','Cancelada':'🚫 Cancelada'
-};
-const _statusClasses = {
-    'Pre-OS':'badge-new','Em analise':'badge-info','Orcada':'badge-warning',
-    'Aguardando aprovacao':'badge-warning','Aprovada':'badge-success',
-    'Reprovada':'badge-danger','Cancelada':'badge-dark'
-};
+const _statusMap = <?php echo json_encode(array_map(fn($v)=>$v['icone'].' '.$v['label'], $status_map)); ?>;
+const _statusBadge = <?php echo json_encode(array_map(fn($v)=>$v['badge'], $status_map)); ?>;
 
 function taxaMaquina(v) { return v > 2000 ? 15.38 : 21.58; }
-function fmt(v)    { return 'R$ ' + v.toFixed(2).replace('.',',').replace(/\B(?=(\d{3})+(?!\d))/g,'.'); }
-function fmtInt(v) { return 'R$ ' + v.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g,'.'); }
-
+function fmt(v)    { return 'R$ ' + v.toFixed(2).replace('.',',').replace(/\B(?=(\d{3})+(?!\d))/g,'.'); }
+function fmtInt(v) { return 'R$ ' + v.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g,'.'); }
 let valorEscolhido = null;
 
 function calcMaquina(v) {
@@ -498,121 +506,97 @@ function calcMaquina(v) {
     const real    = inteiro / (1 + taxa / 100);
     return { taxa, inteiro, real };
 }
-
 function simularValores() {
     const v = parseFloat(document.getElementById('input-valor').value);
-    document.getElementById('sim-aviso').style.display = 'none';
-    if (isNaN(v) || v <= 0) {
-        document.getElementById('sim-base-valor').textContent    = '—';
-        document.getElementById('sim-maquina-valor').textContent = '—';
-        return;
+    if (isNaN(v)||v<=0){
+        document.getElementById('sim-base-valor').textContent='—';
+        document.getElementById('sim-maquina-valor').textContent='—'; return;
     }
-    const { taxa, inteiro, real } = calcMaquina(v);
+    const {taxa,inteiro,real} = calcMaquina(v);
     document.getElementById('sim-base-valor').textContent    = fmt(v);
     document.getElementById('sim-maquina-valor').textContent = fmtInt(inteiro);
-    document.getElementById('sim-maquina-sub').innerHTML =
-        'Elo/Amex 10x (' + taxa.toFixed(2) + '%) → arredondado<br>Você digita ' + fmt(real) + ' na máquina';
-    if (valorEscolhido === 'base')    document.getElementById('input-valor-final').value = v.toFixed(2);
-    if (valorEscolhido === 'maquina') document.getElementById('input-valor-final').value = inteiro.toFixed(2);
-    if (valorEscolhido) atualizarAviso(v);
+    document.getElementById('sim-maquina-sub').innerHTML     = 'Elo/Amex 10x ('+taxa.toFixed(2)+'%)<br>Você digita '+fmt(real)+' na máquina';
+    if(valorEscolhido==='base')    document.getElementById('input-valor-final').value=v.toFixed(2);
+    if(valorEscolhido==='maquina') document.getElementById('input-valor-final').value=inteiro.toFixed(2);
+    if(valorEscolhido) atualizarAviso(v);
 }
-
 function escolherValor(tipo) {
     const v = parseFloat(document.getElementById('input-valor').value);
-    if (isNaN(v) || v <= 0) { _toast('Informe o valor dos serviços primeiro', false); return; }
-    valorEscolhido = tipo;
-    document.getElementById('card-base').classList.toggle('ativo',    tipo === 'base');
-    document.getElementById('card-maquina').classList.toggle('ativo', tipo === 'maquina');
-    const { taxa, inteiro, real } = calcMaquina(v);
-    document.getElementById('input-valor-final').value = (tipo === 'base' ? v : inteiro).toFixed(2);
+    if(isNaN(v)||v<=0){_toast('Informe o valor primeiro',false);return;}
+    valorEscolhido=tipo;
+    document.getElementById('card-base').classList.toggle('ativo',tipo==='base');
+    document.getElementById('card-maquina').classList.toggle('ativo',tipo==='maquina');
+    const {taxa,inteiro,real}=calcMaquina(v);
+    document.getElementById('input-valor-final').value=(tipo==='base'?v:inteiro).toFixed(2);
     atualizarAviso(v);
-    document.getElementById('btn-confirmar-orc').disabled = false;
+    document.getElementById('btn-confirmar-orc').disabled=false;
 }
-
-function atualizarAviso(v) {
-    if (!valorEscolhido) return;
-    const { taxa, inteiro, real } = calcMaquina(v);
-    const aviso = document.getElementById('sim-aviso');
-    aviso.style.display = 'block';
-    if (valorEscolhido === 'base') {
-        aviso.innerHTML = 'ℹ️ <strong>Valor enviado ao cliente: ' + fmt(v) + '</strong><br>' +
-            'Cliente escolhe a forma de pagamento e os descontos/parcelas são calculados a partir deste valor.';
-    } else {
-        aviso.innerHTML = 'ℹ️ <strong>Valor enviado ao cliente: ' + fmtInt(inteiro) + '</strong> (valor inteiro)<br>' +
-            '📳 Na máquina: digite <strong>' + fmt(real) + '</strong> e selecione <strong>10x</strong>.<br>' +
-            'A taxa (' + taxa.toFixed(2) + '%) fará o cliente pagar exatamente <strong>' + fmtInt(inteiro) + '</strong>.';
-    }
+function atualizarAviso(v){
+    if(!valorEscolhido) return;
+    const {taxa,inteiro,real}=calcMaquina(v);
+    const el=document.getElementById('sim-aviso'); el.style.display='block';
+    el.innerHTML = valorEscolhido==='base'
+        ? 'ℹ️ <strong>Enviando ao cliente: '+fmt(v)+'</strong><br>Descontos e parcelas calculados a partir deste valor.'
+        : 'ℹ️ <strong>Enviando ao cliente: '+fmtInt(inteiro)+'</strong><br>📳 Digitar na máquina: <strong>'+fmt(real)+'</strong> em <strong>10x</strong>.';
 }
-
-function confirmarOrcamento() {
-    const valorFinal = parseFloat(document.getElementById('input-valor-final').value);
-    const prazo      = parseInt(document.getElementById('input-prazo').value);
-    if (isNaN(valorFinal) || valorFinal <= 0) { _toast('Escolha o valor a enviar ao cliente', false); return; }
-    if (isNaN(prazo) || prazo <= 0)            { _toast('Informe o prazo em dias úteis', false); return; }
+function confirmarOrcamento(){
+    const vf=parseFloat(document.getElementById('input-valor-final').value);
+    const pr=parseInt(document.getElementById('input-prazo').value);
+    if(isNaN(vf)||vf<=0){_toast('Escolha o valor a enviar',false);return;}
+    if(isNaN(pr)||pr<=0){_toast('Informe o prazo',false);return;}
     fecharModal('modal-orcamento');
-    _enviar('Orcada', { valor_orcamento: valorFinal, prazo_orcamento: prazo });
+    _enviar('Orcada',{valor_orcamento:vf,prazo_orcamento:pr});
 }
-function confirmarReprovacao() {
-    const motivo = document.getElementById('input-motivo').value.trim();
-    if (!motivo) { _toast('Informe o motivo da reprovação', false); return; }
+function confirmarReprovacao(){
+    const m=document.getElementById('input-motivo').value.trim();
+    if(!m){_toast('Informe o motivo',false);return;}
     fecharModal('modal-reprovacao');
-    _enviar('Reprovada', { motivo });
+    _enviar('Reprovada',{motivo:m});
 }
-function atualizarStatus(s) {
-    if (!confirm('Alterar status para "' + _statusLabels[s] + '"?')) return;
-    _enviar(s, {});
+function atualizarStatus(s){
+    const label = _statusMap[s] || s;
+    if(!confirm('Alterar status para "'+label+'"?')) return;
+    _enviar(s,{});
 }
-function _toast(msg, ok) {
-    const el = document.createElement('div');
-    el.textContent = msg;
-    el.style.cssText = 'position:fixed;bottom:24px;right:24px;padding:12px 20px;border-radius:8px;font-size:14px;z-index:9999;color:#fff;background:'+(ok?'#2d7a2d':'#a00');
-    document.body.appendChild(el);
-    setTimeout(() => el.remove(), 3500);
+function _toast(msg,ok){
+    const el=document.createElement('div');
+    el.textContent=msg;
+    el.style.cssText='position:fixed;bottom:24px;right:24px;padding:12px 20px;border-radius:8px;font-size:14px;z-index:9999;color:#fff;background:'+(ok?'#2d7a2d':'#a00');
+    document.body.appendChild(el); setTimeout(()=>el.remove(),3500);
 }
-function abrirModal(id)  { document.getElementById(id).classList.add('aberto'); }
-function fecharModal(id) { document.getElementById(id).classList.remove('aberto'); }
-function abrirModalOrcamento() {
-    valorEscolhido = null;
-    document.getElementById('input-valor').value        = _totalBase > 0 ? _totalBase.toFixed(2) : '';
-    document.getElementById('input-prazo').value        = '';
-    document.getElementById('input-valor-final').value  = '';
-    document.getElementById('btn-confirmar-orc').disabled = true;
-    document.getElementById('sim-aviso').style.display  = 'none';
-    ['card-base','card-maquina'].forEach(id => document.getElementById(id).classList.remove('ativo'));
-    simularValores();
-    abrirModal('modal-orcamento');
-    setTimeout(() => document.getElementById('input-valor').focus(), 100);
+function abrirModal(id) {document.getElementById(id).classList.add('aberto');}
+function fecharModal(id){document.getElementById(id).classList.remove('aberto');}
+function abrirModalOrcamento(){
+    valorEscolhido=null;
+    document.getElementById('input-valor').value=_totalBase>0?_totalBase.toFixed(2):'';
+    document.getElementById('input-prazo').value='';
+    document.getElementById('input-valor-final').value='';
+    document.getElementById('btn-confirmar-orc').disabled=true;
+    document.getElementById('sim-aviso').style.display='none';
+    ['card-base','card-maquina'].forEach(id=>document.getElementById(id).classList.remove('ativo'));
+    simularValores(); abrirModal('modal-orcamento');
+    setTimeout(()=>document.getElementById('input-valor').focus(),100);
 }
-function abrirModalReprovacao() {
-    abrirModal('modal-reprovacao');
-    document.getElementById('input-motivo').focus();
-}
-function _enviar(status, extras) {
-    fetch('atualizar_status.php', {
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ id: _pedidoId, status, ...extras })
+function abrirModalReprovacao(){abrirModal('modal-reprovacao');document.getElementById('input-motivo').focus();}
+function _enviar(status,extras){
+    fetch('atualizar_status.php',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:_pedidoId,status,...extras})})
+    .then(r=>r.json())
+    .then(data=>{
+        if(data.sucesso){
+            const badge=_statusBadge[status]||'badge-secondary';
+            const label=_statusMap[status]||status;
+            document.getElementById('status-badge').innerHTML='<span class="badge '+badge+'">'+label+'</span>';
+            const at=document.getElementById('atualizado-em'); if(at) at.textContent=data.atualizado_em;
+            _toast('✅ Status atualizado!',true);
+            setTimeout(()=>location.reload(),1500);
+        } else { _toast('❌ '+(data.erro||'Erro desconhecido'),false); }
     })
-    .then(r => r.json())
-    .then(data => {
-        if (data.sucesso) {
-            document.getElementById('status-badge').innerHTML =
-                '<span class="badge ' + _statusClasses[status] + '">' + _statusLabels[status] + '</span>';
-            const at = document.getElementById('atualizado-em');
-            if (at) at.textContent = data.atualizado_em;
-            _toast('✅ Status atualizado!', true);
-            setTimeout(() => location.reload(), 1500);
-        } else {
-            _toast('❌ ' + (data.erro || 'Erro desconhecido'), false);
-        }
-    })
-    .catch(() => _toast('❌ Erro de conexão', false));
+    .catch(()=>_toast('❌ Erro de conexão',false));
 }
-document.querySelectorAll('.modal-overlay').forEach(o => {
-    o.addEventListener('click', e => { if (e.target === o) o.classList.remove('aberto'); });
+document.querySelectorAll('.modal-overlay').forEach(o=>{
+    o.addEventListener('click',e=>{if(e.target===o) o.classList.remove('aberto');});
 });
 </script>
-
 <script src="assets/js/admin.js?v=<?php echo $v; ?>"></script>
 </body>
 </html>
