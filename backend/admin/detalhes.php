@@ -1,7 +1,7 @@
 <?php
 /**
  * DETALHES DO PEDIDO - SISTEMA ADONIS
- * Versão: 3.4 - card instrução maquininha para o Adonis
+ * Versão: 3.5 - valor máquina sempre inteiro (ceil) + back-calculate valor real da máquina
  * Data: 27/02/2026
  */
 
@@ -67,7 +67,6 @@ try {
         $historico = $stmt_hist->fetchAll(PDO::FETCH_ASSOC);
     } catch (PDOException $e) {}
 
-    // Buscar dados de pagamento aprovado (forma + parcelas)
     $pagamento_info = null;
     try {
         $stmt_pag = $conn->prepare("
@@ -122,7 +121,6 @@ $v = time();
         .modal-box textarea{resize:vertical;min-height:80px}
         .modal-hint{font-size:11px;color:#aaa;margin-top:4px}
         .modal-actions{display:flex;gap:12px;margin-top:20px;justify-content:flex-end}
-        /* Simulador */
         .sim-sep{border:none;border-top:2px dashed #e0e0e0;margin:20px 0}
         .sim-titulo{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#888;margin-bottom:12px}
         .sim-cards{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px}
@@ -133,8 +131,7 @@ $v = time();
         .sim-card-valor{font-size:22px;font-weight:700;color:#1b5e20;line-height:1}
         .sim-card-sub{font-size:11px;color:#666;margin-top:5px;line-height:1.4}
         .sim-card.maquina .sim-card-valor{color:#e65100}
-        .sim-aviso{font-size:12px;color:#888;background:#f8f9fa;border-radius:6px;padding:8px 12px;margin-bottom:12px;line-height:1.6}
-        /* Card instrução maquininha */
+        .sim-aviso{font-size:12px;color:#555;background:#f8f9fa;border-radius:6px;padding:10px 14px;margin-bottom:12px;line-height:1.8;border-left:3px solid #0d9488}
         .maq-card{background:#fff8e1;border:2px solid #ffc107;border-radius:12px;padding:20px 22px;margin-bottom:20px}
         .maq-card-titulo{font-size:13px;font-weight:700;color:#e65100;text-transform:uppercase;letter-spacing:.5px;margin-bottom:14px;display:flex;align-items:center;gap:6px}
         .maq-linha{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid #ffe082;font-size:14px}
@@ -142,7 +139,6 @@ $v = time();
         .maq-lbl{color:#795548;font-weight:500}
         .maq-val{font-weight:700;color:#e65100;font-size:16px}
         .maq-val.destaque{font-size:20px;color:#bf360c}
-        /* Timeline */
         .timeline{list-style:none;padding:0;margin:0;position:relative}
         .timeline::before{content:'';position:absolute;left:18px;top:0;bottom:0;width:2px;background:#e0e0e0}
         .timeline-item{display:flex;gap:16px;padding:0 0 24px 0}
@@ -207,36 +203,38 @@ $v = time();
     </div>
 
     <?php
-    // Card instrução maquininha — só aparece quando o pedido está Aprovado com pagamento em cartão
     $show_maq = $pedido['status'] === 'Aprovada'
                 && !empty($pedido['valor_orcamento'])
                 && !empty($pagamento_info)
                 && $pagamento_info['forma_pagamento'] === 'Cartão';
-
-    // Fallback: mesmo sem coluna forma_pagamento, mostrar se Aprovada + tem orçamento
-    // (o dado pode vir do JSON de pagamento no futuro — por ora usa a query acima)
     if ($show_maq):
-        $maq_valor   = (float) $pagamento_info['valor_final'];
-        $maq_parcelas = (int)  $pagamento_info['parcelas'];
-        $maq_por_parc = $maq_parcelas > 0 ? $maq_valor / $maq_parcelas : $maq_valor;
+        $maq_valor_cliente = (float) $pagamento_info['valor_final'];   // valor inteiro que o cliente aprovou
+        $maq_parcelas      = (int)   $pagamento_info['parcelas'];
+        // taxa usada na geração: 21.58% (<=2000) ou 15.38% (>2000) sobre o valor BASE
+        // Como não salvamos o valor base original, recalculamos a partir do valor_final
+        // usando o mesmo ceil: valor_real = valor_cliente / (1 + taxa/100)
+        // Determinamos a taxa pelo próprio valor_cliente (aproximação segura)
+        $taxa_aprox = $maq_valor_cliente > 2000 ? 15.38 : 21.58;
+        $maq_valor_real  = $maq_valor_cliente / (1 + $taxa_aprox / 100); // valor a digitar na máquina
+        $maq_por_parcela = $maq_parcelas > 0 ? $maq_valor_cliente / $maq_parcelas : $maq_valor_cliente;
     ?>
     <div class="maq-card">
         <div class="maq-card-titulo">📳 Instrução para cobrar na maquininha</div>
         <div class="maq-linha">
-            <span class="maq-lbl">Valor a cobrar na máquina</span>
-            <span class="maq-val destaque">R$ <?php echo number_format($maq_valor, 2, ',', '.'); ?></span>
+            <span class="maq-lbl">📳 Digite na máquina</span>
+            <span class="maq-val destaque">R$ <?php echo number_format($maq_valor_real, 2, ',', '.'); ?></span>
         </div>
         <div class="maq-linha">
-            <span class="maq-lbl">Parcelas</span>
+            <span class="maq-lbl">Parcelas a selecionar</span>
             <span class="maq-val"><?php echo $maq_parcelas; ?>x</span>
         </div>
         <div class="maq-linha">
-            <span class="maq-lbl">Valor por parcela</span>
-            <span class="maq-val">R$ <?php echo number_format($maq_por_parc, 2, ',', '.'); ?></span>
+            <span class="mbl"></span>
+            <span style="font-size:12px;color:#999">→ Cliente pagará <?php echo $maq_parcelas; ?>x de R$ <?php echo number_format($maq_por_parcela, 2, ',', '.'); ?> = <strong>R$ <?php echo number_format($maq_valor_cliente, 2, ',', '.'); ?></strong></span>
         </div>
         <div style="margin-top:12px;font-size:12px;color:#795548;background:#fff3e0;border-radius:6px;padding:8px 12px">
-            ⚠️ Coloque exatamente <strong>R$ <?php echo number_format($maq_valor, 2, ',', '.'); ?></strong> na máquina
-            e selecione <strong><?php echo $maq_parcelas; ?>x</strong>. Não aplique nenhum acréscimo adicional.
+            ⚠️ Digite <strong>R$ <?php echo number_format($maq_valor_real, 2, ',', '.'); ?></strong> na máquina e selecione <strong><?php echo $maq_parcelas; ?>x</strong>.
+            A máquina aplicará a taxa e o cliente pagará exatamente <strong>R$ <?php echo number_format($maq_valor_cliente, 2, ',', '.'); ?></strong>.
         </div>
     </div>
     <?php endif; ?>
@@ -356,7 +354,7 @@ $v = time();
 
 </div>
 
-<!-- MODAL ORÇAMENTO INTELIGENTE -->
+<!-- MODAL ORÇAMENTO -->
 <div class="modal-overlay" id="modal-orcamento">
     <div class="modal-box">
         <div class="modal-title">💰 Definir Orçamento</div>
@@ -372,7 +370,7 @@ $v = time();
         <hr class="sim-sep">
         <div class="sim-titulo">📊 Simulação de valores &mdash; escolha o que enviar ao cliente</div>
 
-        <div class="sim-cards" id="sim-cards">
+        <div class="sim-cards">
             <div class="sim-card" id="card-base" onclick="escolherValor('base')">
                 <div class="sim-card-label">Valor Base</div>
                 <div class="sim-card-valor" id="sim-base-valor">&mdash;</div>
@@ -381,13 +379,11 @@ $v = time();
             <div class="sim-card maquina" id="card-maquina" onclick="escolherValor('maquina')">
                 <div class="sim-card-label">Valor Máquina (10x)</div>
                 <div class="sim-card-valor" id="sim-maquina-valor">&mdash;</div>
-                <div class="sim-card-sub" id="sim-maquina-sub">Pior caso: Elo/Amex 10x<br>Taxa já embutida no valor</div>
+                <div class="sim-card-sub" id="sim-maquina-sub">Pior caso: Elo/Amex 10x<br>Valor arredondado para cima</div>
             </div>
         </div>
 
-        <div class="sim-aviso" id="sim-aviso" style="display:none">
-            ℹ️ <strong>Valor selecionado:</strong> <span id="sim-aviso-texto"></span>
-        </div>
+        <div class="sim-aviso" id="sim-aviso" style="display:none"></div>
 
         <input type="hidden" id="input-valor-final">
 
@@ -412,60 +408,81 @@ $v = time();
 </div>
 
 <script>
-const _pedidoId    = <?php echo $preos_id; ?>;
-const _totalBase   = <?php echo (float)$total_valor; ?>;
+const _pedidoId  = <?php echo $preos_id; ?>;
+const _totalBase = <?php echo (float)$total_valor; ?>;
 const _statusLabels  = {'Pre-OS':'🗒️ Pré-OS','Em analise':'🔍 Em Análise','Orcada':'💰 Orçada','Aguardando aprovacao':'⏳ Aguardando Aprovação','Aprovada':'✅ Aprovada','Reprovada':'❌ Reprovada','Cancelada':'🚫 Cancelada'};
 const _statusClasses = {'Pre-OS':'badge-new','Em analise':'badge-info','Orcada':'badge-warning','Aguardando aprovacao':'badge-warning','Aprovada':'badge-success','Reprovada':'badge-danger','Cancelada':'badge-dark'};
 
-function taxaMaquina(valor) { return valor > 2000 ? 15.38 : 21.58; }
-function fmt(v){ return 'R$\u00a0' + v.toFixed(2).replace('.',',').replace(/\B(?=(\d{3})+(?!\d))/g,'.'); }
+// Retorna taxa Elo/Amex 10x conforme faixa de valor
+function taxaMaquina(v) { return v > 2000 ? 15.38 : 21.58; }
+
+function fmt(v) {
+    return 'R$\u00a0' + v.toFixed(2).replace('.',',').replace(/\B(?=(\d{3})+(?!\d))/g,'.');
+}
+function fmtInt(v) {
+    // Formata sem centavos quando valor é inteiro
+    return 'R$\u00a0' + v.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g,'.');
+}
 
 let valorEscolhido = null;
 
-function abrirModalOrcamento() {
-    valorEscolhido = null;
-    document.getElementById('input-valor').value = _totalBase > 0 ? _totalBase.toFixed(2) : '';
-    document.getElementById('input-prazo').value  = '';
-    document.getElementById('input-valor-final').value = '';
-    document.getElementById('btn-confirmar-orc').disabled = true;
-    document.getElementById('sim-aviso').style.display = 'none';
-    ['card-base','card-maquina'].forEach(id => document.getElementById(id).classList.remove('ativo'));
-    simularValores();
-    abrirModal('modal-orcamento');
-    setTimeout(() => document.getElementById('input-valor').focus(), 100);
+function calcMaquina(v) {
+    const taxa  = taxaMaquina(v);
+    const bruto = v * (1 + taxa / 100);
+    // Arredonda para o próximo inteiro (ceil)
+    const inteiro = Math.ceil(bruto);
+    // Valor real a digitar na máquina para que, após a taxa, o cliente pague `inteiro`
+    const real = inteiro / (1 + taxa / 100);
+    return { taxa, inteiro, real };
 }
 
 function simularValores() {
     const v = parseFloat(document.getElementById('input-valor').value);
+    const aviso = document.getElementById('sim-aviso');
+    aviso.style.display = 'none';
     if (isNaN(v) || v <= 0) {
         document.getElementById('sim-base-valor').textContent    = '—';
         document.getElementById('sim-maquina-valor').textContent = '—';
         return;
     }
-    const taxa = taxaMaquina(v);
-    const vMaq = v * (1 + taxa / 100);
+    const { taxa, inteiro, real } = calcMaquina(v);
     document.getElementById('sim-base-valor').textContent    = fmt(v);
-    document.getElementById('sim-maquina-valor').textContent = fmt(vMaq);
+    // Mostra valor inteiro no card máquina
+    document.getElementById('sim-maquina-valor').textContent = fmtInt(inteiro);
     document.getElementById('sim-maquina-sub').innerHTML =
-        'Pior caso: Elo/Amex 10x (' + taxa.toFixed(2) + '%)<br>Taxa já embutida no valor';
+        'Elo/Amex 10x (' + taxa.toFixed(2) + '%) → arredondado<br>Você digita ' + fmt(real) + ' na máquina';
+    // Atualiza hidden se já escolheu
     if (valorEscolhido === 'base')    document.getElementById('input-valor-final').value = v.toFixed(2);
-    if (valorEscolhido === 'maquina') document.getElementById('input-valor-final').value = vMaq.toFixed(2);
+    if (valorEscolhido === 'maquina') document.getElementById('input-valor-final').value = inteiro.toFixed(2);
+    if (valorEscolhido) atualizarAviso(v);
 }
 
 function escolherValor(tipo) {
     const v = parseFloat(document.getElementById('input-valor').value);
     if (isNaN(v) || v <= 0) { _toast('Informe o valor dos serviços primeiro', false); return; }
     valorEscolhido = tipo;
-    document.getElementById('card-base').classList.toggle('ativo',    tipo==='base');
-    document.getElementById('card-maquina').classList.toggle('ativo', tipo==='maquina');
-    const taxa   = taxaMaquina(v);
-    const vFinal = tipo === 'base' ? v : v * (1 + taxa/100);
+    document.getElementById('card-base').classList.toggle('ativo',    tipo === 'base');
+    document.getElementById('card-maquina').classList.toggle('ativo', tipo === 'maquina');
+    const { taxa, inteiro, real } = calcMaquina(v);
+    const vFinal = tipo === 'base' ? v : inteiro;
     document.getElementById('input-valor-final').value = vFinal.toFixed(2);
+    atualizarAviso(v);
+    document.getElementById('btn-confirmar-orc').disabled = false;
+}
+
+function atualizarAviso(v) {
+    if (!valorEscolhido) return;
+    const { taxa, inteiro, real } = calcMaquina(v);
     const aviso = document.getElementById('sim-aviso');
     aviso.style.display = 'block';
-    document.getElementById('sim-aviso-texto').textContent =
-        fmt(vFinal) + (tipo === 'maquina' ? ' (com taxa ' + taxa.toFixed(2) + '% de 10x Elo/Amex)' : ' (valor base dos serviços)');
-    document.getElementById('btn-confirmar-orc').disabled = false;
+    if (valorEscolhido === 'base') {
+        aviso.innerHTML = 'ℹ️ <strong>Valor enviado ao cliente: ' + fmt(v) + '</strong><br>' +
+            'Cliente escolhe a forma de pagamento e os descontos/parcelas são calculados a partir deste valor.';
+    } else {
+        aviso.innerHTML = 'ℹ️ <strong>Valor enviado ao cliente: ' + fmtInt(inteiro) + '</strong> (valor inteiro, sem centavos)<br>' +
+            '📳 Na máquina: digite <strong>' + fmt(real) + '</strong> e selecione <strong>10x</strong>.<br>' +
+            'A taxa (' + taxa.toFixed(2) + '%) fará o cliente pagar exatamente <strong>' + fmtInt(inteiro) + '</strong>.';
+    }
 }
 
 function confirmarOrcamento() {
@@ -486,7 +503,6 @@ function atualizarStatus(s) {
     if (!confirm('Alterar status para "' + _statusLabels[s] + '"?')) return;
     _enviar(s, {});
 }
-
 function _toast(msg, ok) {
     const el = document.createElement('div');
     el.textContent = msg;
@@ -496,12 +512,24 @@ function _toast(msg, ok) {
 }
 function abrirModal(id)  { document.getElementById(id).classList.add('aberto'); }
 function fecharModal(id) { document.getElementById(id).classList.remove('aberto'); }
+function abrirModalOrcamento() {
+    valorEscolhido = null;
+    document.getElementById('input-valor').value = _totalBase > 0 ? _totalBase.toFixed(2) : '';
+    document.getElementById('input-prazo').value  = '';
+    document.getElementById('input-valor-final').value = '';
+    document.getElementById('btn-confirmar-orc').disabled = true;
+    document.getElementById('sim-aviso').style.display = 'none';
+    ['card-base','card-maquina'].forEach(id => document.getElementById(id).classList.remove('ativo'));
+    simularValores();
+    abrirModal('modal-orcamento');
+    setTimeout(() => document.getElementById('input-valor').focus(), 100);
+}
 function abrirModalReprovacao() { abrirModal('modal-reprovacao'); document.getElementById('input-motivo').focus(); }
 
 function _enviar(status, extras) {
     fetch('atualizar_status.php', {
-        method: 'POST',
-        headers: {'Content-Type':'application/json'},
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
         body: JSON.stringify({ id: _pedidoId, status, ...extras })
     })
     .then(r => r.json())
