@@ -1,7 +1,7 @@
 <?php
 /**
  * PÁGINA PÚBLICA DE ACOMPANHAMENTO DO PEDIDO
- * Versão: 3.1 - query segura (colunas opcionais)
+ * Versão: 4.0 - aprovação/reprovação + formas de pagamento
  * Data: 27/02/2026
  */
 
@@ -18,27 +18,23 @@ if (!empty($token)) {
         $db   = new Database();
         $conn = $db->getConnection();
 
-        // Detecta colunas opcionais que podem ainda não existir
-        $has_prazo  = false;
-        $has_motivo = false;
+        $has_prazo = $has_motivo = false;
         try {
             $cols = $conn->query("SHOW COLUMNS FROM pre_os")->fetchAll(PDO::FETCH_COLUMN);
-            $has_prazo  = in_array('prazo_orcamento',    $cols);
-            $has_motivo = in_array('motivo_reprovacao',  $cols);
+            $has_prazo  = in_array('prazo_orcamento',   $cols);
+            $has_motivo = in_array('motivo_reprovacao', $cols);
         } catch (PDOException $e) {}
 
-        $extra_cols = '';
-        if ($has_prazo)  $extra_cols .= ', p.prazo_orcamento';
-        if ($has_motivo) $extra_cols .= ', p.motivo_reprovacao';
+        $extra = '';
+        if ($has_prazo)  $extra .= ', p.prazo_orcamento';
+        if ($has_motivo) $extra .= ', p.motivo_reprovacao';
 
         $stmt = $conn->prepare("
-            SELECT
-                p.id, p.status, p.criado_em, p.atualizado_em,
-                p.valor_orcamento, p.observacoes
-                {$extra_cols},
-                c.nome as cliente_nome,
-                i.tipo as instrumento_tipo, i.marca as instrumento_marca,
-                i.modelo as instrumento_modelo, i.cor as instrumento_cor
+            SELECT p.id, p.status, p.criado_em, p.atualizado_em,
+                   p.valor_orcamento, p.observacoes, p.public_token $extra,
+                   c.nome as cliente_nome,
+                   i.tipo as instrumento_tipo, i.marca as instrumento_marca,
+                   i.modelo as instrumento_modelo, i.cor as instrumento_cor
             FROM pre_os p
             LEFT JOIN clientes c ON p.cliente_id = c.id
             LEFT JOIN instrumentos i ON p.instrumento_id = i.id
@@ -47,46 +43,25 @@ if (!empty($token)) {
         $stmt->execute([':token' => $token]);
         $pedido = $stmt->fetch(PDO::FETCH_ASSOC);
 
-        // Garantir chaves com valor padrão caso coluna não exista
         if ($pedido) {
             $pedido['prazo_orcamento']   = $pedido['prazo_orcamento']   ?? null;
             $pedido['motivo_reprovacao'] = $pedido['motivo_reprovacao'] ?? null;
-        } else {
-            $erro = 'Pedido não encontrado. Verifique se o código foi digitado corretamente.';
-        }
 
-        if ($pedido) {
-            $stmt_s = $conn->prepare("
-                SELECT s.nome
-                FROM pre_os_servicos ps JOIN servicos s ON ps.servico_id = s.id
-                WHERE ps.pre_os_id = :id
-            ");
+            $stmt_s = $conn->prepare("SELECT s.nome FROM pre_os_servicos ps JOIN servicos s ON ps.servico_id = s.id WHERE ps.pre_os_id = :id");
             $stmt_s->execute([':id' => $pedido['id']]);
             $servicos = $stmt_s->fetchAll(PDO::FETCH_ASSOC);
 
-            // Histórico também com colunas opcionais
             try {
-                $has_hist_prazo = false;
-                try {
-                    $hcols = $conn->query("SHOW COLUMNS FROM status_historico")->fetchAll(PDO::FETCH_COLUMN);
-                    $has_hist_prazo = in_array('prazo_orcamento', $hcols);
-                } catch (PDOException $e) {}
-
-                $hist_prazo_col = $has_hist_prazo ? ', prazo_orcamento' : '';
-                $stmt_h = $conn->prepare("
-                    SELECT status, valor_orcamento{$hist_prazo_col}, motivo, criado_em
-                    FROM status_historico
-                    WHERE pre_os_id = :id ORDER BY criado_em ASC
-                ");
+                $hcols = $conn->query("SHOW COLUMNS FROM status_historico")->fetchAll(PDO::FETCH_COLUMN);
+                $hp    = in_array('prazo_orcamento', $hcols) ? ', prazo_orcamento' : '';
+                $stmt_h = $conn->prepare("SELECT status, valor_orcamento$hp, motivo, criado_em FROM status_historico WHERE pre_os_id = :id ORDER BY criado_em ASC");
                 $stmt_h->execute([':id' => $pedido['id']]);
                 $historico = $stmt_h->fetchAll(PDO::FETCH_ASSOC);
-                foreach ($historico as &$h) {
-                    $h['prazo_orcamento'] = $h['prazo_orcamento'] ?? null;
-                }
-                unset($h);
+                foreach ($historico as &$h) { $h['prazo_orcamento'] = $h['prazo_orcamento'] ?? null; } unset($h);
             } catch (PDOException $e) {}
+        } else {
+            $erro = 'Pedido não encontrado. Verifique se o código foi digitado corretamente.';
         }
-
     } catch (PDOException $e) {
         error_log('Erro acompanhar: ' . $e->getMessage());
         $erro = 'Erro ao buscar informações. Tente novamente.';
@@ -96,14 +71,15 @@ if (!empty($token)) {
 $statusInfo = [
     'Pre-OS'               => ['label'=>'Recebido',              'cor'=>'#1565c0','bg'=>'#e3f2fd','icone'=>'🗒️','desc'=>'Seu pedido foi recebido e está na fila para análise.'],
     'Em analise'           => ['label'=>'Em Análise',            'cor'=>'#00695c','bg'=>'#e0f2f1','icone'=>'🔍','desc'=>'Nosso técnico está avaliando o instrumento.'],
-    'Orcada'               => ['label'=>'Orçamento Pronto',      'cor'=>'#e65100','bg'=>'#fff3e0','icone'=>'💰','desc'=>'O orçamento está disponível. Entre em contato para aprovar.'],
+    'Orcada'               => ['label'=>'Orçamento Pronto',      'cor'=>'#e65100','bg'=>'#fff3e0','icone'=>'💰','desc'=>'O orçamento está disponível. Escolha a forma de pagamento e aprove abaixo.'],
     'Aguardando aprovacao' => ['label'=>'Aguardando Aprovação', 'cor'=>'#f57f17','bg'=>'#fffde7','icone'=>'⏳','desc'=>'Aguardando sua confirmação para iniciar o serviço.'],
     'Aprovada'             => ['label'=>'Em Serviço',            'cor'=>'#1b5e20','bg'=>'#e8f5e9','icone'=>'✅','desc'=>'Serviço aprovado! Estamos trabalhando no seu instrumento.'],
     'Reprovada'            => ['label'=>'Não Aprovado',          'cor'=>'#b71c1c','bg'=>'#ffebee','icone'=>'❌','desc'=>'O orçamento não foi aprovado.'],
     'Cancelada'            => ['label'=>'Cancelado',             'cor'=>'#37474f','bg'=>'#eceff1','icone'=>'🚫','desc'=>'Este pedido foi cancelado.'],
 ];
-
 $icones_hist = ['Pre-OS'=>'🗒️','Em analise'=>'🔍','Orcada'=>'💰','Aguardando aprovacao'=>'⏳','Aprovada'=>'✅','Reprovada'=>'❌','Cancelada'=>'🚫'];
+
+$pode_aprovar = $pedido && in_array($pedido['status'], ['Orcada','Aguardando aprovacao']) && !empty($pedido['valor_orcamento']);
 ?>
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -126,8 +102,7 @@ $icones_hist = ['Pre-OS'=>'🗒️','Em analise'=>'🔍','Orcada'=>'💰','Aguar
         .busca-token form{display:flex;gap:10px;max-width:480px;margin:0 auto}
         .busca-token input{flex:1;padding:11px 16px;border:2px solid #ddd;border-radius:8px;font-size:14px;font-family:inherit;letter-spacing:.5px;transition:border-color .2s}
         .busca-token input:focus{outline:none;border-color:#0d9488}
-        .busca-token button{padding:11px 22px;background:#0d9488;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;white-space:nowrap;transition:background .2s}
-        .busca-token button:hover{background:#0a7c72}
+        .busca-token button{padding:11px 22px;background:#0d9488;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;white-space:nowrap}
         .container{max-width:740px;margin:0 auto;padding:32px 20px}
         .card{background:#fff;border-radius:12px;padding:24px;box-shadow:0 2px 8px rgba(0,0,0,.07);margin-bottom:20px}
         .card-title{font-size:15px;font-weight:700;color:#444;margin-bottom:16px;padding-bottom:10px;border-bottom:2px solid #f0f0f0;display:flex;align-items:center;gap:8px}
@@ -148,6 +123,56 @@ $icones_hist = ['Pre-OS'=>'🗒️','Em analise'=>'🔍','Orcada'=>'💰','Aguar
         .servico-item{padding:9px 0;border-bottom:1px solid #f0f0f0;font-size:14px;color:#444;display:flex;align-items:center;gap:8px}
         .servico-item:last-child{border-bottom:none}
         .servico-item::before{content:'•';color:#0d9488;font-size:18px;flex-shrink:0}
+        /* PAGAMENTO */
+        .pgto-opcoes{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:18px}
+        .pgto-btn{border:2px solid #e0e0e0;border-radius:10px;padding:14px 10px;text-align:center;cursor:pointer;transition:all .2s;background:#fff;font-family:inherit}
+        .pgto-btn:hover{border-color:#0d9488;background:#f0fdfb}
+        .pgto-btn.ativo{border-color:#0d9488;background:#e0f2f1;box-shadow:0 0 0 3px rgba(13,148,136,.15)}
+        .pgto-btn .pgto-icone{font-size:28px;display:block;margin-bottom:6px}
+        .pgto-btn .pgto-nome{font-size:13px;font-weight:600;color:#333}
+        .pgto-btn .pgto-sub{font-size:11px;color:#0d9488;margin-top:3px}
+        /* RESULTADO PAGAMENTO */
+        .pgto-resultado{background:#f8f9fa;border-radius:10px;padding:18px;margin-bottom:18px;display:none}
+        .pgto-resultado.visivel{display:block}
+        .pgto-res-titulo{font-size:13px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px}
+        .pgto-linha{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #eee;font-size:14px}
+        .pgto-linha:last-child{border-bottom:none}
+        .pgto-linha.destaque{background:#e8f5e9;border-radius:8px;padding:10px 12px;margin:4px -4px;border:none}
+        .pgto-linha .lbl{color:#666}
+        .pgto-linha .val{font-weight:700;color:#222}
+        .pgto-linha.destaque .val{color:#2e7d32;font-size:16px}
+        /* BANDEIRAS */
+        .bandeiras{display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap}
+        .band-btn{border:2px solid #e0e0e0;border-radius:8px;padding:8px 16px;cursor:pointer;font-size:13px;font-weight:600;background:#fff;transition:all .2s;font-family:inherit}
+        .band-btn:hover{border-color:#0d9488}
+        .band-btn.ativo{border-color:#0d9488;background:#e0f2f1}
+        /* PARCELAS */
+        .parcelas-lista{display:flex;flex-direction:column;gap:6px;max-height:280px;overflow-y:auto}
+        .parcela-item{display:flex;justify-content:space-between;align-items:center;padding:9px 12px;border-radius:8px;background:#f5f5f5;font-size:13px;cursor:pointer;border:2px solid transparent;transition:all .15s}
+        .parcela-item:hover{background:#e0f2f1;border-color:#0d9488}
+        .parcela-item.ativo{background:#e0f2f1;border-color:#0d9488}
+        .parc-n{font-weight:700;color:#333}
+        .parc-v{font-weight:700;color:#0d9488}
+        .parc-t{font-size:11px;color:#999}
+        /* BOTÕES AÇÃO */
+        .acoes{display:flex;gap:12px;margin-top:20px}
+        .btn-aprovar{flex:1;padding:14px;background:#2e7d32;color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;transition:background .2s}
+        .btn-aprovar:hover{background:#1b5e20}
+        .btn-aprovar:disabled{background:#bbb;cursor:not-allowed}
+        .btn-reprovar{padding:14px 20px;background:#fff;color:#c62828;border:2px solid #ef9a9a;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .2s}
+        .btn-reprovar:hover{background:#ffebee;border-color:#c62828}
+        /* MODAL REPROVAÇÃO */
+        .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;justify-content:center;align-items:center;padding:20px}
+        .modal-overlay.aberto{display:flex}
+        .modal-box{background:#fff;border-radius:12px;padding:28px;width:100%;max-width:440px;box-shadow:0 8px 32px rgba(0,0,0,.2)}
+        .modal-title{font-size:17px;font-weight:700;margin-bottom:14px;color:#333}
+        .modal-box label{display:block;font-size:13px;font-weight:600;color:#555;margin-bottom:6px}
+        .modal-box textarea{width:100%;padding:10px 14px;border:2px solid #e0e0e0;border-radius:8px;font-size:14px;font-family:inherit;resize:vertical;min-height:100px;transition:border-color .2s}
+        .modal-box textarea:focus{outline:none;border-color:#ef5350}
+        .modal-actions{display:flex;gap:10px;margin-top:16px;justify-content:flex-end}
+        .btn-modal-cancel{padding:10px 18px;background:#f5f5f5;border:none;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit}
+        .btn-modal-confirm{padding:10px 20px;background:#c62828;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit}
+        /* TIMELINE */
         .timeline{list-style:none;padding:0;margin:0;position:relative}
         .timeline::before{content:'';position:absolute;left:16px;top:6px;bottom:6px;width:2px;background:#e8e8e8}
         .tl-item{display:flex;gap:14px;padding-bottom:22px;position:relative}
@@ -165,10 +190,10 @@ $icones_hist = ['Pre-OS'=>'🗒️','Em analise'=>'🔍','Orcada'=>'💰','Aguar
         .erro-box p{font-size:13px;color:#999}
         .footer{text-align:center;padding:28px 20px 40px;font-size:12px;color:#ccc}
         @media(max-width:520px){
-            .status-card{flex-direction:column;text-align:center;gap:12px}
-            .orc-card{flex-direction:column;text-align:center;gap:8px}
+            .status-card,.orc-card{flex-direction:column;text-align:center;gap:12px}
             .busca-token form{flex-direction:column}
-            .header span{display:none}
+            .header span,.orc-emoji{display:none}
+            .acoes{flex-direction:column}
         }
     </style>
 </head>
@@ -184,18 +209,13 @@ $icones_hist = ['Pre-OS'=>'🗒️','Em analise'=>'🔍','Orcada'=>'💰','Aguar
         <p>Digite o código de acompanhamento que você recebeu</p>
         <form method="GET">
             <input type="text" name="token" placeholder="Cole seu código aqui..."
-                   value="<?php echo htmlspecialchars($token); ?>"
-                   autocomplete="off" spellcheck="false">
+                   value="<?php echo htmlspecialchars($token); ?>" autocomplete="off" spellcheck="false">
             <button type="submit">Buscar</button>
         </form>
     </div>
 
     <?php if (!empty($token) && $erro): ?>
-        <div class="erro-box">
-            <span class="erro-icone">😕</span>
-            <h2>Pedido não encontrado</h2>
-            <p><?php echo htmlspecialchars($erro); ?></p>
-        </div>
+        <div class="erro-box"><span class="erro-icone">😕</span><h2>Pedido não encontrado</h2><p><?php echo htmlspecialchars($erro); ?></p></div>
 
     <?php elseif ($pedido):
         $si = $statusInfo[$pedido['status']] ?? ['label'=>$pedido['status'],'cor'=>'#666','bg'=>'#f5f5f5','icone'=>'•','desc'=>''];
@@ -214,10 +234,77 @@ $icones_hist = ['Pre-OS'=>'🗒️','Em analise'=>'🔍','Orcada'=>'💰','Aguar
             <div class="orc-emoji">💰</div>
             <div>
                 <div class="orc-label">Valor do Orçamento</div>
-                <div class="orc-valor">R$ <?php echo number_format($pedido['valor_orcamento'],2,',','.'); ?></div>
+                <div class="orc-valor" id="orc-valor-base">R$ <?php echo number_format($pedido['valor_orcamento'],2,',','.'); ?></div>
                 <?php if (!empty($pedido['prazo_orcamento'])): ?>
                 <div class="orc-prazo">📅 Prazo estimado: <strong><?php echo (int)$pedido['prazo_orcamento']; ?> dias úteis</strong></div>
                 <?php endif; ?>
+            </div>
+        </div>
+        <?php endif; ?>
+
+        <?php if ($pode_aprovar): ?>
+        <!-- BLOCO DE PAGAMENTO + APROVAÇÃO -->
+        <div class="card" id="card-pagamento">
+            <div class="card-title">💳 Forma de Pagamento &amp; Aprovação</div>
+
+            <div class="pgto-opcoes">
+                <button class="pgto-btn" onclick="selecionarPgto('pix')" id="btn-pix">
+                    <span class="pgto-icone">🟢</span>
+                    <span class="pgto-nome">PIX / Dinheiro</span>
+                    <span class="pgto-sub">5% de desconto</span>
+                </button>
+                <button class="pgto-btn" onclick="selecionarPgto('entrada')" id="btn-entrada">
+                    <span class="pgto-icone">🔑</span>
+                    <span class="pgto-nome">Entrada + Retirada</span>
+                    <span class="pgto-sub">60% + 40%</span>
+                </button>
+                <button class="pgto-btn" onclick="selecionarPgto('cartao')" id="btn-cartao">
+                    <span class="pgto-icone">📳</span>
+                    <span class="pgto-nome">Cartão</span>
+                    <span class="pgto-sub">com juros da máquina</span>
+                </button>
+            </div>
+
+            <!-- RESULTADO PIX/DINHEIRO -->
+            <div class="pgto-resultado" id="res-pix">
+                <div class="pgto-res-titulo">🟢 PIX ou Dinheiro — à vista</div>
+                <div class="pgto-linha"><span class="lbl">Valor original</span><span class="val" id="pix-original"></span></div>
+                <div class="pgto-linha"><span class="lbl">Desconto (5%)</span><span class="val" style="color:#2e7d32" id="pix-desconto"></span></div>
+                <div class="pgto-linha destaque"><span class="lbl">Você paga</span><span class="val" id="pix-final"></span></div>
+            </div>
+
+            <!-- RESULTADO ENTRADA -->
+            <div class="pgto-resultado" id="res-entrada">
+                <div class="pgto-res-titulo">🔑 Entrada + Pagamento na Retirada</div>
+                <div class="pgto-linha"><span class="lbl">Valor total</span><span class="val" id="ent-total"></span></div>
+                <div class="pgto-linha"><span class="lbl">Entrada (60%)</span><span class="val" style="color:#1565c0" id="ent-entrada"></span></div>
+                <div class="pgto-linha destaque"><span class="lbl">Na retirada (40%)</span><span class="val" id="ent-retirada"></span></div>
+            </div>
+
+            <!-- RESULTADO CARTÃO -->
+            <div class="pgto-resultado" id="res-cartao">
+                <div class="pgto-res-titulo">📳 Cartão de Crédito / Débito</div>
+                <div class="bandeiras">
+                    <button class="band-btn" onclick="selecionarBandeira('vm')" id="band-vm">Visa / Mastercard</button>
+                    <button class="band-btn" onclick="selecionarBandeira('ea')" id="band-ea">Elo / Amex</button>
+                </div>
+                <div id="parcelas-container" style="display:none">
+                    <div style="font-size:12px;color:#999;margin-bottom:8px">Selecione a quantidade de parcelas:</div>
+                    <div class="parcelas-lista" id="parcelas-lista"></div>
+                    <div class="pgto-linha destaque" style="margin-top:12px" id="res-parc-selecionada" style="display:none">
+                        <span class="lbl" id="parc-sel-label">Parcela selecionada</span>
+                        <span class="val" id="parc-sel-valor"></span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="acoes">
+                <button class="btn-aprovar" id="btn-aprovar" onclick="confirmarAprovacao()" disabled>
+                    ✅ Aprovar Orçamento
+                </button>
+                <button class="btn-reprovar" onclick="abrirReprovacao()">
+                    ❌ Não aprovar
+                </button>
             </div>
         </div>
         <?php endif; ?>
@@ -227,13 +314,10 @@ $icones_hist = ['Pre-OS'=>'🗒️','Em analise'=>'🔍','Orcada'=>'💰','Aguar
             <div class="info-grid">
                 <div class="info-item"><div class="info-label">Número</div><div class="info-value">#<?php echo $pedido['id']; ?></div></div>
                 <div class="info-item"><div class="info-label">Cliente</div><div class="info-value"><?php echo htmlspecialchars($pedido['cliente_nome']); ?></div></div>
-                <div class="info-item">
-                    <div class="info-label">Instrumento</div>
-                    <div class="info-value"><?php
-                        echo htmlspecialchars(trim($pedido['instrumento_tipo'].' '.$pedido['instrumento_marca'].' '.$pedido['instrumento_modelo']));
-                        if (!empty($pedido['instrumento_cor'])) echo ' <span style="color:#aaa;font-size:12px">('. htmlspecialchars($pedido['instrumento_cor']).')</span>';
-                    ?></div>
-                </div>
+                <div class="info-item"><div class="info-label">Instrumento</div><div class="info-value"><?php
+                    echo htmlspecialchars(trim($pedido['instrumento_tipo'].' '.$pedido['instrumento_marca'].' '.$pedido['instrumento_modelo']));
+                    if (!empty($pedido['instrumento_cor'])) echo ' <span style="color:#aaa;font-size:12px">('. htmlspecialchars($pedido['instrumento_cor']).')</span>';
+                ?></div></div>
                 <div class="info-item"><div class="info-label">Abertura</div><div class="info-value"><?php echo date('d/m/Y', strtotime($pedido['criado_em'])); ?></div></div>
                 <div class="info-item"><div class="info-label">Última Atualização</div><div class="info-value"><?php echo date('d/m/Y H:i', strtotime($pedido['atualizado_em'])); ?></div></div>
             </div>
@@ -259,9 +343,7 @@ $icones_hist = ['Pre-OS'=>'🗒️','Em analise'=>'🔍','Orcada'=>'💰','Aguar
                         <div class="tl-status"><?php echo htmlspecialchars($statusInfo[$h['status']]['label'] ?? $h['status']); ?></div>
                         <div class="tl-data"><?php echo date('d/m/Y às H:i', strtotime($h['criado_em'])); ?></div>
                         <?php if (!empty($h['valor_orcamento'])): ?>
-                        <div class="tl-detalhe valor">💰 R$ <?php echo number_format($h['valor_orcamento'],2,',','.'); ?>
-                            <?php if (!empty($h['prazo_orcamento'])): ?> &nbsp;• <strong><?php echo (int)$h['prazo_orcamento']; ?> dias úteis</strong><?php endif; ?>
-                        </div>
+                        <div class="tl-detalhe valor">💰 R$ <?php echo number_format($h['valor_orcamento'],2,',','.'); ?><?php if (!empty($h['prazo_orcamento'])): ?> &nbsp;• <strong><?php echo (int)$h['prazo_orcamento']; ?> dias úteis</strong><?php endif; ?></div>
                         <?php endif; ?>
                         <?php if (!empty($h['motivo'])): ?>
                         <div class="tl-detalhe motivo">⚠️ <?php echo htmlspecialchars($h['motivo']); ?></div>
@@ -290,6 +372,183 @@ $icones_hist = ['Pre-OS'=>'🗒️','Em analise'=>'🔍','Orcada'=>'💰','Aguar
     <?php endif; ?>
 </div>
 
+<!-- MODAL REPROVAÇÃO -->
+<div class="modal-overlay" id="modal-reprovacao">
+    <div class="modal-box">
+        <div class="modal-title">❌ Motivo da Não Aprovação</div>
+        <label>Conte-nos o motivo (obrigatório):</label>
+        <textarea id="motivo-reprovacao" placeholder="Ex: O valor ficou acima do meu orçamento..."></textarea>
+        <div class="modal-actions">
+            <button class="btn-modal-cancel" onclick="fecharModal()">Cancelar</button>
+            <button class="btn-modal-confirm" onclick="enviarReprovacao()">❌ Confirmar Reprovação</button>
+        </div>
+    </div>
+</div>
+
 <div class="footer">Adonis Custom &mdash; Acompanhamento de Pedidos</div>
+
+<?php if ($pode_aprovar): ?>
+<script>
+const VALOR_BASE   = <?php echo (float)$pedido['valor_orcamento']; ?>;
+const PEDIDO_TOKEN = '<?php echo htmlspecialchars($pedido['public_token']); ?>';
+const API_URL      = '../../backend/public/aprovar_orcamento.php';
+
+const TAXAS = {
+    vm: {
+        baixo:  { debito:1.69, av:3.86, p:[0,0,9.86,11.24,12.59,13.92,15.22,16.50,17.76,18.99,20.19,20.39,20.39] },
+        alto:   { debito:1.45, av:3.51, p:[0,0,6.99,6.99,7.99,9.99,10.99,11.99,11.99,12.99,13.99,14.79,14.79] }
+    },
+    ea: {
+        baixo:  { debito:2.88, av:5.05, p:[0,0,11.25,12.63,13.98,15.31,16.61,17.89,19.15,20.38,21.58,21.78,21.78] },
+        alto:   { debito:2.64, av:4.70, p:[0,0,8.38,8.38,9.38,11.38,12.38,13.38,13.38,14.38,15.38,16.18,16.18] }
+    }
+};
+
+let pgtoSelecionado = null;
+let bandeiraSelecionada = null;
+let parcelaSelecionada  = null;
+let pagamentoPayload    = {};
+
+function fmt(v){ return 'R$ ' + v.toFixed(2).replace('.',',').replace(/\B(?=(\d{3})+(?!\d))/g,'.'); }
+
+function selecionarPgto(tipo) {
+    pgtoSelecionado     = tipo;
+    bandeiraSelecionada = null;
+    parcelaSelecionada  = null;
+    pagamentoPayload    = {};
+
+    ['pix','entrada','cartao'].forEach(t => {
+        document.getElementById('btn-'+t).classList.toggle('ativo', t===tipo);
+        document.getElementById('res-'+t).classList.toggle('visivel', t===tipo);
+    });
+
+    if (tipo === 'pix') {
+        const desc  = VALOR_BASE * 0.05;
+        const final = VALOR_BASE - desc;
+        document.getElementById('pix-original').textContent = fmt(VALOR_BASE);
+        document.getElementById('pix-desconto').textContent = '- ' + fmt(desc);
+        document.getElementById('pix-final').textContent    = fmt(final);
+        pagamentoPayload = { forma: 'PIX/Dinheiro', valor_final: final, descricao: 'PIX/Dinheiro à vista com 5% de desconto' };
+        habilitarAprovar(true);
+    } else if (tipo === 'entrada') {
+        const ent = VALOR_BASE * 0.60;
+        const ret = VALOR_BASE * 0.40;
+        document.getElementById('ent-total').textContent    = fmt(VALOR_BASE);
+        document.getElementById('ent-entrada').textContent  = fmt(ent);
+        document.getElementById('ent-retirada').textContent = fmt(ret);
+        pagamentoPayload = { forma: 'Entrada+Retirada', valor_final: VALOR_BASE, entrada: ent, retirada: ret, descricao: 'Entrada 60% + 40% na retirada' };
+        habilitarAprovar(true);
+    } else {
+        habilitarAprovar(false);
+    }
+}
+
+function selecionarBandeira(band) {
+    bandeiraSelecionada = band;
+    parcelaSelecionada  = null;
+    pagamentoPayload    = {};
+    document.getElementById('band-vm').classList.toggle('ativo', band==='vm');
+    document.getElementById('band-ea').classList.toggle('ativo', band==='ea');
+
+    const faixa  = VALOR_BASE > 2000 ? 'alto' : 'baixo';
+    const taxas  = TAXAS[band][faixa];
+    const lista  = document.getElementById('parcelas-lista');
+    lista.innerHTML = '';
+
+    const opcoes = [];
+    // Débito à vista
+    const vDebito = VALOR_BASE * (1 + taxas.debito/100);
+    opcoes.push({ label:'Débito à vista', parcelas:1, taxa:taxas.debito, total:vDebito, porParcela:vDebito, tipo:'debito' });
+    // Crédito à vista
+    const vAV = VALOR_BASE * (1 + taxas.av/100);
+    opcoes.push({ label:'Crédito à vista', parcelas:1, taxa:taxas.av, total:vAV, porParcela:vAV, tipo:'credito_av' });
+    // Parcelado 2x a 10x
+    for (let n=2; n<=10; n++) {
+        const total = VALOR_BASE * (1 + taxas.p[n]/100);
+        opcoes.push({ label: n+'x', parcelas:n, taxa:taxas.p[n], total, porParcela: total/n, tipo:'parcelado' });
+    }
+    // Ordenar do menor para o maior valor por parcela
+    opcoes.sort((a,b) => a.porParcela - b.porParcela);
+
+    opcoes.forEach((op, i) => {
+        const el = document.createElement('div');
+        el.className = 'parcela-item';
+        el.id = 'parc-'+i;
+        const nomeLabel = op.tipo === 'debito' ? op.label :
+                          op.tipo === 'credito_av' ? op.label :
+                          op.label + ' de ' + fmt(op.porParcela);
+        el.innerHTML = `<span class="parc-n">${nomeLabel}</span><span class="parc-t">total ${fmt(op.total)}</span><span class="parc-v">${fmt(op.porParcela)}</span>`;
+        el.onclick = () => {
+            document.querySelectorAll('.parcela-item').forEach(e=>e.classList.remove('ativo'));
+            el.classList.add('ativo');
+            parcelaSelecionada = op;
+            document.getElementById('parc-sel-label').textContent  = nomeLabel;
+            document.getElementById('parc-sel-valor').textContent  = fmt(op.porParcela);
+            document.getElementById('res-parc-selecionada').style.display = 'flex';
+            pagamentoPayload = { forma:'Cartão', bandeira: band==='vm'?'Visa/Mastercard':'Elo/Amex', descricao: nomeLabel, valor_final: op.total, por_parcela: op.porParcela, parcelas: op.parcelas, taxa: op.taxa };
+            habilitarAprovar(true);
+        };
+        lista.appendChild(el);
+    });
+
+    document.getElementById('parcelas-container').style.display = 'block';
+    habilitarAprovar(false);
+}
+
+function habilitarAprovar(ok) {
+    const btn = document.getElementById('btn-aprovar');
+    btn.disabled = !ok;
+    btn.textContent = ok ? '✅ Aprovar Orçamento' : '✅ Selecione a forma de pagamento';
+}
+
+function confirmarAprovacao() {
+    if (!pagamentoPayload.forma) return;
+    const desc = pagamentoPayload.descricao || pagamentoPayload.forma;
+    if (!confirm('Confirmar aprovação?\n\nForma: ' + desc + '\nValor: ' + fmt(pagamentoPayload.valor_final))) return;
+    enviar('Aprovada', { pagamento: pagamentoPayload });
+}
+
+function abrirReprovacao() {
+    document.getElementById('motivo-reprovacao').value = '';
+    document.getElementById('modal-reprovacao').classList.add('aberto');
+}
+function fecharModal() {
+    document.getElementById('modal-reprovacao').classList.remove('aberto');
+}
+function enviarReprovacao() {
+    const motivo = document.getElementById('motivo-reprovacao').value.trim();
+    if (!motivo) { alert('Por favor, informe o motivo.'); return; }
+    fecharModal();
+    enviar('Reprovada', { motivo });
+}
+
+function enviar(status, extras) {
+    fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: PEDIDO_TOKEN, status, ...extras })
+    })
+    .then(r => r.json())
+    .then(d => {
+        if (d.sucesso) {
+            document.getElementById('card-pagamento').innerHTML =
+                '<div style="text-align:center;padding:20px 0">' +
+                (status==='Aprovada' ? '✅ <strong>Orçamento aprovado!</strong><br><span style="font-size:13px;color:#555">Entraremos em contato em breve para combinar os detalhes.</span>' :
+                                       '❌ <strong>Orçamento não aprovado.</strong><br><span style="font-size:13px;color:#555">Registro enviado. Obrigado pelo retorno!</span>') +
+                '</div>';
+            setTimeout(() => location.reload(), 2500);
+        } else {
+            alert('❌ Erro: ' + (d.erro || 'Tente novamente.'));
+        }
+    })
+    .catch(() => alert('❌ Erro de conexão. Tente novamente.'));
+}
+
+document.getElementById('modal-reprovacao').addEventListener('click', function(e){
+    if (e.target === this) fecharModal();
+});
+</script>
+<?php endif; ?>
+
 </body>
 </html>
