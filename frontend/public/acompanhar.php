@@ -1,7 +1,7 @@
 <?php
 /**
  * PÁGINA PÚBLICA DE ACOMPANHAMENTO DO PEDIDO
- * Versão: 5.1 - fix API_URL absoluta
+ * Versão: 5.2 - chave PIX visivel no card de selecao de pagamento
  * Data: 27/02/2026
  */
 
@@ -14,12 +14,9 @@ $servicos  = [];
 $erro      = '';
 $pagamento_aprovado = null;
 
-// Chave PIX e endereço do Adonis (configurar aqui)
 define('ADONIS_PIX',      'adonis@adonis.com.br');  // <<< alterar para chave PIX real
 define('ADONIS_ENDERECO', 'Rua Exemplo, 123 – Aracruz/ES'); // <<< alterar para endereço real
-
-// URL base do sistema — usada no fetch JS
-define('BASE_URL', 'https://adns.luizpimentel.com/adonis-custom');
+define('BASE_URL',        'https://adns.luizpimentel.com/adonis-custom');
 
 if (!empty($token)) {
     try {
@@ -185,6 +182,12 @@ $show_instrucao_pgto = $pedido && in_array($pedido['status'], $status_pos_aprova
         .pgto-linha .lbl{color:#666}
         .pgto-linha .val{font-weight:700;color:#222}
         .pgto-linha.destaque .val{color:#2e7d32;font-size:16px}
+        /* Caixa PIX inline no card de seleção */
+        .pix-box{background:#e0f2f1;border-radius:8px;padding:12px 14px;margin-top:12px;border-left:3px solid #0d9488}
+        .pix-box-label{font-size:11px;color:#00695c;font-weight:700;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px}
+        .pix-box-chave{font-size:15px;font-weight:700;color:#00695c;word-break:break-all;margin-bottom:8px}
+        .pix-box-btn{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;background:#0d9488;color:#fff;border:none;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:background .2s}
+        .pix-box-btn:hover{background:#0a7c72}
         .parcelas-lista{display:flex;flex-direction:column;gap:6px;max-height:280px;overflow-y:auto}
         .parcela-item{display:flex;justify-content:space-between;align-items:center;padding:9px 12px;border-radius:8px;background:#f5f5f5;font-size:13px;cursor:pointer;border:2px solid transparent;transition:all .15s}
         .parcela-item:hover{background:#e0f2f1;border-color:#0d9488}
@@ -279,6 +282,7 @@ $show_instrucao_pgto = $pedido && in_array($pedido['status'], $status_pos_aprova
         </div>
         <?php endif; ?>
 
+        <!-- INSTRUÇÃO PÓS-APROVAÇÃO -->
         <?php if ($show_instrucao_pgto):
             $fp   = $pagamento_aprovado['forma_pagamento'] ?? '';
             $vf   = (float)($pagamento_aprovado['valor_final'] ?? 0);
@@ -340,6 +344,7 @@ $show_instrucao_pgto = $pedido && in_array($pedido['status'], $status_pos_aprova
         </div>
         <?php endif; ?>
 
+        <!-- FORMULÁRIO DE APROVAÇÃO -->
         <?php if ($pode_aprovar): ?>
         <div class="card" id="card-pagamento">
             <div class="card-title">💳 Forma de Pagamento &amp; Aprovação</div>
@@ -360,18 +365,38 @@ $show_instrucao_pgto = $pedido && in_array($pedido['status'], $status_pos_aprova
                     <span class="pgto-sub">parcelado em até 10x</span>
                 </button>
             </div>
+
+            <!-- Resultado PIX -->
             <div class="pgto-resultado" id="res-pix">
                 <div class="pgto-res-titulo">🟢 PIX ou Dinheiro — à vista</div>
                 <div class="pgto-linha"><span class="lbl">Valor do orçamento</span><span class="val" id="pix-original"></span></div>
                 <div class="pgto-linha"><span class="lbl">Desconto à vista (5%)</span><span class="val" style="color:#2e7d32" id="pix-desconto"></span></div>
                 <div class="pgto-linha destaque"><span class="lbl">Você paga</span><span class="val" id="pix-final"></span></div>
+                <!-- CHAVE PIX INLINE -->
+                <div class="pix-box">
+                    <div class="pix-box-label">🟢 Chave PIX para pagamento</div>
+                    <div class="pix-box-chave" id="pix-chave-sel"><?php echo ADONIS_PIX; ?></div>
+                    <button class="pix-box-btn" onclick="copiarPixSel('pix-chave-sel', this)">📋 Copiar chave PIX</button>
+                </div>
+                <div style="margin-top:10px;font-size:12px;color:#555;line-height:1.6">⚠️ Após pagar, <strong>envie o comprovante via WhatsApp</strong> para confirmarmos o recebimento.</div>
             </div>
+
+            <!-- Resultado Entrada -->
             <div class="pgto-resultado" id="res-entrada">
                 <div class="pgto-res-titulo">🔑 Entrada + Pagamento na Retirada</div>
                 <div class="pgto-linha"><span class="lbl">Valor total</span><span class="val" id="ent-total"></span></div>
-                <div class="pgto-linha"><span class="lbl">Entrada (50% agora)</span><span class="val" style="color:#1565c0" id="ent-entrada"></span></div>
+                <div class="pgto-linha"><span class="lbl">Entrada agora (50%)</span><span class="val" style="color:#1565c0" id="ent-entrada"></span></div>
                 <div class="pgto-linha destaque"><span class="lbl">Na retirada (50%)</span><span class="val" id="ent-retirada"></span></div>
+                <!-- CHAVE PIX INLINE -->
+                <div class="pix-box" style="margin-top:12px">
+                    <div class="pix-box-label">🟢 Pague a entrada via PIX</div>
+                    <div class="pix-box-chave" id="ent-chave-sel"><?php echo ADONIS_PIX; ?></div>
+                    <button class="pix-box-btn" onclick="copiarPixSel('ent-chave-sel', this)">📋 Copiar chave PIX</button>
+                </div>
+                <div style="margin-top:10px;font-size:12px;color:#555;line-height:1.6">💡 Envie o comprovante via WhatsApp após o pagamento da entrada. O restante (50%) será cobrado na retirada do instrumento.</div>
             </div>
+
+            <!-- Resultado Cartão -->
             <div class="pgto-resultado" id="res-cartao">
                 <div class="pgto-res-titulo">📳 Cartão de Crédito</div>
                 <div style="font-size:12px;color:#999;margin-bottom:10px">Selecione a quantidade de parcelas:</div>
@@ -380,7 +405,11 @@ $show_instrucao_pgto = $pedido && in_array($pedido['status'], $status_pos_aprova
                     <span class="lbl" id="parc-sel-label"></span>
                     <span class="val" id="parc-sel-valor"></span>
                 </div>
+                <div style="margin-top:12px;font-size:12px;color:#555;background:#fff8e1;border-radius:6px;padding:10px 14px;line-height:1.6;border-left:3px solid #ffc107">
+                    💳 O pagamento no cartão será realizado <strong>na retirada do instrumento</strong>.
+                </div>
             </div>
+
             <div class="acoes">
                 <button class="btn-aprovar" id="btn-aprovar" onclick="confirmarAprovacao()" disabled>✅ Selecione a forma de pagamento</button>
                 <button class="btn-reprovar" onclick="abrirReprovacao()">❌ Não aprovar</button>
@@ -388,6 +417,7 @@ $show_instrucao_pgto = $pedido && in_array($pedido['status'], $status_pos_aprova
         </div>
         <?php endif; ?>
 
+        <!-- DADOS DO PEDIDO -->
         <div class="card">
             <div class="card-title">📋 Dados do Pedido</div>
             <div class="info-grid">
@@ -451,6 +481,7 @@ $show_instrucao_pgto = $pedido && in_array($pedido['status'], $status_pos_aprova
     <?php endif; ?>
 </div>
 
+<!-- MODAL REPROVAÇÃO -->
 <div class="modal-overlay" id="modal-reprovacao">
     <div class="modal-box">
         <div class="modal-title">❌ Motivo da Não Aprovação</div>
@@ -565,9 +596,17 @@ function enviar(status, extras) {
     .catch(() => alert('❌ Erro de conexão. Tente novamente.'));
 }
 function copiarPix() {
-    navigator.clipboard.writeText(document.getElementById('chave-pix').textContent)
-    .then(() => { const b = document.querySelector('.instrucao-copia'); b.textContent='✅ Copiado!'; setTimeout(()=>b.innerHTML='📋 Copiar chave PIX',2000); })
-    .catch(() => alert('Chave PIX: ' + document.getElementById('chave-pix').textContent));
+    const el = document.getElementById('chave-pix');
+    if (!el) return;
+    navigator.clipboard.writeText(el.textContent)
+    .then(() => { const b=document.querySelector('.instrucao-copia'); b.textContent='✅ Copiado!'; setTimeout(()=>b.innerHTML='📋 Copiar chave PIX',2000); })
+    .catch(() => alert('Chave PIX: '+el.textContent));
+}
+function copiarPixSel(idEl, btn) {
+    const texto = document.getElementById(idEl).textContent.trim();
+    navigator.clipboard.writeText(texto)
+    .then(() => { btn.textContent='✅ Copiado!'; setTimeout(()=>btn.innerHTML='📋 Copiar chave PIX',2000); })
+    .catch(() => alert('Chave PIX: '+texto));
 }
 document.getElementById('modal-reprovacao').addEventListener('click', function(e){ if(e.target===this) fecharModal(); });
 </script>
