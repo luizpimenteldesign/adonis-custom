@@ -1,7 +1,7 @@
 <?php
 /**
  * PÁGINA PÚBLICA DE ACOMPANHAMENTO DO PEDIDO
- * Versão: 5.3 - chave PIX e endereço reais
+ * Versão: 5.4 - endereço e PIX sempre visíveis pós-aprovação
  * Data: 27/02/2026
  */
 
@@ -113,10 +113,13 @@ $icones_hist = [
 
 $pode_aprovar = $pedido && in_array($pedido['status'], ['Orcada','Aguardando aprovacao']) && !empty($pedido['valor_orcamento']);
 
+// Status após aprovação — endereço e PIX SEMPRE visíveis aqui
 $status_pos_aprovacao = ['Aprovada','Pagamento recebido','Instrumento recebido',
     'Servico iniciado','Em desenvolvimento','Servico finalizado',
     'Pronto para retirada','Aguardando pagamento retirada','Entregue'];
-$show_instrucao_pgto = $pedido && in_array($pedido['status'], $status_pos_aprovacao) && !empty($pagamento_aprovado);
+$show_pos_aprovacao  = $pedido && in_array($pedido['status'], $status_pos_aprovacao);
+// Detalhes do pagamento: só quando há registro no banco
+$show_detalhe_pgto   = $show_pos_aprovacao && !empty($pagamento_aprovado);
 ?>
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -151,6 +154,7 @@ $show_instrucao_pgto = $pedido && in_array($pedido['status'], $status_pos_aprova
         .orc-emoji{font-size:36px;flex-shrink:0}
         .orc-label{font-size:11px;color:#388e3c;font-weight:700;text-transform:uppercase;letter-spacing:.5px}
         .orc-valor{font-size:32px;font-weight:700;color:#2e7d32;line-height:1.1;margin:2px 0}
+        /* Card de instrução pós-aprovação */
         .instrucao-card{border-radius:12px;padding:20px 24px;margin-bottom:20px;border:2px solid #0d9488;background:#f0fdfa}
         .instrucao-titulo{font-size:14px;font-weight:700;color:#0d9488;text-transform:uppercase;letter-spacing:.5px;margin-bottom:14px;display:flex;align-items:center;gap:8px}
         .instrucao-linha{display:flex;justify-content:space-between;align-items:flex-start;padding:9px 0;border-bottom:1px solid #ccf0ec;font-size:14px}
@@ -160,6 +164,17 @@ $show_instrucao_pgto = $pedido && in_array($pedido['status'], $status_pos_aprova
         .instrucao-val.destaque{font-size:18px;color:#00695c}
         .instrucao-copia{display:inline-flex;align-items:center;gap:6px;margin-top:6px;padding:8px 14px;background:#0d9488;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;transition:background .2s}
         .instrucao-copia:hover{background:#0a7c72}
+        /* Bloco de endereço e PIX sempre visível */
+        .pix-endereco-box{background:#f0fdfa;border-radius:12px;padding:18px 20px;margin-bottom:20px;border:2px solid #0d9488}
+        .pix-endereco-titulo{font-size:13px;font-weight:700;color:#0d9488;text-transform:uppercase;letter-spacing:.5px;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+        .pix-row{display:flex;justify-content:space-between;align-items:flex-start;padding:9px 0;border-bottom:1px solid #ccf0ec;font-size:14px}
+        .pix-row:last-child{border-bottom:none}
+        .pix-row-lbl{color:#555;font-weight:500;flex-shrink:0;margin-right:12px}
+        .pix-row-val{font-weight:700;color:#00695c;text-align:right;word-break:break-all}
+        .maps-link{display:inline-flex;align-items:center;gap:6px;margin-top:8px;font-size:13px;color:#1565c0;font-weight:600;text-decoration:none}
+        .maps-link:hover{text-decoration:underline}
+        .btn-copiar-pix{display:inline-flex;align-items:center;gap:6px;margin-top:8px;padding:8px 16px;background:#0d9488;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;transition:background .2s}
+        .btn-copiar-pix:hover{background:#0a7c72}
         .info-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px}
         .info-item{background:#f8f9fa;border-radius:8px;padding:12px 14px}
         .info-label{font-size:10px;color:#999;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}
@@ -188,8 +203,6 @@ $show_instrucao_pgto = $pedido && in_array($pedido['status'], $status_pos_aprova
         .pix-box-chave{font-size:15px;font-weight:700;color:#00695c;word-break:break-all;margin-bottom:8px}
         .pix-box-btn{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;background:#0d9488;color:#fff;border:none;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:background .2s}
         .pix-box-btn:hover{background:#0a7c72}
-        .maps-link{display:inline-flex;align-items:center;gap:6px;margin-top:8px;font-size:13px;color:#1565c0;font-weight:600;text-decoration:none}
-        .maps-link:hover{text-decoration:underline}
         .parcelas-lista{display:flex;flex-direction:column;gap:6px;max-height:280px;overflow-y:auto}
         .parcela-item{display:flex;justify-content:space-between;align-items:center;padding:9px 12px;border-radius:8px;background:#f5f5f5;font-size:13px;cursor:pointer;border:2px solid transparent;transition:all .15s}
         .parcela-item:hover{background:#e0f2f1;border-color:#0d9488}
@@ -233,8 +246,8 @@ $show_instrucao_pgto = $pedido && in_array($pedido['status'], $status_pos_aprova
             .status-card,.orc-card{flex-direction:column;text-align:center;gap:12px}
             .busca-token form,.acoes{flex-direction:column}
             .header span,.orc-emoji{display:none}
-            .instrucao-linha{flex-direction:column;gap:4px}
-            .instrucao-val{text-align:left}
+            .instrucao-linha,.pix-row{flex-direction:column;gap:4px}
+            .instrucao-val,.pix-row-val{text-align:left}
         }
     </style>
 </head>
@@ -284,69 +297,76 @@ $show_instrucao_pgto = $pedido && in_array($pedido['status'], $status_pos_aprova
         </div>
         <?php endif; ?>
 
-        <!-- INSTRUÇÃO PÓS-APROVAÇÃO -->
-        <?php if ($show_instrucao_pgto):
-            $fp   = $pagamento_aprovado['forma_pagamento'] ?? '';
-            $vf   = (float)($pagamento_aprovado['valor_final'] ?? 0);
-            $parc = (int)($pagamento_aprovado['parcelas'] ?? 0);
-            $desc = $pagamento_aprovado['descricao_pagamento'] ?? $fp;
-            $is_pix     = stripos($fp,'pix') !== false || stripos($fp,'dinheiro') !== false;
-            $is_entrada = stripos($fp,'entrada') !== false;
-            $is_cartao  = stripos($fp,'cart') !== false;
-        ?>
-        <div class="instrucao-card">
-            <div class="instrucao-titulo">📋 Como realizar o pagamento</div>
-            <div class="instrucao-linha">
-                <span class="instrucao-lbl">Forma escolhida</span>
-                <span class="instrucao-val"><?php echo htmlspecialchars($desc ?: $fp); ?></span>
+        <!-- ===================================================
+             BLOCO PÓS-APROVAÇÃO: PIX + ENDEREÇO SEMPRE VISÍVEIS
+             Aparece em TODOS os status após aprovação
+        ==================================================== -->
+        <?php if ($show_pos_aprovacao): ?>
+        <div class="pix-endereco-box">
+            <div class="pix-endereco-titulo">📋 Informações para pagamento e entrega</div>
+
+            <?php if ($show_detalhe_pgto):
+                $fp   = $pagamento_aprovado['forma_pagamento'] ?? '';
+                $vf   = (float)($pagamento_aprovado['valor_final'] ?? 0);
+                $parc = (int)($pagamento_aprovado['parcelas'] ?? 0);
+                $desc = $pagamento_aprovado['descricao_pagamento'] ?? $fp;
+                $is_pix     = stripos($fp,'pix') !== false || stripos($fp,'dinheiro') !== false;
+                $is_entrada = stripos($fp,'entrada') !== false;
+                $is_cartao  = stripos($fp,'cart') !== false;
+            ?>
+            <!-- Detalhes da forma de pagamento -->
+            <div class="pix-row">
+                <span class="pix-row-lbl">Forma de pagamento</span>
+                <span class="pix-row-val"><?php echo htmlspecialchars($desc ?: $fp); ?></span>
             </div>
-            <div class="instrucao-linha">
-                <span class="instrucao-lbl">Valor total</span>
-                <span class="instrucao-val destaque">R$ <?php echo number_format($vf,2,',','.'); ?></span>
+            <div class="pix-row">
+                <span class="pix-row-lbl">Valor total</span>
+                <span class="pix-row-val" style="font-size:18px">
+                    R$ <?php echo number_format($vf,2,',','.'); ?>
+                </span>
             </div>
             <?php if ($is_pix): ?>
-            <div class="instrucao-linha">
-                <span class="instrucao-lbl">Chave PIX</span>
-                <span class="instrucao-val" id="chave-pix"><?php echo ADONIS_PIX; ?></span>
-            </div>
-            <div style="margin-top:10px">
-                <button class="instrucao-copia" onclick="copiarPix()">📋 Copiar chave PIX</button>
-            </div>
-            <div style="margin-top:12px;font-size:12px;color:#555;background:#e0f2f1;border-radius:6px;padding:10px 14px;line-height:1.7">
-                ⚠️ Após realizar o PIX, <strong>envie o comprovante via WhatsApp</strong> para agilizar a confirmação.
+            <div class="pix-row">
+                <span class="pix-row-lbl">Desconto à vista (5%)</span>
+                <span class="pix-row-val" style="color:#2e7d32">– R$ <?php echo number_format($vf * 0.05 / 0.95, 2, ',', '.'); ?></span>
             </div>
             <?php elseif ($is_entrada): ?>
-            <div class="instrucao-linha">
-                <span class="instrucao-lbl">Entrada (agora)</span>
-                <span class="instrucao-val" style="color:#1565c0">R$ <?php echo number_format($vf * 0.5, 2, ',', '.'); ?></span>
+            <div class="pix-row">
+                <span class="pix-row-lbl">Entrada (já paga / a pagar)</span>
+                <span class="pix-row-val">R$ <?php echo number_format($vf * 0.5, 2, ',', '.'); ?></span>
             </div>
-            <div class="instrucao-linha">
-                <span class="instrucao-lbl">Na retirada</span>
-                <span class="instrucao-val" style="color:#1565c0">R$ <?php echo number_format($vf * 0.5, 2, ',', '.'); ?></span>
+            <div class="pix-row">
+                <span class="pix-row-lbl">Saldo na retirada</span>
+                <span class="pix-row-val">R$ <?php echo number_format($vf * 0.5, 2, ',', '.'); ?></span>
             </div>
-            <div style="margin-top:12px;font-size:12px;color:#555;background:#e0f2f1;border-radius:6px;padding:10px 14px;line-height:1.7">
-                💡 Pague <strong>R$ <?php echo number_format($vf * 0.5, 2, ',', '.'); ?></strong> via PIX ao trazer o instrumento.<br>
-                Chave PIX: <strong><?php echo ADONIS_PIX; ?></strong>
-            </div>
-            <?php elseif ($is_cartao): ?>
-            <?php if ($parc > 0): ?>
-            <div class="instrucao-linha">
-                <span class="instrucao-lbl">Parcelamento</span>
-                <span class="instrucao-val"><?php echo $parc; ?>x de R$ <?php echo number_format($vf / $parc, 2, ',', '.'); ?></span>
+            <?php elseif ($is_cartao && $parc > 0): ?>
+            <div class="pix-row">
+                <span class="pix-row-lbl">Parcelamento</span>
+                <span class="pix-row-val"><?php echo $parc; ?>x de R$ <?php echo number_format($vf / $parc, 2, ',', '.'); ?></span>
             </div>
             <?php endif; ?>
-            <div style="margin-top:12px;font-size:12px;color:#555;background:#fff8e1;border-radius:6px;padding:10px 14px;line-height:1.7;border-left:3px solid #ffc107">
-                💳 O pagamento no cartão será realizado <strong>na retirada do instrumento</strong>.
+            <!-- separador -->
+            <div style="border-top:1px dashed #b2dfdb;margin:14px 0"></div>
+            <?php endif; /* $show_detalhe_pgto */ ?>
+
+            <!-- CHAVE PIX — sempre visível -->
+            <div class="pix-row" style="border-bottom:none;padding-bottom:4px">
+                <span class="pix-row-lbl">🟢 Chave PIX</span>
+                <span class="pix-row-val" id="chave-pix-bloco"><?php echo ADONIS_PIX; ?></span>
             </div>
-            <?php endif; ?>
-            <!-- Endereço sempre visível -->
-            <div style="margin-top:14px;padding-top:14px;border-top:1px dashed #b2dfdb">
+            <button class="btn-copiar-pix" onclick="copiarPixBloco(this)">📋 Copiar chave PIX</button>
+            <div style="margin-top:10px;font-size:12px;color:#555;background:#e0f2f1;border-radius:6px;padding:10px 14px;line-height:1.7">
+                ⚠️ Após realizar o pagamento, <strong>envie o comprovante via WhatsApp</strong> para confirmarmos o recebimento.
+            </div>
+
+            <!-- ENDEREÇO — sempre visível -->
+            <div style="border-top:1px dashed #b2dfdb;margin-top:14px;padding-top:14px">
                 <div style="font-size:12px;font-weight:700;color:#00695c;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">📍 Endereço para entrega do instrumento</div>
                 <div style="font-size:14px;color:#333;font-weight:500"><?php echo ADONIS_ENDERECO; ?></div>
                 <a class="maps-link" href="<?php echo ADONIS_MAPS; ?>" target="_blank" rel="noopener">🗺️ Ver no Google Maps</a>
             </div>
         </div>
-        <?php endif; ?>
+        <?php endif; /* $show_pos_aprovacao */ ?>
 
         <!-- FORMULÁRIO DE APROVAÇÃO -->
         <?php if ($pode_aprovar): ?>
@@ -370,7 +390,6 @@ $show_instrucao_pgto = $pedido && in_array($pedido['status'], $status_pos_aprova
                 </button>
             </div>
 
-            <!-- Resultado PIX -->
             <div class="pgto-resultado" id="res-pix">
                 <div class="pgto-res-titulo">🟢 PIX ou Dinheiro — à vista</div>
                 <div class="pgto-linha"><span class="lbl">Valor do orçamento</span><span class="val" id="pix-original"></span></div>
@@ -384,7 +403,6 @@ $show_instrucao_pgto = $pedido && in_array($pedido['status'], $status_pos_aprova
                 <div style="margin-top:10px;font-size:12px;color:#555;line-height:1.6">⚠️ Após pagar, <strong>envie o comprovante via WhatsApp</strong> para confirmarmos o recebimento.</div>
             </div>
 
-            <!-- Resultado Entrada -->
             <div class="pgto-resultado" id="res-entrada">
                 <div class="pgto-res-titulo">🔑 Entrada + Pagamento na Retirada</div>
                 <div class="pgto-linha"><span class="lbl">Valor total</span><span class="val" id="ent-total"></span></div>
@@ -398,7 +416,6 @@ $show_instrucao_pgto = $pedido && in_array($pedido['status'], $status_pos_aprova
                 <div style="margin-top:10px;font-size:12px;color:#555;line-height:1.6">💡 Envie o comprovante via WhatsApp após o pagamento da entrada. O restante (50%) será cobrado na retirada.</div>
             </div>
 
-            <!-- Resultado Cartão -->
             <div class="pgto-resultado" id="res-cartao">
                 <div class="pgto-res-titulo">📳 Cartão de Crédito</div>
                 <div style="font-size:12px;color:#999;margin-bottom:10px">Selecione a quantidade de parcelas:</div>
@@ -412,7 +429,6 @@ $show_instrucao_pgto = $pedido && in_array($pedido['status'], $status_pos_aprova
                 </div>
             </div>
 
-            <!-- Endereço sempre visível no card de aprovação -->
             <div style="margin-top:4px;padding:14px;background:#f0f4ff;border-radius:10px;border-left:3px solid #1565c0">
                 <div style="font-size:11px;font-weight:700;color:#1565c0;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">📍 Onde entregar o instrumento</div>
                 <div style="font-size:13px;color:#333;font-weight:500;margin-bottom:4px"><?php echo ADONIS_ENDERECO; ?></div>
@@ -490,7 +506,6 @@ $show_instrucao_pgto = $pedido && in_array($pedido['status'], $status_pos_aprova
     <?php endif; ?>
 </div>
 
-<!-- MODAL REPROVAÇÃO -->
 <div class="modal-overlay" id="modal-reprovacao">
     <div class="modal-box">
         <div class="modal-title">❌ Motivo da Não Aprovação</div>
@@ -504,6 +519,21 @@ $show_instrucao_pgto = $pedido && in_array($pedido['status'], $status_pos_aprova
 </div>
 
 <div class="footer">Adonis Custom &mdash; Acompanhamento de Pedidos</div>
+
+<script>
+function copiarPixBloco(btn) {
+    const texto = document.getElementById('chave-pix-bloco').textContent.trim();
+    navigator.clipboard.writeText(texto)
+    .then(() => { btn.textContent='✅ Copiado!'; setTimeout(()=>btn.innerHTML='📋 Copiar chave PIX',2000); })
+    .catch(() => alert('Chave PIX: '+texto));
+}
+function copiarPixSel(idEl, btn) {
+    const texto = document.getElementById(idEl).textContent.trim();
+    navigator.clipboard.writeText(texto)
+    .then(() => { btn.textContent='✅ Copiado!'; setTimeout(()=>btn.innerHTML='📋 Copiar chave PIX',2000); })
+    .catch(() => alert('Chave PIX: '+texto));
+}
+</script>
 
 <?php if ($pode_aprovar): ?>
 <script>
@@ -560,7 +590,6 @@ function selecionarPgto(tipo) {
         habilitarAprovar(false);
     }
 }
-
 function habilitarAprovar(ok) {
     const btn = document.getElementById('btn-aprovar');
     btn.disabled    = !ok;
@@ -604,30 +633,7 @@ function enviar(status, extras) {
     })
     .catch(() => alert('❌ Erro de conexão. Tente novamente.'));
 }
-function copiarPix() {
-    const el = document.getElementById('chave-pix');
-    if (!el) return;
-    navigator.clipboard.writeText(el.textContent)
-    .then(() => { const b=document.querySelector('.instrucao-copia'); b.textContent='✅ Copiado!'; setTimeout(()=>b.innerHTML='📋 Copiar chave PIX',2000); })
-    .catch(() => alert('Chave PIX: '+el.textContent));
-}
-function copiarPixSel(idEl, btn) {
-    const texto = document.getElementById(idEl).textContent.trim();
-    navigator.clipboard.writeText(texto)
-    .then(() => { btn.textContent='✅ Copiado!'; setTimeout(()=>btn.innerHTML='📋 Copiar chave PIX',2000); })
-    .catch(() => alert('Chave PIX: '+texto));
-}
 document.getElementById('modal-reprovacao').addEventListener('click', function(e){ if(e.target===this) fecharModal(); });
-</script>
-<?php else: ?>
-<script>
-function copiarPix() {
-    const el = document.getElementById('chave-pix');
-    if (!el) return;
-    navigator.clipboard.writeText(el.textContent)
-    .then(() => { const b=document.querySelector('.instrucao-copia'); b.textContent='✅ Copiado!'; setTimeout(()=>b.innerHTML='📋 Copiar chave PIX',2000); })
-    .catch(() => alert('Chave PIX: '+el.textContent));
-}
 </script>
 <?php endif; ?>
 </body>
