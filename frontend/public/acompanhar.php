@@ -1,7 +1,7 @@
 <?php
 /**
  * PÁGINA PÚBLICA DE ACOMPANHAMENTO DO PEDIDO
- * Versão: 4.0 - aprovação/reprovação + formas de pagamento
+ * Versão: 4.1 - entrada corrigida para 50%
  * Data: 27/02/2026
  */
 
@@ -78,7 +78,6 @@ $statusInfo = [
     'Cancelada'            => ['label'=>'Cancelado',             'cor'=>'#37474f','bg'=>'#eceff1','icone'=>'🚫','desc'=>'Este pedido foi cancelado.'],
 ];
 $icones_hist = ['Pre-OS'=>'🗒️','Em analise'=>'🔍','Orcada'=>'💰','Aguardando aprovacao'=>'⏳','Aprovada'=>'✅','Reprovada'=>'❌','Cancelada'=>'🚫'];
-
 $pode_aprovar = $pedido && in_array($pedido['status'], ['Orcada','Aguardando aprovacao']) && !empty($pedido['valor_orcamento']);
 ?>
 <!DOCTYPE html>
@@ -123,7 +122,6 @@ $pode_aprovar = $pedido && in_array($pedido['status'], ['Orcada','Aguardando apr
         .servico-item{padding:9px 0;border-bottom:1px solid #f0f0f0;font-size:14px;color:#444;display:flex;align-items:center;gap:8px}
         .servico-item:last-child{border-bottom:none}
         .servico-item::before{content:'•';color:#0d9488;font-size:18px;flex-shrink:0}
-        /* PAGAMENTO */
         .pgto-opcoes{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:18px}
         .pgto-btn{border:2px solid #e0e0e0;border-radius:10px;padding:14px 10px;text-align:center;cursor:pointer;transition:all .2s;background:#fff;font-family:inherit}
         .pgto-btn:hover{border-color:#0d9488;background:#f0fdfb}
@@ -131,7 +129,6 @@ $pode_aprovar = $pedido && in_array($pedido['status'], ['Orcada','Aguardando apr
         .pgto-btn .pgto-icone{font-size:28px;display:block;margin-bottom:6px}
         .pgto-btn .pgto-nome{font-size:13px;font-weight:600;color:#333}
         .pgto-btn .pgto-sub{font-size:11px;color:#0d9488;margin-top:3px}
-        /* RESULTADO PAGAMENTO */
         .pgto-resultado{background:#f8f9fa;border-radius:10px;padding:18px;margin-bottom:18px;display:none}
         .pgto-resultado.visivel{display:block}
         .pgto-res-titulo{font-size:13px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px}
@@ -141,12 +138,10 @@ $pode_aprovar = $pedido && in_array($pedido['status'], ['Orcada','Aguardando apr
         .pgto-linha .lbl{color:#666}
         .pgto-linha .val{font-weight:700;color:#222}
         .pgto-linha.destaque .val{color:#2e7d32;font-size:16px}
-        /* BANDEIRAS */
         .bandeiras{display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap}
         .band-btn{border:2px solid #e0e0e0;border-radius:8px;padding:8px 16px;cursor:pointer;font-size:13px;font-weight:600;background:#fff;transition:all .2s;font-family:inherit}
         .band-btn:hover{border-color:#0d9488}
         .band-btn.ativo{border-color:#0d9488;background:#e0f2f1}
-        /* PARCELAS */
         .parcelas-lista{display:flex;flex-direction:column;gap:6px;max-height:280px;overflow-y:auto}
         .parcela-item{display:flex;justify-content:space-between;align-items:center;padding:9px 12px;border-radius:8px;background:#f5f5f5;font-size:13px;cursor:pointer;border:2px solid transparent;transition:all .15s}
         .parcela-item:hover{background:#e0f2f1;border-color:#0d9488}
@@ -154,14 +149,12 @@ $pode_aprovar = $pedido && in_array($pedido['status'], ['Orcada','Aguardando apr
         .parc-n{font-weight:700;color:#333}
         .parc-v{font-weight:700;color:#0d9488}
         .parc-t{font-size:11px;color:#999}
-        /* BOTÕES AÇÃO */
         .acoes{display:flex;gap:12px;margin-top:20px}
         .btn-aprovar{flex:1;padding:14px;background:#2e7d32;color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;transition:background .2s}
         .btn-aprovar:hover{background:#1b5e20}
         .btn-aprovar:disabled{background:#bbb;cursor:not-allowed}
         .btn-reprovar{padding:14px 20px;background:#fff;color:#c62828;border:2px solid #ef9a9a;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .2s}
         .btn-reprovar:hover{background:#ffebee;border-color:#c62828}
-        /* MODAL REPROVAÇÃO */
         .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;justify-content:center;align-items:center;padding:20px}
         .modal-overlay.aberto{display:flex}
         .modal-box{background:#fff;border-radius:12px;padding:28px;width:100%;max-width:440px;box-shadow:0 8px 32px rgba(0,0,0,.2)}
@@ -172,7 +165,6 @@ $pode_aprovar = $pedido && in_array($pedido['status'], ['Orcada','Aguardando apr
         .modal-actions{display:flex;gap:10px;margin-top:16px;justify-content:flex-end}
         .btn-modal-cancel{padding:10px 18px;background:#f5f5f5;border:none;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit}
         .btn-modal-confirm{padding:10px 20px;background:#c62828;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit}
-        /* TIMELINE */
         .timeline{list-style:none;padding:0;margin:0;position:relative}
         .timeline::before{content:'';position:absolute;left:16px;top:6px;bottom:6px;width:2px;background:#e8e8e8}
         .tl-item{display:flex;gap:14px;padding-bottom:22px;position:relative}
@@ -191,9 +183,8 @@ $pode_aprovar = $pedido && in_array($pedido['status'], ['Orcada','Aguardando apr
         .footer{text-align:center;padding:28px 20px 40px;font-size:12px;color:#ccc}
         @media(max-width:520px){
             .status-card,.orc-card{flex-direction:column;text-align:center;gap:12px}
-            .busca-token form{flex-direction:column}
+            .busca-token form,.acoes{flex-direction:column}
             .header span,.orc-emoji{display:none}
-            .acoes{flex-direction:column}
         }
     </style>
 </head>
@@ -220,13 +211,9 @@ $pode_aprovar = $pedido && in_array($pedido['status'], ['Orcada','Aguardando apr
     <?php elseif ($pedido):
         $si = $statusInfo[$pedido['status']] ?? ['label'=>$pedido['status'],'cor'=>'#666','bg'=>'#f5f5f5','icone'=>'•','desc'=>''];
     ?>
-
         <div class="status-card" style="background:<?php echo $si['bg']; ?>;color:<?php echo $si['cor']; ?>">
             <div class="status-icone"><?php echo $si['icone']; ?></div>
-            <div>
-                <div class="status-label"><?php echo $si['label']; ?></div>
-                <div class="status-desc"><?php echo $si['desc']; ?></div>
-            </div>
+            <div><div class="status-label"><?php echo $si['label']; ?></div><div class="status-desc"><?php echo $si['desc']; ?></div></div>
         </div>
 
         <?php if (!empty($pedido['valor_orcamento'])): ?>
@@ -234,7 +221,7 @@ $pode_aprovar = $pedido && in_array($pedido['status'], ['Orcada','Aguardando apr
             <div class="orc-emoji">💰</div>
             <div>
                 <div class="orc-label">Valor do Orçamento</div>
-                <div class="orc-valor" id="orc-valor-base">R$ <?php echo number_format($pedido['valor_orcamento'],2,',','.'); ?></div>
+                <div class="orc-valor">R$ <?php echo number_format($pedido['valor_orcamento'],2,',','.'); ?></div>
                 <?php if (!empty($pedido['prazo_orcamento'])): ?>
                 <div class="orc-prazo">📅 Prazo estimado: <strong><?php echo (int)$pedido['prazo_orcamento']; ?> dias úteis</strong></div>
                 <?php endif; ?>
@@ -243,10 +230,8 @@ $pode_aprovar = $pedido && in_array($pedido['status'], ['Orcada','Aguardando apr
         <?php endif; ?>
 
         <?php if ($pode_aprovar): ?>
-        <!-- BLOCO DE PAGAMENTO + APROVAÇÃO -->
         <div class="card" id="card-pagamento">
             <div class="card-title">💳 Forma de Pagamento &amp; Aprovação</div>
-
             <div class="pgto-opcoes">
                 <button class="pgto-btn" onclick="selecionarPgto('pix')" id="btn-pix">
                     <span class="pgto-icone">🟢</span>
@@ -256,7 +241,7 @@ $pode_aprovar = $pedido && in_array($pedido['status'], ['Orcada','Aguardando apr
                 <button class="pgto-btn" onclick="selecionarPgto('entrada')" id="btn-entrada">
                     <span class="pgto-icone">🔑</span>
                     <span class="pgto-nome">Entrada + Retirada</span>
-                    <span class="pgto-sub">60% + 40%</span>
+                    <span class="pgto-sub">50% + 50%</span>
                 </button>
                 <button class="pgto-btn" onclick="selecionarPgto('cartao')" id="btn-cartao">
                     <span class="pgto-icone">📳</span>
@@ -265,7 +250,6 @@ $pode_aprovar = $pedido && in_array($pedido['status'], ['Orcada','Aguardando apr
                 </button>
             </div>
 
-            <!-- RESULTADO PIX/DINHEIRO -->
             <div class="pgto-resultado" id="res-pix">
                 <div class="pgto-res-titulo">🟢 PIX ou Dinheiro — à vista</div>
                 <div class="pgto-linha"><span class="lbl">Valor original</span><span class="val" id="pix-original"></span></div>
@@ -273,15 +257,13 @@ $pode_aprovar = $pedido && in_array($pedido['status'], ['Orcada','Aguardando apr
                 <div class="pgto-linha destaque"><span class="lbl">Você paga</span><span class="val" id="pix-final"></span></div>
             </div>
 
-            <!-- RESULTADO ENTRADA -->
             <div class="pgto-resultado" id="res-entrada">
                 <div class="pgto-res-titulo">🔑 Entrada + Pagamento na Retirada</div>
                 <div class="pgto-linha"><span class="lbl">Valor total</span><span class="val" id="ent-total"></span></div>
-                <div class="pgto-linha"><span class="lbl">Entrada (60%)</span><span class="val" style="color:#1565c0" id="ent-entrada"></span></div>
-                <div class="pgto-linha destaque"><span class="lbl">Na retirada (40%)</span><span class="val" id="ent-retirada"></span></div>
+                <div class="pgto-linha"><span class="lbl">Entrada (50%)</span><span class="val" style="color:#1565c0" id="ent-entrada"></span></div>
+                <div class="pgto-linha destaque"><span class="lbl">Na retirada (50%)</span><span class="val" id="ent-retirada"></span></div>
             </div>
 
-            <!-- RESULTADO CARTÃO -->
             <div class="pgto-resultado" id="res-cartao">
                 <div class="pgto-res-titulo">📳 Cartão de Crédito / Débito</div>
                 <div class="bandeiras">
@@ -291,20 +273,16 @@ $pode_aprovar = $pedido && in_array($pedido['status'], ['Orcada','Aguardando apr
                 <div id="parcelas-container" style="display:none">
                     <div style="font-size:12px;color:#999;margin-bottom:8px">Selecione a quantidade de parcelas:</div>
                     <div class="parcelas-lista" id="parcelas-lista"></div>
-                    <div class="pgto-linha destaque" style="margin-top:12px" id="res-parc-selecionada" style="display:none">
-                        <span class="lbl" id="parc-sel-label">Parcela selecionada</span>
+                    <div class="pgto-linha destaque" style="margin-top:12px;display:none" id="res-parc-selecionada">
+                        <span class="lbl" id="parc-sel-label"></span>
                         <span class="val" id="parc-sel-valor"></span>
                     </div>
                 </div>
             </div>
 
             <div class="acoes">
-                <button class="btn-aprovar" id="btn-aprovar" onclick="confirmarAprovacao()" disabled>
-                    ✅ Aprovar Orçamento
-                </button>
-                <button class="btn-reprovar" onclick="abrirReprovacao()">
-                    ❌ Não aprovar
-                </button>
+                <button class="btn-aprovar" id="btn-aprovar" onclick="confirmarAprovacao()" disabled>✅ Selecione a forma de pagamento</button>
+                <button class="btn-reprovar" onclick="abrirReprovacao()">❌ Não aprovar</button>
             </div>
         </div>
         <?php endif; ?>
@@ -372,7 +350,6 @@ $pode_aprovar = $pedido && in_array($pedido['status'], ['Orcada','Aguardando apr
     <?php endif; ?>
 </div>
 
-<!-- MODAL REPROVAÇÃO -->
 <div class="modal-overlay" id="modal-reprovacao">
     <div class="modal-box">
         <div class="modal-title">❌ Motivo da Não Aprovação</div>
@@ -404,39 +381,28 @@ const TAXAS = {
     }
 };
 
-let pgtoSelecionado = null;
-let bandeiraSelecionada = null;
-let parcelaSelecionada  = null;
-let pagamentoPayload    = {};
-
+let pgtoSelecionado = null, bandeiraSelecionada = null, pagamentoPayload = {};
 function fmt(v){ return 'R$ ' + v.toFixed(2).replace('.',',').replace(/\B(?=(\d{3})+(?!\d))/g,'.'); }
 
 function selecionarPgto(tipo) {
-    pgtoSelecionado     = tipo;
-    bandeiraSelecionada = null;
-    parcelaSelecionada  = null;
-    pagamentoPayload    = {};
-
+    pgtoSelecionado = tipo; bandeiraSelecionada = null; pagamentoPayload = {};
     ['pix','entrada','cartao'].forEach(t => {
         document.getElementById('btn-'+t).classList.toggle('ativo', t===tipo);
         document.getElementById('res-'+t).classList.toggle('visivel', t===tipo);
     });
-
     if (tipo === 'pix') {
-        const desc  = VALOR_BASE * 0.05;
-        const final = VALOR_BASE - desc;
+        const desc=VALOR_BASE*0.05, final=VALOR_BASE-desc;
         document.getElementById('pix-original').textContent = fmt(VALOR_BASE);
-        document.getElementById('pix-desconto').textContent = '- ' + fmt(desc);
+        document.getElementById('pix-desconto').textContent = '- '+fmt(desc);
         document.getElementById('pix-final').textContent    = fmt(final);
-        pagamentoPayload = { forma: 'PIX/Dinheiro', valor_final: final, descricao: 'PIX/Dinheiro à vista com 5% de desconto' };
+        pagamentoPayload = { forma:'PIX/Dinheiro', valor_final:final, descricao:'PIX/Dinheiro à vista com 5% de desconto' };
         habilitarAprovar(true);
     } else if (tipo === 'entrada') {
-        const ent = VALOR_BASE * 0.60;
-        const ret = VALOR_BASE * 0.40;
+        const ent=VALOR_BASE*0.50, ret=VALOR_BASE*0.50;
         document.getElementById('ent-total').textContent    = fmt(VALOR_BASE);
         document.getElementById('ent-entrada').textContent  = fmt(ent);
         document.getElementById('ent-retirada').textContent = fmt(ret);
-        pagamentoPayload = { forma: 'Entrada+Retirada', valor_final: VALOR_BASE, entrada: ent, retirada: ret, descricao: 'Entrada 60% + 40% na retirada' };
+        pagamentoPayload = { forma:'Entrada+Retirada', valor_final:VALOR_BASE, entrada:ent, retirada:ret, descricao:'Entrada 50% + 50% na retirada' };
         habilitarAprovar(true);
     } else {
         habilitarAprovar(false);
@@ -444,54 +410,39 @@ function selecionarPgto(tipo) {
 }
 
 function selecionarBandeira(band) {
-    bandeiraSelecionada = band;
-    parcelaSelecionada  = null;
-    pagamentoPayload    = {};
+    bandeiraSelecionada = band; pagamentoPayload = {};
     document.getElementById('band-vm').classList.toggle('ativo', band==='vm');
     document.getElementById('band-ea').classList.toggle('ativo', band==='ea');
-
-    const faixa  = VALOR_BASE > 2000 ? 'alto' : 'baixo';
-    const taxas  = TAXAS[band][faixa];
-    const lista  = document.getElementById('parcelas-lista');
+    const faixa = VALOR_BASE > 2000 ? 'alto' : 'baixo';
+    const taxas = TAXAS[band][faixa];
+    const lista = document.getElementById('parcelas-lista');
     lista.innerHTML = '';
-
     const opcoes = [];
-    // Débito à vista
-    const vDebito = VALOR_BASE * (1 + taxas.debito/100);
-    opcoes.push({ label:'Débito à vista', parcelas:1, taxa:taxas.debito, total:vDebito, porParcela:vDebito, tipo:'debito' });
-    // Crédito à vista
-    const vAV = VALOR_BASE * (1 + taxas.av/100);
-    opcoes.push({ label:'Crédito à vista', parcelas:1, taxa:taxas.av, total:vAV, porParcela:vAV, tipo:'credito_av' });
-    // Parcelado 2x a 10x
-    for (let n=2; n<=10; n++) {
-        const total = VALOR_BASE * (1 + taxas.p[n]/100);
-        opcoes.push({ label: n+'x', parcelas:n, taxa:taxas.p[n], total, porParcela: total/n, tipo:'parcelado' });
+    opcoes.push({ label:'Débito à vista', parcelas:1, total:VALOR_BASE*(1+taxas.debito/100), tipo:'debito' });
+    opcoes.push({ label:'Crédito à vista', parcelas:1, total:VALOR_BASE*(1+taxas.av/100), tipo:'credito_av' });
+    for (let n=2;n<=10;n++) {
+        const total=VALOR_BASE*(1+taxas.p[n]/100);
+        opcoes.push({ label:n+'x', parcelas:n, total, tipo:'parcelado' });
     }
-    // Ordenar do menor para o maior valor por parcela
-    opcoes.sort((a,b) => a.porParcela - b.porParcela);
-
-    opcoes.forEach((op, i) => {
+    opcoes.sort((a,b)=>(a.total/a.parcelas)-(b.total/b.parcelas));
+    opcoes.forEach((op,i) => {
+        const pv = op.total/op.parcelas;
         const el = document.createElement('div');
-        el.className = 'parcela-item';
-        el.id = 'parc-'+i;
-        const nomeLabel = op.tipo === 'debito' ? op.label :
-                          op.tipo === 'credito_av' ? op.label :
-                          op.label + ' de ' + fmt(op.porParcela);
-        el.innerHTML = `<span class="parc-n">${nomeLabel}</span><span class="parc-t">total ${fmt(op.total)}</span><span class="parc-v">${fmt(op.porParcela)}</span>`;
+        el.className='parcela-item'; el.id='parc-'+i;
+        const nLabel = op.tipo==='parcelado' ? op.label+' de '+fmt(pv) : op.label;
+        el.innerHTML = `<span class="parc-n">${nLabel}</span><span class="parc-t">total ${fmt(op.total)}</span><span class="parc-v">${fmt(pv)}</span>`;
         el.onclick = () => {
             document.querySelectorAll('.parcela-item').forEach(e=>e.classList.remove('ativo'));
             el.classList.add('ativo');
-            parcelaSelecionada = op;
-            document.getElementById('parc-sel-label').textContent  = nomeLabel;
-            document.getElementById('parc-sel-valor').textContent  = fmt(op.porParcela);
+            document.getElementById('parc-sel-label').textContent = nLabel;
+            document.getElementById('parc-sel-valor').textContent = fmt(pv);
             document.getElementById('res-parc-selecionada').style.display = 'flex';
-            pagamentoPayload = { forma:'Cartão', bandeira: band==='vm'?'Visa/Mastercard':'Elo/Amex', descricao: nomeLabel, valor_final: op.total, por_parcela: op.porParcela, parcelas: op.parcelas, taxa: op.taxa };
+            pagamentoPayload = { forma:'Cartão', bandeira:band==='vm'?'Visa/Mastercard':'Elo/Amex', descricao:nLabel, valor_final:op.total, por_parcela:pv, parcelas:op.parcelas };
             habilitarAprovar(true);
         };
         lista.appendChild(el);
     });
-
-    document.getElementById('parcelas-container').style.display = 'block';
+    document.getElementById('parcelas-container').style.display='block';
     habilitarAprovar(false);
 }
 
@@ -500,55 +451,35 @@ function habilitarAprovar(ok) {
     btn.disabled = !ok;
     btn.textContent = ok ? '✅ Aprovar Orçamento' : '✅ Selecione a forma de pagamento';
 }
-
 function confirmarAprovacao() {
     if (!pagamentoPayload.forma) return;
-    const desc = pagamentoPayload.descricao || pagamentoPayload.forma;
-    if (!confirm('Confirmar aprovação?\n\nForma: ' + desc + '\nValor: ' + fmt(pagamentoPayload.valor_final))) return;
+    if (!confirm('Confirmar aprovação?\n\nForma: '+pagamentoPayload.descricao+'\nValor: '+fmt(pagamentoPayload.valor_final))) return;
     enviar('Aprovada', { pagamento: pagamentoPayload });
 }
-
 function abrirReprovacao() {
-    document.getElementById('motivo-reprovacao').value = '';
+    document.getElementById('motivo-reprovacao').value='';
     document.getElementById('modal-reprovacao').classList.add('aberto');
 }
-function fecharModal() {
-    document.getElementById('modal-reprovacao').classList.remove('aberto');
-}
+function fecharModal() { document.getElementById('modal-reprovacao').classList.remove('aberto'); }
 function enviarReprovacao() {
-    const motivo = document.getElementById('motivo-reprovacao').value.trim();
+    const motivo=document.getElementById('motivo-reprovacao').value.trim();
     if (!motivo) { alert('Por favor, informe o motivo.'); return; }
     fecharModal();
     enviar('Reprovada', { motivo });
 }
-
 function enviar(status, extras) {
-    fetch(API_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token: PEDIDO_TOKEN, status, ...extras })
+    fetch(API_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:PEDIDO_TOKEN,status,...extras})})
+    .then(r=>r.json())
+    .then(d=>{
+        if(d.sucesso){
+            document.getElementById('card-pagamento').innerHTML='<div style="text-align:center;padding:20px 0">'+(status==='Aprovada'?'✅ <strong>Orçamento aprovado!</strong><br><span style="font-size:13px;color:#555">Entraremos em contato em breve para combinar os detalhes.</span>':'❌ <strong>Orçamento não aprovado.</strong><br><span style="font-size:13px;color:#555">Registro enviado. Obrigado pelo retorno!</span>')+'</div>';
+            setTimeout(()=>location.reload(),2500);
+        } else { alert('❌ Erro: '+(d.erro||'Tente novamente.')); }
     })
-    .then(r => r.json())
-    .then(d => {
-        if (d.sucesso) {
-            document.getElementById('card-pagamento').innerHTML =
-                '<div style="text-align:center;padding:20px 0">' +
-                (status==='Aprovada' ? '✅ <strong>Orçamento aprovado!</strong><br><span style="font-size:13px;color:#555">Entraremos em contato em breve para combinar os detalhes.</span>' :
-                                       '❌ <strong>Orçamento não aprovado.</strong><br><span style="font-size:13px;color:#555">Registro enviado. Obrigado pelo retorno!</span>') +
-                '</div>';
-            setTimeout(() => location.reload(), 2500);
-        } else {
-            alert('❌ Erro: ' + (d.erro || 'Tente novamente.'));
-        }
-    })
-    .catch(() => alert('❌ Erro de conexão. Tente novamente.'));
+    .catch(()=>alert('❌ Erro de conexão. Tente novamente.'));
 }
-
-document.getElementById('modal-reprovacao').addEventListener('click', function(e){
-    if (e.target === this) fecharModal();
-});
+document.getElementById('modal-reprovacao').addEventListener('click',function(e){if(e.target===this)fecharModal();});
 </script>
 <?php endif; ?>
-
 </body>
 </html>
