@@ -1,7 +1,10 @@
 <?php
 /**
  * DETALHES DO PEDIDO - SISTEMA ADONIS
- * Versão: 3.5 - valor máquina sempre inteiro (ceil) + back-calculate valor real da máquina
+ * Versão: 3.6
+ * - Remove botão Aprovar do painel (aprovação é exclusiva do cliente pelo link)
+ * - Card de resumo de pagamento para todos os tipos (PIX, Entrada, Cartão)
+ * - Card maquininha apenas quando pagamento = Cartão
  * Data: 27/02/2026
  */
 
@@ -67,10 +70,11 @@ try {
         $historico = $stmt_hist->fetchAll(PDO::FETCH_ASSOC);
     } catch (PDOException $e) {}
 
+    // Dados de pagamento registrados pelo cliente ao aprovar
     $pagamento_info = null;
     try {
         $stmt_pag = $conn->prepare("
-            SELECT forma_pagamento, parcelas, valor_final, por_parcela
+            SELECT forma_pagamento, parcelas, valor_final, por_parcela, descricao_pagamento
             FROM status_historico
             WHERE pre_os_id = :id AND status = 'Aprovada'
             ORDER BY criado_em DESC LIMIT 1
@@ -110,6 +114,7 @@ $v = time();
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="assets/css/admin.css?v=<?php echo $v; ?>">
     <style>
+        /* Modais */
         .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;justify-content:center;align-items:center;padding:20px}
         .modal-overlay.aberto{display:flex}
         .modal-box{background:#fff;border-radius:12px;padding:28px;width:100%;max-width:520px;box-shadow:0 8px 32px rgba(0,0,0,.2);max-height:90vh;overflow-y:auto}
@@ -121,6 +126,7 @@ $v = time();
         .modal-box textarea{resize:vertical;min-height:80px}
         .modal-hint{font-size:11px;color:#aaa;margin-top:4px}
         .modal-actions{display:flex;gap:12px;margin-top:20px;justify-content:flex-end}
+        /* Simulador orçamento */
         .sim-sep{border:none;border-top:2px dashed #e0e0e0;margin:20px 0}
         .sim-titulo{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#888;margin-bottom:12px}
         .sim-cards{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px}
@@ -132,6 +138,15 @@ $v = time();
         .sim-card-sub{font-size:11px;color:#666;margin-top:5px;line-height:1.4}
         .sim-card.maquina .sim-card-valor{color:#e65100}
         .sim-aviso{font-size:12px;color:#555;background:#f8f9fa;border-radius:6px;padding:10px 14px;margin-bottom:12px;line-height:1.8;border-left:3px solid #0d9488}
+        /* Card pagamento aprovado (todos os tipos) */
+        .pgto-aprovado-card{border-radius:12px;padding:20px 22px;margin-bottom:20px;border:2px solid #a5d6a7;background:#f1f8e9}
+        .pgto-aprovado-titulo{font-size:13px;font-weight:700;color:#2e7d32;text-transform:uppercase;letter-spacing:.5px;margin-bottom:14px;display:flex;align-items:center;gap:6px}
+        .pgto-aprovado-linha{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #c8e6c9;font-size:14px}
+        .pgto-aprovado-linha:last-child{border-bottom:none}
+        .pgto-aprovado-lbl{color:#388e3c;font-weight:500}
+        .pgto-aprovado-val{font-weight:700;color:#1b5e20;font-size:15px}
+        .pgto-aprovado-val.destaque{font-size:19px;color:#1b5e20}
+        /* Card maquininha (só para cartão) */
         .maq-card{background:#fff8e1;border:2px solid #ffc107;border-radius:12px;padding:20px 22px;margin-bottom:20px}
         .maq-card-titulo{font-size:13px;font-weight:700;color:#e65100;text-transform:uppercase;letter-spacing:.5px;margin-bottom:14px;display:flex;align-items:center;gap:6px}
         .maq-linha{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid #ffe082;font-size:14px}
@@ -139,6 +154,7 @@ $v = time();
         .maq-lbl{color:#795548;font-weight:500}
         .maq-val{font-weight:700;color:#e65100;font-size:16px}
         .maq-val.destaque{font-size:20px;color:#bf360c}
+        /* Timeline */
         .timeline{list-style:none;padding:0;margin:0;position:relative}
         .timeline::before{content:'';position:absolute;left:18px;top:0;bottom:0;width:2px;background:#e0e0e0}
         .timeline-item{display:flex;gap:16px;padding:0 0 24px 0}
@@ -169,6 +185,7 @@ $v = time();
 
 <div class="container">
 
+    <!-- CARD STATUS + AÇÕES -->
     <div class="card">
         <div class="card-header">
             <div>
@@ -191,7 +208,6 @@ $v = time();
             <div class="actions">
                 <button class="btn btn-info"    onclick="atualizarStatus('Em analise')">🔍 Analisar</button>
                 <button class="btn btn-warning" onclick="abrirModalOrcamento()">💰 Orçar</button>
-                <button class="btn btn-success" onclick="atualizarStatus('Aprovada')">✅ Aprovar</button>
                 <button class="btn btn-danger"  onclick="abrirModalReprovacao()">❌ Reprovar</button>
                 <button class="btn btn-dark"    onclick="atualizarStatus('Cancelada')">🚫 Cancelar</button>
             </div>
@@ -202,22 +218,60 @@ $v = time();
         </div>
     </div>
 
+    <?php if ($pedido['status'] === 'Aprovada' && !empty($pagamento_info)): ?>
+
     <?php
-    $show_maq = $pedido['status'] === 'Aprovada'
-                && !empty($pedido['valor_orcamento'])
-                && !empty($pagamento_info)
-                && $pagamento_info['forma_pagamento'] === 'Cartão';
-    if ($show_maq):
-        $maq_valor_cliente = (float) $pagamento_info['valor_final'];   // valor inteiro que o cliente aprovou
-        $maq_parcelas      = (int)   $pagamento_info['parcelas'];
-        // taxa usada na geração: 21.58% (<=2000) ou 15.38% (>2000) sobre o valor BASE
-        // Como não salvamos o valor base original, recalculamos a partir do valor_final
-        // usando o mesmo ceil: valor_real = valor_cliente / (1 + taxa/100)
-        // Determinamos a taxa pelo próprio valor_cliente (aproximação segura)
-        $taxa_aprox = $maq_valor_cliente > 2000 ? 15.38 : 21.58;
-        $maq_valor_real  = $maq_valor_cliente / (1 + $taxa_aprox / 100); // valor a digitar na máquina
-        $maq_por_parcela = $maq_parcelas > 0 ? $maq_valor_cliente / $maq_parcelas : $maq_valor_cliente;
+        $forma       = $pagamento_info['forma_pagamento'] ?? '';
+        $vf          = (float)($pagamento_info['valor_final']  ?? 0);
+        $parcelas    = (int)  ($pagamento_info['parcelas']     ?? 0);
+        $por_parcela = (float)($pagamento_info['por_parcela']  ?? 0);
+        $descricao   = $pagamento_info['descricao_pagamento']  ?? $forma;
+
+        // Ternarios de rótulo / ícone por forma
+        $pgto_icone = '💳';
+        if (stripos($forma,'pix') !== false || stripos($forma,'dinheiro') !== false) $pgto_icone = '🟢';
+        elseif (stripos($forma,'entrada') !== false) $pgto_icone = '🔑';
+        elseif (stripos($forma,'cart') !== false)    $pgto_icone = '📳';
     ?>
+
+    <!-- CARD RESUMO DE PAGAMENTO -->
+    <div class="pgto-aprovado-card">
+        <div class="pgto-aprovado-titulo"><?php echo $pgto_icone; ?> Pagamento escolhido pelo cliente</div>
+
+        <div class="pgto-aprovado-linha">
+            <span class="pgto-aprovado-lbl">Forma</span>
+            <span class="pgto-aprovado-val"><?php echo htmlspecialchars($descricao ?: $forma); ?></span>
+        </div>
+
+        <div class="pgto-aprovado-linha">
+            <span class="pgto-aprovado-lbl">Valor total</span>
+            <span class="pgto-aprovado-val destaque">R$ <?php echo number_format($vf, 2, ',', '.'); ?></span>
+        </div>
+
+        <?php if ($parcelas > 0 && stripos($forma,'cart') !== false): ?>
+        <div class="pgto-aprovado-linha">
+            <span class="pgto-aprovado-lbl">Parcelas</span>
+            <span class="pgto-aprovado-val"><?php echo $parcelas; ?>x de R$ <?php echo number_format($por_parcela, 2, ',', '.'); ?></span>
+        </div>
+        <?php elseif (stripos($forma,'entrada') !== false): ?>
+        <div class="pgto-aprovado-linha">
+            <span class="pgto-aprovado-lbl">Entrada (50% agora)</span>
+            <span class="pgto-aprovado-val">R$ <?php echo number_format($vf * 0.5, 2, ',', '.'); ?></span>
+        </div>
+        <div class="pgto-aprovado-linha">
+            <span class="pgto-aprovado-lbl">Na retirada (50%)</span>
+            <span class="pgto-aprovado-val">R$ <?php echo number_format($vf * 0.5, 2, ',', '.'); ?></span>
+        </div>
+        <?php endif; ?>
+    </div>
+
+    <?php if (stripos($forma, 'cart') !== false && $parcelas > 0):
+        // Back-calculate: valor real a digitar na máquina
+        $taxa_aprox      = $vf > 2000 ? 15.38 : 21.58;
+        $maq_valor_real  = $vf / (1 + $taxa_aprox / 100);
+        $maq_por_parcela = $vf / $parcelas;
+    ?>
+    <!-- CARD MAQUININHA (somente cartão) -->
     <div class="maq-card">
         <div class="maq-card-titulo">📳 Instrução para cobrar na maquininha</div>
         <div class="maq-linha">
@@ -226,19 +280,25 @@ $v = time();
         </div>
         <div class="maq-linha">
             <span class="maq-lbl">Parcelas a selecionar</span>
-            <span class="maq-val"><?php echo $maq_parcelas; ?>x</span>
+            <span class="maq-val"><?php echo $parcelas; ?>x</span>
         </div>
         <div class="maq-linha">
-            <span class="mbl"></span>
-            <span style="font-size:12px;color:#999">→ Cliente pagará <?php echo $maq_parcelas; ?>x de R$ <?php echo number_format($maq_por_parcela, 2, ',', '.'); ?> = <strong>R$ <?php echo number_format($maq_valor_cliente, 2, ',', '.'); ?></strong></span>
+            <span style="font-size:12px;color:#999">→ Cliente pagará <?php echo $parcelas; ?>x de
+            R$ <?php echo number_format($maq_por_parcela, 2, ',', '.'); ?>
+            = <strong>R$ <?php echo number_format($vf, 2, ',', '.'); ?></strong></span>
         </div>
         <div style="margin-top:12px;font-size:12px;color:#795548;background:#fff3e0;border-radius:6px;padding:8px 12px">
-            ⚠️ Digite <strong>R$ <?php echo number_format($maq_valor_real, 2, ',', '.'); ?></strong> na máquina e selecione <strong><?php echo $maq_parcelas; ?>x</strong>.
-            A máquina aplicará a taxa e o cliente pagará exatamente <strong>R$ <?php echo number_format($maq_valor_cliente, 2, ',', '.'); ?></strong>.
+            ⚠️ Digite <strong>R$ <?php echo number_format($maq_valor_real, 2, ',', '.'); ?></strong>
+            na máquina e selecione <strong><?php echo $parcelas; ?>x</strong>.
+            A máquina aplicará a taxa e o cliente pagará exatamente
+            <strong>R$ <?php echo number_format($vf, 2, ',', '.'); ?></strong>.
         </div>
     </div>
     <?php endif; ?>
 
+    <?php endif; /* fim bloco status=Aprovada */ ?>
+
+    <!-- DADOS DO CLIENTE -->
     <div class="card">
         <div class="card-header"><h2 class="card-title">👤 Dados do Cliente</h2></div>
         <div class="info-grid">
@@ -260,6 +320,7 @@ $v = time();
         </div>
     </div>
 
+    <!-- DADOS DO INSTRUMENTO -->
     <div class="card">
         <div class="card-header"><h2 class="card-title">🎸 Dados do Instrumento</h2></div>
         <div class="info-grid">
@@ -268,10 +329,11 @@ $v = time();
             <div class="info-item"><div class="info-label">Modelo</div><div class="info-value"><?php echo htmlspecialchars($pedido['instrumento_modelo']); ?></div></div>
             <?php if (!empty($pedido['instrumento_cor'])): ?><div class="info-item"><div class="info-label">Cor</div><div class="info-value"><?php echo htmlspecialchars($pedido['instrumento_cor']); ?></div></div><?php endif; ?>
             <?php if (!empty($pedido['instrumento_referencia'])): ?><div class="info-item"><div class="info-label">Referência</div><div class="info-value"><?php echo htmlspecialchars($pedido['instrumento_referencia']); ?></div></div><?php endif; ?>
-            <?php if (!empty($pedido['instrumento_serie'])): ?><div class="info-item"><div class="info-label">Número de Série</div><div class="info-value"><?php echo htmlspecialchars($pedido['instrumento_serie']); ?></div></div><?php endif; ?>
+            <?php if (!empty($pedido['instrumento_serie'])): ?><div class="info-item"><div class="info-label">Número de Série</div><div class="info-value"><?php echo htmlspecialchars($pedido['instrumento_serie'])); ?></div></div><?php endif; ?>
         </div>
     </div>
 
+    <!-- SERVIÇOS -->
     <div class="card">
         <div class="card-header"><h2 class="card-title">🔧 Serviços Solicitados</h2></div>
         <?php if (empty($servicos)): ?>
@@ -300,6 +362,7 @@ $v = time();
         <?php endif; ?>
     </div>
 
+    <!-- FOTOS -->
     <?php if (!empty($fotos)): ?>
     <div class="card">
         <div class="card-header"><h2 class="card-title">📷 Fotos do Instrumento</h2></div>
@@ -311,6 +374,7 @@ $v = time();
     </div>
     <?php endif; ?>
 
+    <!-- OBSERVAÇÕES -->
     <?php if (!empty($pedido['observacoes'])): ?>
     <div class="card">
         <div class="card-header"><h2 class="card-title">📝 Observações do Cliente</h2></div>
@@ -318,6 +382,7 @@ $v = time();
     </div>
     <?php endif; ?>
 
+    <!-- HISTÓRICO -->
     <div class="card">
         <div class="card-header"><h2 class="card-title">🕓 Histórico de Status</h2></div>
         <?php if (empty($historico)): ?>
@@ -344,6 +409,7 @@ $v = time();
         <?php endif; ?>
     </div>
 
+    <!-- TOKEN -->
     <div class="card">
         <div class="card-header">
             <h2 class="card-title">🔑 Código de Acompanhamento</h2>
@@ -384,7 +450,6 @@ $v = time();
         </div>
 
         <div class="sim-aviso" id="sim-aviso" style="display:none"></div>
-
         <input type="hidden" id="input-valor-final">
 
         <div class="modal-actions">
@@ -399,7 +464,7 @@ $v = time();
     <div class="modal-box">
         <div class="modal-title">❌ Motivo da Reprovação</div>
         <label for="input-motivo">Descreva o motivo</label>
-        <textarea id="input-motivo" placeholder="Ex: Cliente desistiu do serviço..."></textarea>
+        <textarea id="input-motivo" placeholder="Ex: Peça indisponível, serviço não realizável..."></textarea>
         <div class="modal-actions">
             <button class="btn btn-secondary" onclick="fecharModal('modal-reprovacao')">Cancelar</button>
             <button class="btn btn-danger" onclick="confirmarReprovacao()">❌ Confirmar Reprovação</button>
@@ -410,36 +475,33 @@ $v = time();
 <script>
 const _pedidoId  = <?php echo $preos_id; ?>;
 const _totalBase = <?php echo (float)$total_valor; ?>;
-const _statusLabels  = {'Pre-OS':'🗒️ Pré-OS','Em analise':'🔍 Em Análise','Orcada':'💰 Orçada','Aguardando aprovacao':'⏳ Aguardando Aprovação','Aprovada':'✅ Aprovada','Reprovada':'❌ Reprovada','Cancelada':'🚫 Cancelada'};
-const _statusClasses = {'Pre-OS':'badge-new','Em analise':'badge-info','Orcada':'badge-warning','Aguardando aprovacao':'badge-warning','Aprovada':'badge-success','Reprovada':'badge-danger','Cancelada':'badge-dark'};
+const _statusLabels  = {
+    'Pre-OS':'🗒️ Pré-OS','Em analise':'🔍 Em Análise','Orcada':'💰 Orçada',
+    'Aguardando aprovacao':'⏳ Aguardando Aprovação','Aprovada':'✅ Aprovada',
+    'Reprovada':'❌ Reprovada','Cancelada':'🚫 Cancelada'
+};
+const _statusClasses = {
+    'Pre-OS':'badge-new','Em analise':'badge-info','Orcada':'badge-warning',
+    'Aguardando aprovacao':'badge-warning','Aprovada':'badge-success',
+    'Reprovada':'badge-danger','Cancelada':'badge-dark'
+};
 
-// Retorna taxa Elo/Amex 10x conforme faixa de valor
 function taxaMaquina(v) { return v > 2000 ? 15.38 : 21.58; }
-
-function fmt(v) {
-    return 'R$\u00a0' + v.toFixed(2).replace('.',',').replace(/\B(?=(\d{3})+(?!\d))/g,'.');
-}
-function fmtInt(v) {
-    // Formata sem centavos quando valor é inteiro
-    return 'R$\u00a0' + v.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g,'.');
-}
+function fmt(v)    { return 'R$ ' + v.toFixed(2).replace('.',',').replace(/\B(?=(\d{3})+(?!\d))/g,'.'); }
+function fmtInt(v) { return 'R$ ' + v.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g,'.'); }
 
 let valorEscolhido = null;
 
 function calcMaquina(v) {
-    const taxa  = taxaMaquina(v);
-    const bruto = v * (1 + taxa / 100);
-    // Arredonda para o próximo inteiro (ceil)
-    const inteiro = Math.ceil(bruto);
-    // Valor real a digitar na máquina para que, após a taxa, o cliente pague `inteiro`
-    const real = inteiro / (1 + taxa / 100);
+    const taxa    = taxaMaquina(v);
+    const inteiro = Math.ceil(v * (1 + taxa / 100));
+    const real    = inteiro / (1 + taxa / 100);
     return { taxa, inteiro, real };
 }
 
 function simularValores() {
     const v = parseFloat(document.getElementById('input-valor').value);
-    const aviso = document.getElementById('sim-aviso');
-    aviso.style.display = 'none';
+    document.getElementById('sim-aviso').style.display = 'none';
     if (isNaN(v) || v <= 0) {
         document.getElementById('sim-base-valor').textContent    = '—';
         document.getElementById('sim-maquina-valor').textContent = '—';
@@ -447,11 +509,9 @@ function simularValores() {
     }
     const { taxa, inteiro, real } = calcMaquina(v);
     document.getElementById('sim-base-valor').textContent    = fmt(v);
-    // Mostra valor inteiro no card máquina
     document.getElementById('sim-maquina-valor').textContent = fmtInt(inteiro);
     document.getElementById('sim-maquina-sub').innerHTML =
         'Elo/Amex 10x (' + taxa.toFixed(2) + '%) → arredondado<br>Você digita ' + fmt(real) + ' na máquina';
-    // Atualiza hidden se já escolheu
     if (valorEscolhido === 'base')    document.getElementById('input-valor-final').value = v.toFixed(2);
     if (valorEscolhido === 'maquina') document.getElementById('input-valor-final').value = inteiro.toFixed(2);
     if (valorEscolhido) atualizarAviso(v);
@@ -464,8 +524,7 @@ function escolherValor(tipo) {
     document.getElementById('card-base').classList.toggle('ativo',    tipo === 'base');
     document.getElementById('card-maquina').classList.toggle('ativo', tipo === 'maquina');
     const { taxa, inteiro, real } = calcMaquina(v);
-    const vFinal = tipo === 'base' ? v : inteiro;
-    document.getElementById('input-valor-final').value = vFinal.toFixed(2);
+    document.getElementById('input-valor-final').value = (tipo === 'base' ? v : inteiro).toFixed(2);
     atualizarAviso(v);
     document.getElementById('btn-confirmar-orc').disabled = false;
 }
@@ -479,7 +538,7 @@ function atualizarAviso(v) {
         aviso.innerHTML = 'ℹ️ <strong>Valor enviado ao cliente: ' + fmt(v) + '</strong><br>' +
             'Cliente escolhe a forma de pagamento e os descontos/parcelas são calculados a partir deste valor.';
     } else {
-        aviso.innerHTML = 'ℹ️ <strong>Valor enviado ao cliente: ' + fmtInt(inteiro) + '</strong> (valor inteiro, sem centavos)<br>' +
+        aviso.innerHTML = 'ℹ️ <strong>Valor enviado ao cliente: ' + fmtInt(inteiro) + '</strong> (valor inteiro)<br>' +
             '📳 Na máquina: digite <strong>' + fmt(real) + '</strong> e selecione <strong>10x</strong>.<br>' +
             'A taxa (' + taxa.toFixed(2) + '%) fará o cliente pagar exatamente <strong>' + fmtInt(inteiro) + '</strong>.';
     }
@@ -514,18 +573,20 @@ function abrirModal(id)  { document.getElementById(id).classList.add('aberto'); 
 function fecharModal(id) { document.getElementById(id).classList.remove('aberto'); }
 function abrirModalOrcamento() {
     valorEscolhido = null;
-    document.getElementById('input-valor').value = _totalBase > 0 ? _totalBase.toFixed(2) : '';
-    document.getElementById('input-prazo').value  = '';
-    document.getElementById('input-valor-final').value = '';
+    document.getElementById('input-valor').value        = _totalBase > 0 ? _totalBase.toFixed(2) : '';
+    document.getElementById('input-prazo').value        = '';
+    document.getElementById('input-valor-final').value  = '';
     document.getElementById('btn-confirmar-orc').disabled = true;
-    document.getElementById('sim-aviso').style.display = 'none';
+    document.getElementById('sim-aviso').style.display  = 'none';
     ['card-base','card-maquina'].forEach(id => document.getElementById(id).classList.remove('ativo'));
     simularValores();
     abrirModal('modal-orcamento');
     setTimeout(() => document.getElementById('input-valor').focus(), 100);
 }
-function abrirModalReprovacao() { abrirModal('modal-reprovacao'); document.getElementById('input-motivo').focus(); }
-
+function abrirModalReprovacao() {
+    abrirModal('modal-reprovacao');
+    document.getElementById('input-motivo').focus();
+}
 function _enviar(status, extras) {
     fetch('atualizar_status.php', {
         method:'POST',
@@ -535,7 +596,8 @@ function _enviar(status, extras) {
     .then(r => r.json())
     .then(data => {
         if (data.sucesso) {
-            document.getElementById('status-badge').innerHTML = '<span class="badge '+_statusClasses[status]+'">'+_statusLabels[status]+'</span>';
+            document.getElementById('status-badge').innerHTML =
+                '<span class="badge ' + _statusClasses[status] + '">' + _statusLabels[status] + '</span>';
             const at = document.getElementById('atualizado-em');
             if (at) at.textContent = data.atualizado_em;
             _toast('✅ Status atualizado!', true);
