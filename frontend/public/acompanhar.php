@@ -1,7 +1,7 @@
 <?php
 /**
  * PÁGINA PÚBLICA DE ACOMPANHAMENTO DO PEDIDO
- * Versão: 4.3 - remove aviso de taxa no cartão
+ * Versão: 4.4 - remove débito do bloco cartão; parcelas iniciam em 2x
  * Data: 27/02/2026
  */
 
@@ -240,8 +240,8 @@ $pode_aprovar = $pedido && in_array($pedido['status'], ['Orcada','Aguardando apr
                 </button>
                 <button class="pgto-btn" onclick="selecionarPgto('cartao')" id="btn-cartao">
                     <span class="pgto-icone">📳</span>
-                    <span class="pgto-nome">Cartão</span>
-                    <span class="pgto-sub">crédito ou débito</span>
+                    <span class="pgto-nome">Cartão de Crédito</span>
+                    <span class="pgto-sub">parcelado em até 10x</span>
                 </button>
             </div>
 
@@ -260,7 +260,7 @@ $pode_aprovar = $pedido && in_array($pedido['status'], ['Orcada','Aguardando apr
             </div>
 
             <div class="pgto-resultado" id="res-cartao">
-                <div class="pgto-res-titulo">📳 Cartão de Crédito / Débito</div>
+                <div class="pgto-res-titulo">📳 Cartão de Crédito</div>
                 <div style="font-size:12px;color:#999;margin-bottom:10px">Selecione a quantidade de parcelas:</div>
                 <div class="parcelas-lista" id="parcelas-lista"></div>
                 <div class="pgto-linha destaque" style="margin-top:12px;display:none" id="res-parc-selecionada">
@@ -359,6 +359,7 @@ const VALOR_BASE   = <?php echo (float)$pedido['valor_orcamento']; ?>;
 const PEDIDO_TOKEN = '<?php echo htmlspecialchars($pedido['public_token']); ?>';
 const API_URL      = '../../backend/public/aprovar_orcamento.php';
 const MAX_PARCELAS = 10;
+const MIN_PARCELAS = 2; // Cartão de crédito: mínimo 2x (débito vai via PIX)
 
 let pgtoSelecionado = null, pagamentoPayload = {};
 function fmt(v){ return 'R$ ' + v.toFixed(2).replace('.',',').replace(/\B(?=(\d{3})+(?!\d))/g,'.'); }
@@ -388,11 +389,12 @@ function selecionarPgto(tipo) {
         const lista = document.getElementById('parcelas-lista');
         lista.innerHTML = '';
         document.getElementById('res-parc-selecionada').style.display = 'none';
-        for (let n = 1; n <= MAX_PARCELAS; n++) {
+        // Parcelas de 2x a 10x (débito não parcela — quem quer pagar à vista usa PIX)
+        for (let n = MIN_PARCELAS; n <= MAX_PARCELAS; n++) {
             const pv  = VALOR_BASE / n;
             const el  = document.createElement('div');
             el.className = 'parcela-item';
-            const label = n === 1 ? 'À vista (1x)' : n + 'x de ' + fmt(pv);
+            const label = n + 'x de ' + fmt(pv);
             el.innerHTML = `<span class="parc-n">${label}</span><span class="parc-v">${fmt(pv)}</span>`;
             el.onclick = () => {
                 document.querySelectorAll('.parcela-item').forEach(e => e.classList.remove('ativo'));
