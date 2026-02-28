@@ -1,7 +1,7 @@
 <?php
 /**
  * PÁGINA PÚBLICA DE ACOMPANHAMENTO DO PEDIDO
- * Versão: 4.2 - cartão sem dupla taxa (só divide VALOR_BASE pelas parcelas)
+ * Versão: 4.3 - remove aviso de taxa no cartão
  * Data: 27/02/2026
  */
 
@@ -144,7 +144,6 @@ $pode_aprovar = $pedido && in_array($pedido['status'], ['Orcada','Aguardando apr
         .parcela-item.ativo{background:#e0f2f1;border-color:#0d9488}
         .parc-n{font-weight:700;color:#333}
         .parc-v{font-weight:700;color:#0d9488}
-        .parc-aviso{font-size:11px;color:#999;margin-bottom:10px;padding:8px 10px;background:#fff8e1;border-radius:6px;border-left:3px solid #ffc107}
         .acoes{display:flex;gap:12px;margin-top:20px}
         .btn-aprovar{flex:1;padding:14px;background:#2e7d32;color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;transition:background .2s}
         .btn-aprovar:hover{background:#1b5e20}
@@ -242,7 +241,7 @@ $pode_aprovar = $pedido && in_array($pedido['status'], ['Orcada','Aguardando apr
                 <button class="pgto-btn" onclick="selecionarPgto('cartao')" id="btn-cartao">
                     <span class="pgto-icone">📳</span>
                     <span class="pgto-nome">Cartão</span>
-                    <span class="pgto-sub">valor já inclui taxas</span>
+                    <span class="pgto-sub">crédito ou débito</span>
                 </button>
             </div>
 
@@ -262,10 +261,6 @@ $pode_aprovar = $pedido && in_array($pedido['status'], ['Orcada','Aguardando apr
 
             <div class="pgto-resultado" id="res-cartao">
                 <div class="pgto-res-titulo">📳 Cartão de Crédito / Débito</div>
-                <div class="parc-aviso">
-                    💡 O valor do orçamento já inclui as taxas da maquininha.
-                    Escolha apenas em quantas vezes deseja pagar:
-                </div>
                 <div style="font-size:12px;color:#999;margin-bottom:10px">Selecione a quantidade de parcelas:</div>
                 <div class="parcelas-lista" id="parcelas-lista"></div>
                 <div class="pgto-linha destaque" style="margin-top:12px;display:none" id="res-parc-selecionada">
@@ -360,13 +355,9 @@ $pode_aprovar = $pedido && in_array($pedido['status'], ['Orcada','Aguardando apr
 
 <?php if ($pode_aprovar): ?>
 <script>
-// VALOR_BASE = valor enviado pelo Adonis (já com taxa embutida, se aplicável)
-// O cartão NÃO aplica mais nenhuma taxa — apenas divide em parcelas
 const VALOR_BASE   = <?php echo (float)$pedido['valor_orcamento']; ?>;
 const PEDIDO_TOKEN = '<?php echo htmlspecialchars($pedido['public_token']); ?>';
 const API_URL      = '../../backend/public/aprovar_orcamento.php';
-
-// Número máximo de parcelas permitido
 const MAX_PARCELAS = 10;
 
 let pgtoSelecionado = null, pagamentoPayload = {};
@@ -378,7 +369,6 @@ function selecionarPgto(tipo) {
         document.getElementById('btn-'+t).classList.toggle('ativo', t===tipo);
         document.getElementById('res-'+t).classList.toggle('visivel', t===tipo);
     });
-
     if (tipo === 'pix') {
         const desc  = VALOR_BASE * 0.05;
         const final = VALOR_BASE - desc;
@@ -387,7 +377,6 @@ function selecionarPgto(tipo) {
         document.getElementById('pix-final').textContent    = fmt(final);
         pagamentoPayload = { forma:'PIX/Dinheiro', valor_final:final, descricao:'PIX/Dinheiro à vista com 5% de desconto' };
         habilitarAprovar(true);
-
     } else if (tipo === 'entrada') {
         const metade = VALOR_BASE * 0.50;
         document.getElementById('ent-total').textContent    = fmt(VALOR_BASE);
@@ -395,20 +384,15 @@ function selecionarPgto(tipo) {
         document.getElementById('ent-retirada').textContent = fmt(metade);
         pagamentoPayload = { forma:'Entrada+Retirada', valor_final:VALOR_BASE, entrada:metade, retirada:metade, descricao:'Entrada 50% + 50% na retirada' };
         habilitarAprovar(true);
-
     } else if (tipo === 'cartao') {
-        // Monta lista de parcelas SEM aplicar taxa — só divide
         const lista = document.getElementById('parcelas-lista');
         lista.innerHTML = '';
         document.getElementById('res-parc-selecionada').style.display = 'none';
-
         for (let n = 1; n <= MAX_PARCELAS; n++) {
             const pv  = VALOR_BASE / n;
             const el  = document.createElement('div');
             el.className = 'parcela-item';
-            const label = n === 1
-                ? 'À vista (1x)'
-                : n + 'x de ' + fmt(pv);
+            const label = n === 1 ? 'À vista (1x)' : n + 'x de ' + fmt(pv);
             el.innerHTML = `<span class="parc-n">${label}</span><span class="parc-v">${fmt(pv)}</span>`;
             el.onclick = () => {
                 document.querySelectorAll('.parcela-item').forEach(e => e.classList.remove('ativo'));
@@ -416,13 +400,7 @@ function selecionarPgto(tipo) {
                 document.getElementById('parc-sel-label').textContent = label;
                 document.getElementById('parc-sel-valor').textContent  = fmt(pv);
                 document.getElementById('res-parc-selecionada').style.display = 'flex';
-                pagamentoPayload = {
-                    forma:'Cartão',
-                    descricao: label,
-                    valor_final: VALOR_BASE,
-                    por_parcela: pv,
-                    parcelas: n
-                };
+                pagamentoPayload = { forma:'Cartão', descricao:label, valor_final:VALOR_BASE, por_parcela:pv, parcelas:n };
                 habilitarAprovar(true);
             };
             lista.appendChild(el);
@@ -433,16 +411,14 @@ function selecionarPgto(tipo) {
 
 function habilitarAprovar(ok) {
     const btn = document.getElementById('btn-aprovar');
-    btn.disabled  = !ok;
+    btn.disabled    = !ok;
     btn.textContent = ok ? '✅ Aprovar Orçamento' : '✅ Selecione a forma de pagamento';
 }
-
 function confirmarAprovacao() {
     if (!pagamentoPayload.forma) return;
-    if (!confirm('Confirmar aprovação?\n\nForma: ' + pagamentoPayload.descricao + '\nValor total: ' + fmt(pagamentoPayload.valor_final))) return;
+    if (!confirm('Confirmar aprovação?\n\nForma: '+pagamentoPayload.descricao+'\nValor total: '+fmt(pagamentoPayload.valor_final))) return;
     enviar('Aprovada', { pagamento: pagamentoPayload });
 }
-
 function abrirReprovacao() {
     document.getElementById('motivo-reprovacao').value = '';
     document.getElementById('modal-reprovacao').classList.add('aberto');
@@ -454,33 +430,18 @@ function enviarReprovacao() {
     fecharModal();
     enviar('Reprovada', { motivo });
 }
-
 function enviar(status, extras) {
-    fetch(API_URL, {
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ token: PEDIDO_TOKEN, status, ...extras })
+    fetch(API_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:PEDIDO_TOKEN,status,...extras})})
+    .then(r=>r.json())
+    .then(d=>{
+        if(d.sucesso){
+            document.getElementById('card-pagamento').innerHTML='<div style="text-align:center;padding:20px 0">'+(status==='Aprovada'?'✅ <strong>Orçamento aprovado!</strong><br><span style="font-size:13px;color:#555">Entraremos em contato em breve para combinar os detalhes.</span>':'❌ <strong>Orçamento não aprovado.</strong><br><span style="font-size:13px;color:#555">Registro enviado. Obrigado pelo retorno!</span>')+'</div>';
+            setTimeout(()=>location.reload(),2500);
+        } else { alert('❌ Erro: '+(d.erro||'Tente novamente.')); }
     })
-    .then(r => r.json())
-    .then(d => {
-        if (d.sucesso) {
-            document.getElementById('card-pagamento').innerHTML =
-                '<div style="text-align:center;padding:20px 0">' +
-                (status === 'Aprovada'
-                    ? '✅ <strong>Orçamento aprovado!</strong><br><span style="font-size:13px;color:#555">Entraremos em contato em breve para combinar os detalhes.</span>'
-                    : '❌ <strong>Orçamento não aprovado.</strong><br><span style="font-size:13px;color:#555">Registro enviado. Obrigado pelo retorno!</span>'
-                ) + '</div>';
-            setTimeout(() => location.reload(), 2500);
-        } else {
-            alert('❌ Erro: ' + (d.erro || 'Tente novamente.'));
-        }
-    })
-    .catch(() => alert('❌ Erro de conexão. Tente novamente.'));
+    .catch(()=>alert('❌ Erro de conexão. Tente novamente.'));
 }
-
-document.getElementById('modal-reprovacao').addEventListener('click', function(e) {
-    if (e.target === this) fecharModal();
-});
+document.getElementById('modal-reprovacao').addEventListener('click',function(e){if(e.target===this)fecharModal();});
 </script>
 <?php endif; ?>
 </body>

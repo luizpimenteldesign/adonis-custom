@@ -1,7 +1,7 @@
 <?php
 /**
  * DETALHES DO PEDIDO - SISTEMA ADONIS
- * Versão: 3.3 - modal orçamento inteligente
+ * Versão: 3.4 - card instrução maquininha para o Adonis
  * Data: 27/02/2026
  */
 
@@ -67,6 +67,19 @@ try {
         $historico = $stmt_hist->fetchAll(PDO::FETCH_ASSOC);
     } catch (PDOException $e) {}
 
+    // Buscar dados de pagamento aprovado (forma + parcelas)
+    $pagamento_info = null;
+    try {
+        $stmt_pag = $conn->prepare("
+            SELECT forma_pagamento, parcelas, valor_final, por_parcela
+            FROM status_historico
+            WHERE pre_os_id = :id AND status = 'Aprovada'
+            ORDER BY criado_em DESC LIMIT 1
+        ");
+        $stmt_pag->execute([':id' => $preos_id]);
+        $pagamento_info = $stmt_pag->fetch(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {}
+
 } catch (PDOException $e) {
     error_log('Erro detalhes: ' . $e->getMessage());
     header('Location: dashboard.php?erro=banco'); exit;
@@ -121,6 +134,14 @@ $v = time();
         .sim-card-sub{font-size:11px;color:#666;margin-top:5px;line-height:1.4}
         .sim-card.maquina .sim-card-valor{color:#e65100}
         .sim-aviso{font-size:12px;color:#888;background:#f8f9fa;border-radius:6px;padding:8px 12px;margin-bottom:12px;line-height:1.6}
+        /* Card instrução maquininha */
+        .maq-card{background:#fff8e1;border:2px solid #ffc107;border-radius:12px;padding:20px 22px;margin-bottom:20px}
+        .maq-card-titulo{font-size:13px;font-weight:700;color:#e65100;text-transform:uppercase;letter-spacing:.5px;margin-bottom:14px;display:flex;align-items:center;gap:6px}
+        .maq-linha{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid #ffe082;font-size:14px}
+        .maq-linha:last-child{border-bottom:none}
+        .maq-lbl{color:#795548;font-weight:500}
+        .maq-val{font-weight:700;color:#e65100;font-size:16px}
+        .maq-val.destaque{font-size:20px;color:#bf360c}
         /* Timeline */
         .timeline{list-style:none;padding:0;margin:0;position:relative}
         .timeline::before{content:'';position:absolute;left:18px;top:0;bottom:0;width:2px;background:#e0e0e0}
@@ -184,6 +205,41 @@ $v = time();
             <div class="info-item"><div class="info-label">Última Atualização</div><div class="info-value" id="atualizado-em"><?php echo date('d/m/Y H:i', strtotime($pedido['atualizado_em'])); ?></div></div>
         </div>
     </div>
+
+    <?php
+    // Card instrução maquininha — só aparece quando o pedido está Aprovado com pagamento em cartão
+    $show_maq = $pedido['status'] === 'Aprovada'
+                && !empty($pedido['valor_orcamento'])
+                && !empty($pagamento_info)
+                && $pagamento_info['forma_pagamento'] === 'Cartão';
+
+    // Fallback: mesmo sem coluna forma_pagamento, mostrar se Aprovada + tem orçamento
+    // (o dado pode vir do JSON de pagamento no futuro — por ora usa a query acima)
+    if ($show_maq):
+        $maq_valor   = (float) $pagamento_info['valor_final'];
+        $maq_parcelas = (int)  $pagamento_info['parcelas'];
+        $maq_por_parc = $maq_parcelas > 0 ? $maq_valor / $maq_parcelas : $maq_valor;
+    ?>
+    <div class="maq-card">
+        <div class="maq-card-titulo">📳 Instrução para cobrar na maquininha</div>
+        <div class="maq-linha">
+            <span class="maq-lbl">Valor a cobrar na máquina</span>
+            <span class="maq-val destaque">R$ <?php echo number_format($maq_valor, 2, ',', '.'); ?></span>
+        </div>
+        <div class="maq-linha">
+            <span class="maq-lbl">Parcelas</span>
+            <span class="maq-val"><?php echo $maq_parcelas; ?>x</span>
+        </div>
+        <div class="maq-linha">
+            <span class="maq-lbl">Valor por parcela</span>
+            <span class="maq-val">R$ <?php echo number_format($maq_por_parc, 2, ',', '.'); ?></span>
+        </div>
+        <div style="margin-top:12px;font-size:12px;color:#795548;background:#fff3e0;border-radius:6px;padding:8px 12px">
+            ⚠️ Coloque exatamente <strong>R$ <?php echo number_format($maq_valor, 2, ',', '.'); ?></strong> na máquina
+            e selecione <strong><?php echo $maq_parcelas; ?>x</strong>. Não aplique nenhum acréscimo adicional.
+        </div>
+    </div>
+    <?php endif; ?>
 
     <div class="card">
         <div class="card-header"><h2 class="card-title">👤 Dados do Cliente</h2></div>
@@ -325,7 +381,7 @@ $v = time();
             <div class="sim-card maquina" id="card-maquina" onclick="escolherValor('maquina')">
                 <div class="sim-card-label">Valor Máquina (10x)</div>
                 <div class="sim-card-valor" id="sim-maquina-valor">&mdash;</div>
-                <div class="sim-card-sub" id="sim-maquina-sub">Pior caso: Elo/Amex 10x<br>Cliente recebe desconto se pagar à vista</div>
+                <div class="sim-card-sub" id="sim-maquina-sub">Pior caso: Elo/Amex 10x<br>Taxa já embutida no valor</div>
             </div>
         </div>
 
@@ -361,11 +417,7 @@ const _totalBase   = <?php echo (float)$total_valor; ?>;
 const _statusLabels  = {'Pre-OS':'🗒️ Pré-OS','Em analise':'🔍 Em Análise','Orcada':'💰 Orçada','Aguardando aprovacao':'⏳ Aguardando Aprovação','Aprovada':'✅ Aprovada','Reprovada':'❌ Reprovada','Cancelada':'🚫 Cancelada'};
 const _statusClasses = {'Pre-OS':'badge-new','Em analise':'badge-info','Orcada':'badge-warning','Aguardando aprovacao':'badge-warning','Aprovada':'badge-success','Reprovada':'badge-danger','Cancelada':'badge-dark'};
 
-// Taxas máquina: pior caso por faixa
-// Elo/Amex até 2k: 10x = 21.58%, acima de 2k: 10x = 15.38%
-function taxaMaquina(valor) {
-    return valor > 2000 ? 15.38 : 21.58;
-}
+function taxaMaquina(valor) { return valor > 2000 ? 15.38 : 21.58; }
 function fmt(v){ return 'R$\u00a0' + v.toFixed(2).replace('.',',').replace(/\B(?=(\d{3})+(?!\d))/g,'.'); }
 
 let valorEscolhido = null;
@@ -390,16 +442,14 @@ function simularValores() {
         document.getElementById('sim-maquina-valor').textContent = '—';
         return;
     }
-    const taxa    = taxaMaquina(v);
-    const vMaq    = v * (1 + taxa / 100);
+    const taxa = taxaMaquina(v);
+    const vMaq = v * (1 + taxa / 100);
     document.getElementById('sim-base-valor').textContent    = fmt(v);
     document.getElementById('sim-maquina-valor').textContent = fmt(vMaq);
     document.getElementById('sim-maquina-sub').innerHTML =
-        'Pior caso: Elo/Amex 10x (' + taxa.toFixed(2) + '%)<br>Cliente recebe desconto se pagar à vista';
-
-    // Se já havia uma escolha, recalcular o hidden
-    if (valorEscolhido === 'base')    { document.getElementById('input-valor-final').value = v.toFixed(2); }
-    if (valorEscolhido === 'maquina') { document.getElementById('input-valor-final').value = vMaq.toFixed(2); }
+        'Pior caso: Elo/Amex 10x (' + taxa.toFixed(2) + '%)<br>Taxa já embutida no valor';
+    if (valorEscolhido === 'base')    document.getElementById('input-valor-final').value = v.toFixed(2);
+    if (valorEscolhido === 'maquina') document.getElementById('input-valor-final').value = vMaq.toFixed(2);
 }
 
 function escolherValor(tipo) {
@@ -408,7 +458,7 @@ function escolherValor(tipo) {
     valorEscolhido = tipo;
     document.getElementById('card-base').classList.toggle('ativo',    tipo==='base');
     document.getElementById('card-maquina').classList.toggle('ativo', tipo==='maquina');
-    const taxa  = taxaMaquina(v);
+    const taxa   = taxaMaquina(v);
     const vFinal = tipo === 'base' ? v : v * (1 + taxa/100);
     document.getElementById('input-valor-final').value = vFinal.toFixed(2);
     const aviso = document.getElementById('sim-aviso');
