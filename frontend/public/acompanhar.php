@@ -1,7 +1,7 @@
 <?php
 /**
  * PÁGINA PÚBLICA DE ACOMPANHAMENTO DO PEDIDO
- * Versão: 5.2 - chave PIX visivel no card de selecao de pagamento
+ * Versão: 5.3 - chave PIX e endereço reais
  * Data: 27/02/2026
  */
 
@@ -14,8 +14,9 @@ $servicos  = [];
 $erro      = '';
 $pagamento_aprovado = null;
 
-define('ADONIS_PIX',      'adonis@adonis.com.br');  // <<< alterar para chave PIX real
-define('ADONIS_ENDERECO', 'Rua Exemplo, 123 – Aracruz/ES'); // <<< alterar para endereço real
+define('ADONIS_PIX',      'adonisjnr85@gmail.com');
+define('ADONIS_ENDERECO', 'Rua do Presépio, s/n – Chácara do Conde, Vila Velha – ES, 29114-608');
+define('ADONIS_MAPS',     'https://www.google.com/maps/place/Adonis+C+L/@-20.3292315,-40.3449407,21z');
 define('BASE_URL',        'https://adns.luizpimentel.com/adonis-custom');
 
 if (!empty($token)) {
@@ -182,12 +183,13 @@ $show_instrucao_pgto = $pedido && in_array($pedido['status'], $status_pos_aprova
         .pgto-linha .lbl{color:#666}
         .pgto-linha .val{font-weight:700;color:#222}
         .pgto-linha.destaque .val{color:#2e7d32;font-size:16px}
-        /* Caixa PIX inline no card de seleção */
         .pix-box{background:#e0f2f1;border-radius:8px;padding:12px 14px;margin-top:12px;border-left:3px solid #0d9488}
         .pix-box-label{font-size:11px;color:#00695c;font-weight:700;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px}
         .pix-box-chave{font-size:15px;font-weight:700;color:#00695c;word-break:break-all;margin-bottom:8px}
         .pix-box-btn{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;background:#0d9488;color:#fff;border:none;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:background .2s}
         .pix-box-btn:hover{background:#0a7c72}
+        .maps-link{display:inline-flex;align-items:center;gap:6px;margin-top:8px;font-size:13px;color:#1565c0;font-weight:600;text-decoration:none}
+        .maps-link:hover{text-decoration:underline}
         .parcelas-lista{display:flex;flex-direction:column;gap:6px;max-height:280px;overflow-y:auto}
         .parcela-item{display:flex;justify-content:space-between;align-items:center;padding:9px 12px;border-radius:8px;background:#f5f5f5;font-size:13px;cursor:pointer;border:2px solid transparent;transition:all .15s}
         .parcela-item:hover{background:#e0f2f1;border-color:#0d9488}
@@ -337,9 +339,11 @@ $show_instrucao_pgto = $pedido && in_array($pedido['status'], $status_pos_aprova
                 💳 O pagamento no cartão será realizado <strong>na retirada do instrumento</strong>.
             </div>
             <?php endif; ?>
+            <!-- Endereço sempre visível -->
             <div style="margin-top:14px;padding-top:14px;border-top:1px dashed #b2dfdb">
                 <div style="font-size:12px;font-weight:700;color:#00695c;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">📍 Endereço para entrega do instrumento</div>
                 <div style="font-size:14px;color:#333;font-weight:500"><?php echo ADONIS_ENDERECO; ?></div>
+                <a class="maps-link" href="<?php echo ADONIS_MAPS; ?>" target="_blank" rel="noopener">🗺️ Ver no Google Maps</a>
             </div>
         </div>
         <?php endif; ?>
@@ -372,7 +376,6 @@ $show_instrucao_pgto = $pedido && in_array($pedido['status'], $status_pos_aprova
                 <div class="pgto-linha"><span class="lbl">Valor do orçamento</span><span class="val" id="pix-original"></span></div>
                 <div class="pgto-linha"><span class="lbl">Desconto à vista (5%)</span><span class="val" style="color:#2e7d32" id="pix-desconto"></span></div>
                 <div class="pgto-linha destaque"><span class="lbl">Você paga</span><span class="val" id="pix-final"></span></div>
-                <!-- CHAVE PIX INLINE -->
                 <div class="pix-box">
                     <div class="pix-box-label">🟢 Chave PIX para pagamento</div>
                     <div class="pix-box-chave" id="pix-chave-sel"><?php echo ADONIS_PIX; ?></div>
@@ -387,13 +390,12 @@ $show_instrucao_pgto = $pedido && in_array($pedido['status'], $status_pos_aprova
                 <div class="pgto-linha"><span class="lbl">Valor total</span><span class="val" id="ent-total"></span></div>
                 <div class="pgto-linha"><span class="lbl">Entrada agora (50%)</span><span class="val" style="color:#1565c0" id="ent-entrada"></span></div>
                 <div class="pgto-linha destaque"><span class="lbl">Na retirada (50%)</span><span class="val" id="ent-retirada"></span></div>
-                <!-- CHAVE PIX INLINE -->
                 <div class="pix-box" style="margin-top:12px">
                     <div class="pix-box-label">🟢 Pague a entrada via PIX</div>
                     <div class="pix-box-chave" id="ent-chave-sel"><?php echo ADONIS_PIX; ?></div>
                     <button class="pix-box-btn" onclick="copiarPixSel('ent-chave-sel', this)">📋 Copiar chave PIX</button>
                 </div>
-                <div style="margin-top:10px;font-size:12px;color:#555;line-height:1.6">💡 Envie o comprovante via WhatsApp após o pagamento da entrada. O restante (50%) será cobrado na retirada do instrumento.</div>
+                <div style="margin-top:10px;font-size:12px;color:#555;line-height:1.6">💡 Envie o comprovante via WhatsApp após o pagamento da entrada. O restante (50%) será cobrado na retirada.</div>
             </div>
 
             <!-- Resultado Cartão -->
@@ -408,6 +410,13 @@ $show_instrucao_pgto = $pedido && in_array($pedido['status'], $status_pos_aprova
                 <div style="margin-top:12px;font-size:12px;color:#555;background:#fff8e1;border-radius:6px;padding:10px 14px;line-height:1.6;border-left:3px solid #ffc107">
                     💳 O pagamento no cartão será realizado <strong>na retirada do instrumento</strong>.
                 </div>
+            </div>
+
+            <!-- Endereço sempre visível no card de aprovação -->
+            <div style="margin-top:4px;padding:14px;background:#f0f4ff;border-radius:10px;border-left:3px solid #1565c0">
+                <div style="font-size:11px;font-weight:700;color:#1565c0;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">📍 Onde entregar o instrumento</div>
+                <div style="font-size:13px;color:#333;font-weight:500;margin-bottom:4px"><?php echo ADONIS_ENDERECO; ?></div>
+                <a class="maps-link" href="<?php echo ADONIS_MAPS; ?>" target="_blank" rel="noopener">🗺️ Ver no Google Maps</a>
             </div>
 
             <div class="acoes">
