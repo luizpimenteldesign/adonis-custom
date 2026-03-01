@@ -1,8 +1,8 @@
 <?php
 /**
  * LOGIN ADMINISTRATIVO - SISTEMA ADONIS
- * Versão: 1.2
- * Data: 26/01/2026
+ * Versão: 1.3
+ * Data: 01/03/2026
  */
 
 session_start();
@@ -99,7 +99,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <body class="login-body">
     <div class="login-container">
         <div class="login-header">
-            <img src="https://adns.luizpimentel.com/adonis-custom/frontend/public/assets/img/Logo-Adonis3.png" alt="Adonis Custom" class="login-logo">
+            <!-- Logo-Adonis2: versão escura, para fundos brancos/claros -->
+            <img src="https://adns.luizpimentel.com/adonis-custom/frontend/public/assets/img/Logo-Adonis2.png" alt="Adonis Custom" class="login-logo">
             <h1 class="login-title">Área Administrativa</h1>
             <p class="login-subtitle">Faça login para acessar o painel</p>
         </div>
