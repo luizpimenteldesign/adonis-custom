@@ -1,0 +1,139 @@
+/* =============================================
+   SIDEBAR — Adonis Admin (colapsável)
+   Compartilhado por todas as páginas admin
+   ============================================= */
+
+.app-layout{display:flex;min-height:100vh}
+
+.sidebar{
+    width:240px;flex-shrink:0;
+    background:var(--g-surface);
+    border-right:1px solid var(--g-border);
+    display:flex;flex-direction:column;
+    position:fixed;top:0;left:0;bottom:0;
+    z-index:200;overflow-y:auto;
+    transform:translateX(-100%);
+    transition:transform .25s ease;
+}
+.sidebar.open{transform:translateX(0)}
+@media(min-width:960px){
+    .sidebar{transform:translateX(0);position:sticky;top:0;height:100vh}
+}
+
+.sidebar-logo{
+    padding:20px 20px 12px;
+    display:flex;align-items:center;gap:10px;
+    border-bottom:1px solid var(--g-border);
+    margin-bottom:8px;
+}
+.sidebar-logo img{height:34px}
+.sidebar-logo-title{
+    font-family:'Google Sans',sans-serif;
+    font-size:16px;font-weight:700;color:var(--g-text);
+}
+
+/* Links diretos */
+.nav-item-link{
+    display:flex;align-items:center;gap:10px;
+    padding:9px 16px;margin:1px 8px;
+    border-radius:10px;
+    font-size:13.5px;font-weight:500;
+    color:var(--g-text-2);text-decoration:none;
+    transition:background .15s,color .15s;
+    -webkit-tap-highlight-color:transparent;
+}
+.nav-item-link:hover{background:var(--g-hover);color:var(--g-text);text-decoration:none}
+.nav-item-link.active{background:var(--g-blue-light);color:var(--g-blue)}
+.nav-item-link .nav-icon{font-size:16px;width:20px;text-align:center;flex-shrink:0}
+
+/* Grupos */
+.nav-group{margin:1px 0}
+
+.nav-group-toggle{
+    display:flex;align-items:center;gap:10px;
+    padding:9px 16px;margin:1px 8px;
+    border-radius:10px;
+    font-size:13.5px;font-weight:500;
+    color:var(--g-text-2);
+    cursor:pointer;user-select:none;
+    transition:background .15s,color .15s;
+    -webkit-tap-highlight-color:transparent;
+}
+.nav-group-toggle:hover{background:var(--g-hover);color:var(--g-text)}
+.nav-group-toggle.open{color:var(--g-text)}
+.nav-group-toggle .nav-icon{font-size:16px;width:20px;text-align:center;flex-shrink:0}
+.nav-group-toggle .nav-label{flex:1}
+.nav-group-toggle .nav-total{
+    font-size:11px;font-weight:700;
+    background:var(--g-hover);color:var(--g-text-3);
+    padding:2px 6px;border-radius:8px;min-width:18px;text-align:center;
+}
+.nav-group-toggle.open .nav-total{background:var(--g-blue-light);color:var(--g-blue)}
+.nav-group-toggle .nav-chevron{
+    font-size:10px;color:var(--g-text-3);
+    transition:transform .2s;
+    margin-left:2px;
+}
+.nav-group-toggle.open .nav-chevron{transform:rotate(90deg)}
+
+/* Subitens */
+.nav-sub{overflow:hidden;max-height:0;transition:max-height .25s ease}
+.nav-sub.open{max-height:600px}
+
+.nav-sub-item{
+    display:flex;align-items:center;gap:8px;
+    padding:7px 16px 7px 46px;margin:1px 8px;
+    border-radius:8px;
+    font-size:13px;font-weight:400;
+    color:var(--g-text-2);text-decoration:none;
+    transition:background .12s,color .12s;
+    -webkit-tap-highlight-color:transparent;
+}
+.nav-sub-item:hover{background:var(--g-hover);color:var(--g-text);text-decoration:none}
+.nav-sub-item.active{background:var(--g-blue-light);color:var(--g-blue);font-weight:500}
+.nav-sub-item .sub-badge{
+    margin-left:auto;
+    font-size:11px;font-weight:700;
+    color:var(--g-blue);background:var(--g-blue-light);
+    padding:1px 6px;border-radius:8px;min-width:18px;text-align:center;
+}
+.nav-sub-item.active .sub-badge{background:var(--g-blue);color:#fff}
+
+.sidebar-divider{border:none;border-top:1px solid var(--g-border);margin:6px 0}
+
+.sidebar-user{
+    padding:14px 16px;border-top:1px solid var(--g-border);
+    display:flex;align-items:center;gap:10px;margin-top:auto;
+}
+.sidebar-user-avatar{
+    width:34px;height:34px;border-radius:50%;
+    background:var(--g-blue-light);color:var(--g-blue);
+    display:flex;align-items:center;justify-content:center;
+    font-family:'Google Sans',sans-serif;font-size:13px;font-weight:700;flex-shrink:0;
+}
+.sidebar-user-info{flex:1;min-width:0}
+.sidebar-user-name{font-size:13px;font-weight:500;color:var(--g-text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sidebar-user-role{font-size:11px;color:var(--g-text-3)}
+.sidebar-logout{color:var(--g-text-3);text-decoration:none;font-size:17px;padding:4px;flex-shrink:0}
+.sidebar-logout:hover{color:var(--g-red);text-decoration:none}
+
+.sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:199}
+.sidebar-overlay.open{display:block}
+
+/* Layout main */
+.main-content{flex:1;min-width:0;display:flex;flex-direction:column}
+
+.topbar{
+    position:sticky;top:0;z-index:100;
+    height:56px;background:var(--g-surface);
+    border-bottom:1px solid var(--g-border);
+    display:flex;align-items:center;padding:0 16px;gap:12px;
+}
+@media(min-width:960px){.topbar{display:none}}
+.topbar-title{font-family:'Google Sans',sans-serif;font-size:17px;font-weight:500;color:var(--g-text);flex:1}
+.btn-menu{
+    width:40px;height:40px;display:flex;align-items:center;justify-content:center;
+    border:none;background:none;font-size:22px;cursor:pointer;
+    border-radius:50%;color:var(--g-text-2);-webkit-tap-highlight-color:transparent;
+}
+.btn-menu:hover{background:var(--g-hover)}
