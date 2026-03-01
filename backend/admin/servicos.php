@@ -5,6 +5,11 @@ require_once '../config/Database.php';
 $db   = new Database();
 $conn = $db->getConnection();
 
+// Garante que a coluna prazo_padrao_dias existe
+try {
+    $conn->query("ALTER TABLE servicos ADD COLUMN prazo_padrao_dias INT DEFAULT NULL");
+} catch (Exception $e) { /* já existe */ }
+
 $busca = trim($_GET['q'] ?? '');
 $msg   = isset($_GET['msg']) ? $_GET['msg'] : '';
 
@@ -13,17 +18,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $acao = $_POST['acao'] ?? '';
 
     if ($acao === 'criar' || $acao === 'editar') {
-        $nome      = trim($_POST['nome'] ?? '');
-        $descricao = trim($_POST['descricao'] ?? '');
-        $valor     = str_replace(',','.', trim($_POST['valor_base'] ?? '0'));
-        $ativo     = isset($_POST['ativo']) ? 1 : 0;
+        $nome       = trim($_POST['nome'] ?? '');
+        $descricao  = trim($_POST['descricao'] ?? '');
+        $valor      = str_replace(',', '.', trim($_POST['valor_base'] ?? '0'));
+        $prazo      = ($_POST['prazo_padrao_dias'] ?? '') !== '' ? (int)$_POST['prazo_padrao_dias'] : null;
+        $ativo      = isset($_POST['ativo']) ? 1 : 0;
+
         if (!$nome) { header('Location: servicos.php?msg=erro:Nome obrigatório'); exit; }
+
         if ($acao === 'criar') {
-            $conn->prepare('INSERT INTO servicos (nome, descricao, valor_base, ativo) VALUES (?,?,?,?)')->execute([$nome,$descricao,$valor,$ativo]);
+            $conn->prepare('INSERT INTO servicos (nome, descricao, valor_base, prazo_padrao_dias, ativo) VALUES (?,?,?,?,?)')
+                 ->execute([$nome, $descricao, $valor, $prazo, $ativo]);
             header('Location: servicos.php?msg=sucesso:Serviço criado!'); exit;
         } else {
             $id = (int)$_POST['id'];
-            $conn->prepare('UPDATE servicos SET nome=?, descricao=?, valor_base=?, ativo=? WHERE id=?')->execute([$nome,$descricao,$valor,$ativo,$id]);
+            $conn->prepare('UPDATE servicos SET nome=?, descricao=?, valor_base=?, prazo_padrao_dias=?, ativo=? WHERE id=?')
+                 ->execute([$nome, $descricao, $valor, $prazo, $ativo, $id]);
             header('Location: servicos.php?msg=sucesso:Serviço atualizado!'); exit;
         }
     }
@@ -45,7 +55,7 @@ try {
          . ($busca ? ' WHERE s.nome LIKE :q OR s.descricao LIKE :q' : '')
          . ' GROUP BY s.id ORDER BY s.nome';
     $stmt = $conn->prepare($sql);
-    if ($busca) $stmt->execute([':q'=>'%'.$busca.'%']);
+    if ($busca) $stmt->execute([':q' => '%'.$busca.'%']);
     else $stmt->execute();
     $servicos = $stmt->fetchAll(PDO::FETCH_ASSOC);
 } catch (Exception $e) { $servicos = []; }
@@ -83,12 +93,12 @@ include '_sidebar_data.php';
         <div class="page-header">
             <div>
                 <h1 class="page-title">🔧 Serviços</h1>
-                <div class="page-subtitle"><?php echo count($servicos); ?> serviço<?php echo count($servicos)!==1?'s':''; ?> cadastrado<?php echo count($servicos)!==1?'s':''; ?></div>
+                <div class="page-subtitle"><?php echo count($servicos); ?> serviço<?php echo count($servicos) !== 1 ? 's' : ''; ?> cadastrado<?php echo count($servicos) !== 1 ? 's' : ''; ?></div>
             </div>
-            <button class="btn btn-primary" onclick="abrirModalServico()">+ Novo Serviço</button>
+            <button class="btn btn-primary" onclick="abrirModal()">+ Novo Serviço</button>
         </div>
 
-        <?php if ($msg): list($tipo,$texto) = explode(':', $msg, 2); ?>
+        <?php if ($msg): list($tipo, $texto) = explode(':', $msg, 2); ?>
         <div class="alert alert-<?php echo $tipo; ?>"><?php echo htmlspecialchars($texto); ?></div>
         <?php endif; ?>
 
@@ -107,17 +117,18 @@ include '_sidebar_data.php';
             <div class="empty-state">
                 <div class="empty-state-icon">🔧</div>
                 <div class="empty-state-title">Nenhum serviço encontrado</div>
-                <div class="empty-state-sub">Clique em "+ Novo Serviço" para começar</div>
+                <div class="empty-state-sub"><?php echo $busca ? 'Tente outro termo de busca' : 'Clique em "+ Novo Serviço" para cadastrar'; ?></div>
             </div>
             <?php else: ?>
             <table class="data-table">
                 <thead>
                     <tr>
-                        <th>Serviço</th>
+                        <th>Nome</th>
                         <th>Descrição</th>
                         <th class="text-right">Valor Base</th>
-                        <th class="text-center">Usos</th>
-                        <th class="text-center">Ativo</th>
+                        <th class="text-center">Prazo (d.u.)</th>
+                        <th class="text-center">Uso</th>
+                        <th class="text-center">Status</th>
                         <th class="text-center">Ações</th>
                     </tr>
                 </thead>
@@ -125,25 +136,37 @@ include '_sidebar_data.php';
                 <?php foreach ($servicos as $s): ?>
                 <tr class="<?php echo !$s['ativo'] ? 'row-inactive' : ''; ?>">
                     <td><strong><?php echo htmlspecialchars($s['nome']); ?></strong></td>
-                    <td class="text-muted" style="font-size:13px"><?php echo $s['descricao'] ? htmlspecialchars($s['descricao']) : '<em>sem descrição</em>'; ?></td>
-                    <td class="text-right" style="font-family:'Google Sans',sans-serif;font-weight:700;color:var(--g-green)">
-                        <?php echo $s['valor_base'] > 0 ? 'R$ '.number_format($s['valor_base'],2,',','.') : '<span class="text-muted">—</span>'; ?>
-                    </td>
-                    <td class="text-center"><?php echo $s['total_uso']; ?></td>
+                    <td style="font-size:13px;color:var(--g-text-2)"><?php echo $s['descricao'] ? htmlspecialchars($s['descricao']) : '<span class="text-muted">—</span>'; ?></td>
+                    <td class="text-right"><strong>R$ <?php echo number_format((float)$s['valor_base'], 2, ',', '.'); ?></strong></td>
                     <td class="text-center">
-                        <span class="badge <?php echo $s['ativo'] ? 'badge-success' : 'badge-dark'; ?>"><?php echo $s['ativo'] ? 'Ativo' : 'Inativo'; ?></span>
+                        <?php if ($s['prazo_padrao_dias']): ?>
+                        <span class="badge badge-info"><?php echo $s['prazo_padrao_dias']; ?> d.u.</span>
+                        <?php else: ?><span class="text-muted">—</span><?php endif; ?>
+                    </td>
+                    <td class="text-center">
+                        <?php if ($s['total_uso'] > 0): ?>
+                        <span class="badge badge-info"><?php echo $s['total_uso']; ?></span>
+                        <?php else: ?><span class="text-muted">0</span><?php endif; ?>
+                    </td>
+                    <td class="text-center">
+                        <?php if ($s['ativo']): ?>
+                        <span class="badge badge-success">✅ Ativo</span>
+                        <?php else: ?>
+                        <span class="badge badge-dark">⛔ Inativo</span>
+                        <?php endif; ?>
                     </td>
                     <td class="text-center">
                         <div class="table-actions">
-                            <button class="btn-icon" onclick='editarServico(<?php echo json_encode($s); ?>)' title="Editar">✏️</button>
+                            <button class="btn-icon" title="Editar"
+                                onclick="editarServico(<?php echo $s['id']; ?>,<?php echo htmlspecialchars(json_encode($s['nome']),ENT_QUOTES); ?>,<?php echo htmlspecialchars(json_encode($s['descricao']),ENT_QUOTES); ?>,<?php echo $s['valor_base']; ?>,<?php echo $s['ativo']; ?>,<?php echo $s['prazo_padrao_dias'] !== null ? $s['prazo_padrao_dias'] : 'null'; ?>)">✏️</button>
                             <?php if ($s['total_uso'] == 0): ?>
-                            <form method="POST" style="display:inline" onsubmit="return confirm('Excluir serviço?')">
+                            <form method="POST" style="display:inline" onsubmit="return confirm('Excluir serviço &quot;<?php echo htmlspecialchars(addslashes($s['nome'])); ?>&quot;?')">
                                 <input type="hidden" name="acao" value="excluir">
                                 <input type="hidden" name="id" value="<?php echo $s['id']; ?>">
                                 <button type="submit" class="btn-icon danger" title="Excluir">🗑️</button>
                             </form>
                             <?php else: ?>
-                            <span class="btn-icon disabled" title="Em uso">🔒</span>
+                            <span class="btn-icon disabled" title="Em uso — não pode excluir">🔒</span>
                             <?php endif; ?>
                         </div>
                     </td>
@@ -164,23 +187,37 @@ include '_sidebar_data.php';
     <a href="logout.php"><span>🚪</span>Sair</a>
 </nav>
 
-<!-- MODAL SERVIÇO -->
+<!-- MODAL CRIAR / EDITAR -->
 <div class="modal-overlay" id="modal-servico">
     <div class="modal-box">
         <div class="modal-drag"></div>
-        <div class="modal-title" id="modal-servico-titulo">Novo Serviço</div>
-        <form method="POST" action="servicos.php" id="form-servico">
-            <input type="hidden" name="acao" id="form-acao" value="criar">
-            <input type="hidden" name="id"   id="form-id"   value="">
-            <label>Nome do serviço *</label>
-            <input type="text" name="nome" id="form-nome" placeholder="Ex: Regulagem completa" required>
-            <label>Descrição</label>
-            <textarea name="descricao" id="form-descricao" placeholder="Detalhes do serviço..." rows="2"></textarea>
-            <label>Valor Base (R$)</label>
-            <input type="number" name="valor_base" id="form-valor" step="0.01" min="0" placeholder="Ex: 150.00">
-            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:400;margin-top:8px">
-                <input type="checkbox" name="ativo" id="form-ativo" checked style="width:auto"> Serviço ativo (visível no formulário)
+        <div class="modal-title" id="modal-titulo">Novo Serviço</div>
+        <form method="POST" id="form-servico">
+            <input type="hidden" name="acao" id="f-acao" value="criar">
+            <input type="hidden" name="id"   id="f-id"   value="">
+
+            <label class="form-label">NOME DO SERVIÇO *</label>
+            <input class="form-input" type="text" name="nome" id="f-nome" required placeholder="Ex: Setup Completo">
+
+            <label class="form-label">DESCRIÇÃO</label>
+            <textarea class="form-input" name="descricao" id="f-descricao" rows="3" placeholder="Descreva brevemente o serviço..."></textarea>
+
+            <div style="display:flex;gap:12px">
+                <div style="flex:1">
+                    <label class="form-label">VALOR BASE (R$)</label>
+                    <input class="form-input" type="number" name="valor_base" id="f-valor" min="0" step="0.01" placeholder="0,00">
+                </div>
+                <div style="flex:1">
+                    <label class="form-label">PRAZO PADRÃO (DIAS ÚTEIS)</label>
+                    <input class="form-input" type="number" name="prazo_padrao_dias" id="f-prazo" min="1" step="1" placeholder="Ex: 7">
+                </div>
+            </div>
+
+            <label class="form-check" style="margin-top:8px">
+                <input type="checkbox" name="ativo" id="f-ativo" value="1">
+                SERVIÇO ATIVO (VISÍVEL NO FORMULÁRIO)
             </label>
+
             <div class="modal-actions">
                 <button type="button" class="btn btn-secondary" onclick="fecharModalServico()">Cancelar</button>
                 <button type="submit" class="btn btn-primary">Salvar</button>
@@ -191,33 +228,38 @@ include '_sidebar_data.php';
 
 <script src="assets/js/sidebar.js?v=<?php echo $v; ?>"></script>
 <script>
-function abrirModalServico(){
-    document.getElementById('modal-servico-titulo').textContent = 'Novo Serviço';
-    document.getElementById('form-acao').value = 'criar';
-    document.getElementById('form-id').value   = '';
-    document.getElementById('form-nome').value  = '';
-    document.getElementById('form-descricao').value = '';
-    document.getElementById('form-valor').value = '';
-    document.getElementById('form-ativo').checked = true;
+function abrirModal() {
+    document.getElementById('modal-titulo').textContent = 'Novo Serviço';
+    document.getElementById('f-acao').value     = 'criar';
+    document.getElementById('f-id').value       = '';
+    document.getElementById('f-nome').value     = '';
+    document.getElementById('f-descricao').value= '';
+    document.getElementById('f-valor').value    = '';
+    document.getElementById('f-prazo').value    = '';
+    document.getElementById('f-ativo').checked  = true;
     document.getElementById('modal-servico').classList.add('aberto');
-    setTimeout(()=>document.getElementById('form-nome').focus(),150);
+    setTimeout(() => document.getElementById('f-nome').focus(), 150);
 }
-function editarServico(s){
-    document.getElementById('modal-servico-titulo').textContent = 'Editar Serviço';
-    document.getElementById('form-acao').value = 'editar';
-    document.getElementById('form-id').value   = s.id;
-    document.getElementById('form-nome').value  = s.nome;
-    document.getElementById('form-descricao').value = s.descricao||'';
-    document.getElementById('form-valor').value = s.valor_base||'';
-    document.getElementById('form-ativo').checked = s.ativo==1;
+
+function editarServico(id, nome, desc, valor, ativo, prazo) {
+    document.getElementById('modal-titulo').textContent = 'Editar Serviço';
+    document.getElementById('f-acao').value      = 'editar';
+    document.getElementById('f-id').value        = id;
+    document.getElementById('f-nome').value      = nome;
+    document.getElementById('f-descricao').value = desc || '';
+    document.getElementById('f-valor').value     = Number(valor).toFixed(2);
+    document.getElementById('f-prazo').value     = prazo !== null && prazo !== undefined ? prazo : '';
+    document.getElementById('f-ativo').checked   = !!ativo;
     document.getElementById('modal-servico').classList.add('aberto');
-    setTimeout(()=>document.getElementById('form-nome').focus(),150);
+    setTimeout(() => document.getElementById('f-nome').focus(), 150);
 }
-function fecharModalServico(){
+
+function fecharModalServico() {
     document.getElementById('modal-servico').classList.remove('aberto');
 }
-document.getElementById('modal-servico').addEventListener('click',e=>{
-    if(e.target===document.getElementById('modal-servico')) fecharModalServico();
+
+document.getElementById('modal-servico').addEventListener('click', function(e) {
+    if (e.target === this) fecharModalServico();
 });
 </script>
 </body>
