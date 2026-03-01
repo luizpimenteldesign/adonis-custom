@@ -2,7 +2,7 @@
 /**
  * DASHBOARD — SISTEMA ADONIS
  * Visual: Google / Material Design 3
- * Versão: 6.2 — Sidebar colapsável estilo WordPress
+ * Versão: 6.3 — busca live search corrigida
  */
 require_once 'auth.php';
 require_once '../config/Database.php';
@@ -107,15 +107,13 @@ $filtros_chips = [
     'Cancelada'            => 'Canceladas',
 ];
 
-// Estrutura do menu: grupos colapsáveis com subitens
-// 'status' vazio = página de navegação (href direto), não filtro
 $nav_menu = [
     [
         'id'    => 'nav-dashboard',
         'icon'  => '🏠',
         'label' => 'Dashboard',
         'href'  => 'dashboard.php',
-        'tipo'  => 'link', // link direto, sem submenu
+        'tipo'  => 'link',
     ],
     [
         'id'    => 'nav-os',
@@ -161,7 +159,7 @@ $nav_menu = [
         'tipo'  => 'group',
         'itens' => [
             ['href'=>'clientes.php',    'label'=>'Clientes',     'status'=>null],
-            ['href'=>'instrumentos.php','label'=>'Instrumentos', 'status'=>null],
+            ['href'=>'catalogo.php',    'label'=>'Catálogo',     'status'=>null],
             ['href'=>'servicos.php',    'label'=>'Serviços',     'status'=>null],
         ],
     ],
@@ -174,10 +172,8 @@ $nav_menu = [
     ],
 ];
 
-// Detecta qual grupo deve começar aberto
 function grupoAtivo($itens, $filtro_status, $current_page) {
     foreach ($itens as $it) {
-        // status null = página outra (clientes, etc) — checa pelo href
         if ($it['status'] === null) {
             if (basename($current_page) === basename($it['href'])) return true;
         } else {
@@ -216,88 +212,30 @@ $v = time();
     .sidebar-logo img{height:34px}
     .sidebar-logo-title{font-family:'Google Sans',sans-serif;font-size:16px;font-weight:700;color:var(--g-text)}
 
-    /* Links diretos (sem submenu) */
-    .nav-item-link{
-        display:flex;align-items:center;gap:10px;
-        padding:9px 16px;margin:1px 8px;
-        border-radius:10px;
-        font-size:13.5px;font-weight:500;
-        color:var(--g-text-2);text-decoration:none;
-        transition:background .15s,color .15s;
-        -webkit-tap-highlight-color:transparent;
-    }
+    .nav-item-link{display:flex;align-items:center;gap:10px;padding:9px 16px;margin:1px 8px;border-radius:10px;font-size:13.5px;font-weight:500;color:var(--g-text-2);text-decoration:none;transition:background .15s,color .15s;-webkit-tap-highlight-color:transparent;}
     .nav-item-link:hover{background:var(--g-hover);color:var(--g-text);text-decoration:none}
     .nav-item-link.active{background:var(--g-blue-light);color:var(--g-blue)}
     .nav-item-link .nav-icon{font-size:16px;width:20px;text-align:center;flex-shrink:0}
 
-    /* Grupo colapsável */
     .nav-group{margin:1px 0}
-
-    .nav-group-toggle{
-        display:flex;align-items:center;gap:10px;
-        padding:9px 16px;margin:1px 8px;
-        border-radius:10px;
-        font-size:13.5px;font-weight:500;
-        color:var(--g-text-2);
-        cursor:pointer;
-        user-select:none;
-        transition:background .15s,color .15s;
-        -webkit-tap-highlight-color:transparent;
-        list-style:none;
-    }
+    .nav-group-toggle{display:flex;align-items:center;gap:10px;padding:9px 16px;margin:1px 8px;border-radius:10px;font-size:13.5px;font-weight:500;color:var(--g-text-2);cursor:pointer;user-select:none;transition:background .15s,color .15s;-webkit-tap-highlight-color:transparent;list-style:none;}
     .nav-group-toggle:hover{background:var(--g-hover);color:var(--g-text)}
     .nav-group-toggle.open{color:var(--g-text)}
     .nav-group-toggle .nav-icon{font-size:16px;width:20px;text-align:center;flex-shrink:0}
     .nav-group-toggle .nav-label{flex:1}
-    .nav-group-toggle .nav-total{
-        font-size:11px;font-weight:700;
-        background:var(--g-hover);color:var(--g-text-3);
-        padding:2px 6px;border-radius:8px;min-width:18px;text-align:center;
-    }
+    .nav-group-toggle .nav-total{font-size:11px;font-weight:700;background:var(--g-hover);color:var(--g-text-3);padding:2px 6px;border-radius:8px;min-width:18px;text-align:center;}
     .nav-group-toggle.open .nav-total{background:var(--g-blue-light);color:var(--g-blue)}
-    .nav-group-toggle .nav-chevron{
-        font-size:10px;color:var(--g-text-3);
-        transition:transform .2s;
-        margin-left:2px;
-    }
+    .nav-group-toggle .nav-chevron{font-size:10px;color:var(--g-text-3);transition:transform .2s;margin-left:2px;}
     .nav-group-toggle.open .nav-chevron{transform:rotate(90deg)}
 
-    /* Subitens */
-    .nav-sub{
-        overflow:hidden;
-        max-height:0;
-        transition:max-height .25s ease;
-    }
+    .nav-sub{overflow:hidden;max-height:0;transition:max-height .25s ease;}
     .nav-sub.open{max-height:600px}
 
-    .nav-sub-item{
-        display:flex;align-items:center;gap:8px;
-        padding:7px 16px 7px 46px;
-        margin:1px 8px;
-        border-radius:8px;
-        font-size:13px;font-weight:400;
-        color:var(--g-text-2);text-decoration:none;
-        transition:background .12s,color .12s;
-        -webkit-tap-highlight-color:transparent;
-    }
+    .nav-sub-item{display:flex;align-items:center;gap:8px;padding:7px 16px 7px 46px;margin:1px 8px;border-radius:8px;font-size:13px;font-weight:400;color:var(--g-text-2);text-decoration:none;transition:background .12s,color .12s;-webkit-tap-highlight-color:transparent;}
     .nav-sub-item:hover{background:var(--g-hover);color:var(--g-text);text-decoration:none}
-    .nav-sub-item.active{
-        background:var(--g-blue-light);
-        color:var(--g-blue);
-        font-weight:500;
-    }
-    .nav-sub-item .sub-badge{
-        margin-left:auto;
-        font-size:11px;font-weight:700;
-        color:var(--g-blue);
-        background:var(--g-blue-light);
-        padding:1px 6px;border-radius:8px;
-        min-width:18px;text-align:center;
-    }
-    .nav-sub-item.active .sub-badge{
-        background:var(--g-blue);
-        color:#fff;
-    }
+    .nav-sub-item.active{background:var(--g-blue-light);color:var(--g-blue);font-weight:500;}
+    .nav-sub-item .sub-badge{margin-left:auto;font-size:11px;font-weight:700;color:var(--g-blue);background:var(--g-blue-light);padding:1px 6px;border-radius:8px;min-width:18px;text-align:center;}
+    .nav-sub-item.active .sub-badge{background:var(--g-blue);color:#fff;}
 
     .sidebar-divider{border:none;border-top:1px solid var(--g-border);margin:6px 0}
 
@@ -375,6 +313,11 @@ $v = time();
     .rep-inline{padding:0 20px 12px}
     .rep-inline textarea{width:100%;padding:9px 12px;border:1px solid var(--g-border);border-radius:8px;font-size:13px;font-family:inherit;resize:vertical;min-height:70px;background:var(--g-bg);outline:none}
     .rep-inline textarea:focus{border-color:var(--g-red);background:var(--g-surface)}
+
+    /* ── BUSCA — spinner de loading ─────────────────── */
+    .search-loading{display:none;width:16px;height:16px;border:2px solid var(--g-border);border-top-color:var(--g-blue);border-radius:50%;animation:spin .6s linear infinite;flex-shrink:0}
+    .search-loading.active{display:block}
+    @keyframes spin{to{transform:rotate(360deg)}}
     </style>
 </head>
 <body>
@@ -399,9 +342,7 @@ $v = time();
         </a>
 
     <?php elseif ($item['tipo'] === 'group'):
-        // Verifica se algum subitem está ativo — se sim, abre o grupo
         $grupo_aberto = grupoAtivo($item['itens'], $filtro_status, $current_page);
-        // Conta total do grupo
         $grupo_total  = 0;
         foreach ($item['itens'] as $it) {
             if ($it['status'] !== null && $it['status'] !== '') {
@@ -421,7 +362,6 @@ $v = time();
             </div>
             <div class="nav-sub<?php echo $grupo_aberto ? ' open' : ''; ?>" id="sub-<?php echo $item['id']; ?>">
                 <?php foreach ($item['itens'] as $it):
-                    // Define se este subitem está ativo
                     if ($it['status'] === null) {
                         $sub_active = (basename($current_page) === basename($it['href']));
                     } elseif ($it['status'] === '') {
@@ -488,16 +428,20 @@ $v = time();
         </div>
 
         <!-- BUSCA -->
-        <form method="GET" action="dashboard.php" id="form-busca" style="margin-bottom:12px">
-            <input type="hidden" name="status" value="<?php echo htmlspecialchars($filtro_status); ?>">
+        <div style="margin-bottom:12px">
             <div class="search-bar">
                 <span class="search-icon">🔍</span>
-                <input type="text" name="q" placeholder="Buscar por cliente, instrumento, ID..." value="<?php echo htmlspecialchars($busca); ?>" autocomplete="off" id="input-busca">
+                <input type="text"
+                       id="input-busca"
+                       placeholder="Buscar por cliente, instrumento, ID..."
+                       value="<?php echo htmlspecialchars($busca); ?>"
+                       autocomplete="off">
+                <div class="search-loading" id="search-spinner"></div>
                 <?php if ($busca): ?>
                 <button type="button" onclick="limparBusca()" style="background:none;border:none;cursor:pointer;font-size:16px;color:var(--g-text-3);padding:0 8px" title="Limpar">✕</button>
                 <?php endif; ?>
             </div>
-        </form>
+        </div>
 
         <!-- CHIPS DE FILTRO -->
         <div class="chips-row" style="margin-bottom:16px">
@@ -647,20 +591,17 @@ function toggleGroup(id){
     const sub    = document.getElementById('sub-'    + id);
     toggle.classList.toggle('open');
     sub.classList.toggle('open');
-    // Persiste estado no localStorage
     const estado = JSON.parse(localStorage.getItem('nav_grupos') || '{}');
     estado[id] = toggle.classList.contains('open');
     localStorage.setItem('nav_grupos', JSON.stringify(estado));
 }
 
-// Restaura grupos abertos do localStorage (sem sobrescrever os abertos pelo PHP)
 document.addEventListener('DOMContentLoaded', () => {
     const estado = JSON.parse(localStorage.getItem('nav_grupos') || '{}');
     for (const [id, aberto] of Object.entries(estado)) {
         const toggle = document.getElementById('toggle-' + id);
         const sub    = document.getElementById('sub-'    + id);
         if (!toggle || !sub) continue;
-        // Só aplica se o PHP não já abriu (evita fechar grupo ativo)
         if (aberto && !toggle.classList.contains('open')) {
             toggle.classList.add('open');
             sub.classList.add('open');
@@ -668,7 +609,37 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-// ─ Busca
+// ─ BUSCA LIVE — debounce 400ms + Enter imediato
+(function() {
+    const input   = document.getElementById('input-busca');
+    const spinner = document.getElementById('search-spinner');
+    const status  = <?php echo json_encode($filtro_status); ?>;
+    let timer = null;
+
+    function doSearch(q) {
+        spinner.classList.add('active');
+        let url = 'dashboard.php';
+        const params = [];
+        if (status)        params.push('status=' + encodeURIComponent(status));
+        if (q.trim())      params.push('q='      + encodeURIComponent(q.trim()));
+        if (params.length) url += '?' + params.join('&');
+        window.location.href = url;
+    }
+
+    input.addEventListener('input', function() {
+        clearTimeout(timer);
+        timer = setTimeout(() => doSearch(this.value), 400);
+    });
+
+    input.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            clearTimeout(timer);
+            doSearch(this.value);
+        }
+    });
+})();
+
 function limparBusca(){
     const s = <?php echo json_encode($filtro_status); ?>;
     location.href = 'dashboard.php' + (s ? '?status=' + encodeURIComponent(s) : '');
@@ -738,7 +709,7 @@ function renderAcoes(acoes, totalBase, status){
         const[s,label,cls,modal]=a;
         if(modal==='modal-orc')      html+=`<button class="btn ${cls}" onclick="_abrirOrcamento(${totalBase})">${label}</button>`;
         else if(modal==='modal-rep') html+=`<button class="btn ${cls}" onclick="_abrirReprovacao()">${label}</button>`;
-        else                         html+=`<button class="btn ${cls}" onclick="_enviar('${s.replace(/'/g,"\\'")}')"><span>${label}</span></button>`;
+        else                         html+=`<button class="btn ${cls}" onclick="_enviar('${s.replace(/'/g,"\\'")}')">${label}</button>`;
     }
     html+=`</div></div>`;
     return html;
@@ -829,7 +800,7 @@ function _abrirWa(link,label){
     document.getElementById('modal-wa').classList.add('aberto');
 }
 
-// ─ Fetch
+// ─ Toast
 function _toast(msg,ok){
     const el=document.createElement('div'); el.className='g-toast'; el.textContent=msg;
     document.body.appendChild(el); setTimeout(()=>el.remove(),3000);
