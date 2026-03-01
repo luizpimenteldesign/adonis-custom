@@ -2,7 +2,7 @@
 /**
  * DASHBOARD — SISTEMA ADONIS
  * Visual: Google / Material Design 3
- * Versão: 6.1 — Fix filtros, busca, menu active, listagem
+ * Versão: 6.2 — Sidebar colapsável estilo WordPress
  */
 require_once 'auth.php';
 require_once '../config/Database.php';
@@ -49,10 +49,8 @@ try {
     $pedidos = $stmt->fetchAll(PDO::FETCH_ASSOC);
 } catch (Exception $e) {
     $pedidos = [];
-    error_log('Dashboard query error: '.$e->getMessage());
 }
 
-// Totais de serviços por pré-OS (para simulador de orçamento)
 $totais_servicos = [];
 try {
     $ts = $conn->query("SELECT ps.pre_os_id, SUM(s.valor_base) as total FROM pre_os_servicos ps JOIN servicos s ON ps.servico_id = s.id GROUP BY ps.pre_os_id")->fetchAll(PDO::FETCH_ASSOC);
@@ -109,28 +107,86 @@ $filtros_chips = [
     'Cancelada'            => 'Canceladas',
 ];
 
-// Links da sidebar com flag de active
-$sidebar_sections = [
-    'Principal' => [
-        ['href'=>'dashboard.php',                          'icon'=>'📋', 'label'=>'Todos os Pedidos',    'status'=>''],
-        ['href'=>'dashboard.php?status=Pre-OS',            'icon'=>'🗒️', 'label'=>'Pré-OS',               'status'=>'Pre-OS'],
-        ['href'=>'dashboard.php?status=Em analise',        'icon'=>'🔍', 'label'=>'Em Análise',           'status'=>'Em analise'],
-        ['href'=>'dashboard.php?status=Orcada',            'icon'=>'💰', 'label'=>'Orçadas',              'status'=>'Orcada'],
-        ['href'=>'dashboard.php?status=Aguardando aprovacao','icon'=>'⏳','label'=>'Aguard. Aprovação',  'status'=>'Aguardando aprovacao'],
+// Estrutura do menu: grupos colapsáveis com subitens
+// 'status' vazio = página de navegação (href direto), não filtro
+$nav_menu = [
+    [
+        'id'    => 'nav-dashboard',
+        'icon'  => '🏠',
+        'label' => 'Dashboard',
+        'href'  => 'dashboard.php',
+        'tipo'  => 'link', // link direto, sem submenu
     ],
-    'Execução' => [
-        ['href'=>'dashboard.php?status=Aprovada',          'icon'=>'💳', 'label'=>'Aguard. Pagamento',   'status'=>'Aprovada'],
-        ['href'=>'dashboard.php?status=Instrumento recebido','icon'=>'📦','label'=>'Instr. Recebido',    'status'=>'Instrumento recebido'],
-        ['href'=>'dashboard.php?status=Em desenvolvimento', 'icon'=>'⚙️', 'label'=>'Em Execução',        'status'=>'Em desenvolvimento'],
-        ['href'=>'dashboard.php?status=Servico finalizado', 'icon'=>'🎸', 'label'=>'Serviço Finalizado', 'status'=>'Servico finalizado'],
-        ['href'=>'dashboard.php?status=Pronto para retirada','icon'=>'🎉','label'=>'Pronto p/ Retirada','status'=>'Pronto para retirada'],
+    [
+        'id'    => 'nav-os',
+        'icon'  => '📋',
+        'label' => 'Ordens de Serviço',
+        'tipo'  => 'group',
+        'itens' => [
+            ['href'=>'dashboard.php',                           'label'=>'Todos os Pedidos', 'status'=>''],
+            ['href'=>'dashboard.php?status=Pre-OS',             'label'=>'Pré-OS',            'status'=>'Pre-OS'],
+            ['href'=>'dashboard.php?status=Em analise',         'label'=>'Em Análise',        'status'=>'Em analise'],
+            ['href'=>'dashboard.php?status=Orcada',             'label'=>'Orçadas',           'status'=>'Orcada'],
+            ['href'=>'dashboard.php?status=Aguardando aprovacao','label'=>'Aguard. Aprovação','status'=>'Aguardando aprovacao'],
+        ],
     ],
-    'Encerrados' => [
-        ['href'=>'dashboard.php?status=Entregue',  'icon'=>'🏁', 'label'=>'Entregues',  'status'=>'Entregue'],
-        ['href'=>'dashboard.php?status=Reprovada', 'icon'=>'❌', 'label'=>'Reprovados', 'status'=>'Reprovada'],
-        ['href'=>'dashboard.php?status=Cancelada', 'icon'=>'🚫', 'label'=>'Cancelados', 'status'=>'Cancelada'],
+    [
+        'id'    => 'nav-exec',
+        'icon'  => '🔧',
+        'label' => 'Execução',
+        'tipo'  => 'group',
+        'itens' => [
+            ['href'=>'dashboard.php?status=Aprovada',              'label'=>'Aguard. Pagamento',   'status'=>'Aprovada'],
+            ['href'=>'dashboard.php?status=Instrumento recebido',  'label'=>'Instr. Recebido',     'status'=>'Instrumento recebido'],
+            ['href'=>'dashboard.php?status=Em desenvolvimento',    'label'=>'Em Execução',        'status'=>'Em desenvolvimento'],
+            ['href'=>'dashboard.php?status=Servico finalizado',    'label'=>'Serviço Finalizado',  'status'=>'Servico finalizado'],
+            ['href'=>'dashboard.php?status=Pronto para retirada',  'label'=>'Pronto p/ Retirada',  'status'=>'Pronto para retirada'],
+        ],
+    ],
+    [
+        'id'    => 'nav-enc',
+        'icon'  => '🗃️',
+        'label' => 'Encerrados',
+        'tipo'  => 'group',
+        'itens' => [
+            ['href'=>'dashboard.php?status=Entregue',  'label'=>'Entregues',  'status'=>'Entregue'],
+            ['href'=>'dashboard.php?status=Reprovada', 'label'=>'Reprovados', 'status'=>'Reprovada'],
+            ['href'=>'dashboard.php?status=Cancelada', 'label'=>'Cancelados', 'status'=>'Cancelada'],
+        ],
+    ],
+    [
+        'id'    => 'nav-cad',
+        'icon'  => '🗂️',
+        'label' => 'Cadastros',
+        'tipo'  => 'group',
+        'itens' => [
+            ['href'=>'clientes.php',    'label'=>'Clientes',     'status'=>null],
+            ['href'=>'instrumentos.php','label'=>'Instrumentos', 'status'=>null],
+            ['href'=>'servicos.php',    'label'=>'Serviços',     'status'=>null],
+        ],
+    ],
+    [
+        'id'    => 'nav-cfg',
+        'icon'  => '⚙️',
+        'label' => 'Configurações',
+        'href'  => 'configuracoes.php',
+        'tipo'  => 'link',
     ],
 ];
+
+// Detecta qual grupo deve começar aberto
+function grupoAtivo($itens, $filtro_status, $current_page) {
+    foreach ($itens as $it) {
+        // status null = página outra (clientes, etc) — checa pelo href
+        if ($it['status'] === null) {
+            if (basename($current_page) === basename($it['href'])) return true;
+        } else {
+            if ($filtro_status === $it['status']) return true;
+        }
+    }
+    return false;
+}
+$current_page = 'dashboard.php';
 
 function badge($s,$m){$i=$m[$s]??['label'=>$s,'badge'=>'badge-secondary','icone'=>'•'];return '<span class="badge '.$i['badge'].'">'.$i['icone'].' '.$i['label'].'</span>';}
 function iniciais($nome){$parts=array_filter(explode(' ',trim($nome??'')));if(count($parts)>=2) return strtoupper(substr($parts[0],0,1).substr(end($parts),0,1));return strtoupper(substr($parts[0]??'?',0,2));}
@@ -148,30 +204,115 @@ $v = time();
     <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="assets/css/admin.css?v=<?php echo $v; ?>">
     <style>
+    /* ── LAYOUT ──────────────────────────────────────── */
     .app-layout{display:flex;min-height:100vh}
+
+    /* ── SIDEBAR ─────────────────────────────────────── */
     .sidebar{width:240px;flex-shrink:0;background:var(--g-surface);border-right:1px solid var(--g-border);display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;z-index:200;overflow-y:auto;transform:translateX(-100%);transition:transform .25s ease}
     .sidebar.open{transform:translateX(0)}
     @media(min-width:960px){.sidebar{transform:translateX(0);position:sticky;top:0;height:100vh}}
-    .sidebar-logo{padding:20px 20px 10px;display:flex;align-items:center;gap:10px}
-    .sidebar-logo img{height:36px}
+
+    .sidebar-logo{padding:20px 20px 12px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--g-border);margin-bottom:8px}
+    .sidebar-logo img{height:34px}
     .sidebar-logo-title{font-family:'Google Sans',sans-serif;font-size:16px;font-weight:700;color:var(--g-text)}
-    .sidebar-section{padding:8px 0}
-    .sidebar-section-label{font-size:11px;font-weight:600;color:var(--g-text-3);text-transform:uppercase;letter-spacing:.6px;padding:8px 20px 4px}
-    .sidebar-link{display:flex;align-items:center;gap:12px;padding:10px 20px;font-size:14px;font-weight:500;color:var(--g-text-2);text-decoration:none;border-radius:0 24px 24px 0;margin-right:12px;transition:background .15s,color .15s;-webkit-tap-highlight-color:transparent}
-    .sidebar-link:hover{background:var(--g-hover);color:var(--g-text);text-decoration:none}
-    .sidebar-link.active{background:var(--g-blue-light);color:var(--g-blue)}
-    .sidebar-link .nav-icon{font-size:18px;flex-shrink:0;width:22px;text-align:center}
-    .sidebar-link .nav-badge{margin-left:auto;background:var(--g-blue);color:#fff;font-size:11px;font-weight:700;padding:2px 7px;border-radius:10px;min-width:20px;text-align:center}
-    .sidebar-divider{border:none;border-top:1px solid var(--g-border);margin:8px 0}
-    .sidebar-user{margin-top:auto;padding:16px 20px;border-top:1px solid var(--g-border);display:flex;align-items:center;gap:10px}
-    .sidebar-user-avatar{width:36px;height:36px;border-radius:50%;background:var(--g-blue-light);color:var(--g-blue);display:flex;align-items:center;justify-content:center;font-family:'Google Sans',sans-serif;font-size:14px;font-weight:700;flex-shrink:0}
+
+    /* Links diretos (sem submenu) */
+    .nav-item-link{
+        display:flex;align-items:center;gap:10px;
+        padding:9px 16px;margin:1px 8px;
+        border-radius:10px;
+        font-size:13.5px;font-weight:500;
+        color:var(--g-text-2);text-decoration:none;
+        transition:background .15s,color .15s;
+        -webkit-tap-highlight-color:transparent;
+    }
+    .nav-item-link:hover{background:var(--g-hover);color:var(--g-text);text-decoration:none}
+    .nav-item-link.active{background:var(--g-blue-light);color:var(--g-blue)}
+    .nav-item-link .nav-icon{font-size:16px;width:20px;text-align:center;flex-shrink:0}
+
+    /* Grupo colapsável */
+    .nav-group{margin:1px 0}
+
+    .nav-group-toggle{
+        display:flex;align-items:center;gap:10px;
+        padding:9px 16px;margin:1px 8px;
+        border-radius:10px;
+        font-size:13.5px;font-weight:500;
+        color:var(--g-text-2);
+        cursor:pointer;
+        user-select:none;
+        transition:background .15s,color .15s;
+        -webkit-tap-highlight-color:transparent;
+        list-style:none;
+    }
+    .nav-group-toggle:hover{background:var(--g-hover);color:var(--g-text)}
+    .nav-group-toggle.open{color:var(--g-text)}
+    .nav-group-toggle .nav-icon{font-size:16px;width:20px;text-align:center;flex-shrink:0}
+    .nav-group-toggle .nav-label{flex:1}
+    .nav-group-toggle .nav-total{
+        font-size:11px;font-weight:700;
+        background:var(--g-hover);color:var(--g-text-3);
+        padding:2px 6px;border-radius:8px;min-width:18px;text-align:center;
+    }
+    .nav-group-toggle.open .nav-total{background:var(--g-blue-light);color:var(--g-blue)}
+    .nav-group-toggle .nav-chevron{
+        font-size:10px;color:var(--g-text-3);
+        transition:transform .2s;
+        margin-left:2px;
+    }
+    .nav-group-toggle.open .nav-chevron{transform:rotate(90deg)}
+
+    /* Subitens */
+    .nav-sub{
+        overflow:hidden;
+        max-height:0;
+        transition:max-height .25s ease;
+    }
+    .nav-sub.open{max-height:600px}
+
+    .nav-sub-item{
+        display:flex;align-items:center;gap:8px;
+        padding:7px 16px 7px 46px;
+        margin:1px 8px;
+        border-radius:8px;
+        font-size:13px;font-weight:400;
+        color:var(--g-text-2);text-decoration:none;
+        transition:background .12s,color .12s;
+        -webkit-tap-highlight-color:transparent;
+    }
+    .nav-sub-item:hover{background:var(--g-hover);color:var(--g-text);text-decoration:none}
+    .nav-sub-item.active{
+        background:var(--g-blue-light);
+        color:var(--g-blue);
+        font-weight:500;
+    }
+    .nav-sub-item .sub-badge{
+        margin-left:auto;
+        font-size:11px;font-weight:700;
+        color:var(--g-blue);
+        background:var(--g-blue-light);
+        padding:1px 6px;border-radius:8px;
+        min-width:18px;text-align:center;
+    }
+    .nav-sub-item.active .sub-badge{
+        background:var(--g-blue);
+        color:#fff;
+    }
+
+    .sidebar-divider{border:none;border-top:1px solid var(--g-border);margin:6px 0}
+
+    .sidebar-user{padding:14px 16px;border-top:1px solid var(--g-border);display:flex;align-items:center;gap:10px;margin-top:auto}
+    .sidebar-user-avatar{width:34px;height:34px;border-radius:50%;background:var(--g-blue-light);color:var(--g-blue);display:flex;align-items:center;justify-content:center;font-family:'Google Sans',sans-serif;font-size:13px;font-weight:700;flex-shrink:0}
     .sidebar-user-info{flex:1;min-width:0}
     .sidebar-user-name{font-size:13px;font-weight:500;color:var(--g-text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .sidebar-user-role{font-size:11px;color:var(--g-text-3)}
-    .sidebar-logout{color:var(--g-text-3);text-decoration:none;font-size:18px;padding:4px;flex-shrink:0}
+    .sidebar-logout{color:var(--g-text-3);text-decoration:none;font-size:17px;padding:4px;flex-shrink:0}
     .sidebar-logout:hover{color:var(--g-red);text-decoration:none}
+
     .sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:199}
     .sidebar-overlay.open{display:block}
+
+    /* ── MAIN ───────────────────────────────────────── */
     .main-content{flex:1;min-width:0;display:flex;flex-direction:column}
     .topbar{position:sticky;top:0;z-index:100;height:56px;background:var(--g-surface);border-bottom:1px solid var(--g-border);display:flex;align-items:center;padding:0 16px;gap:12px}
     @media(min-width:960px){.topbar{display:none}}
@@ -180,6 +321,8 @@ $v = time();
     .btn-menu:hover{background:var(--g-hover)}
     .page-content{flex:1;padding:20px;max-width:1400px}
     @media(min-width:960px){body{padding-bottom:0}.bottom-nav{display:none}}
+
+    /* ── STATS ───────────────────────────────────────── */
     .stats-row{display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap}
     .stat-chip{display:flex;align-items:center;gap:10px;background:var(--g-surface);border:1px solid var(--g-border);border-radius:12px;padding:12px 18px;cursor:pointer;transition:box-shadow .15s,border-color .15s;-webkit-tap-highlight-color:transparent;flex:1;min-width:120px}
     .stat-chip:hover{box-shadow:var(--g-shadow-md);border-color:var(--g-blue)}
@@ -189,6 +332,8 @@ $v = time();
     .stat-chip.yellow .stat-chip-val{color:var(--g-yellow)}
     .stat-chip.orange .stat-chip-val{color:#e37400}
     .stat-chip.green .stat-chip-val{color:var(--g-green)}
+
+    /* ── LISTA + PAINEL ──────────────────────────────── */
     .dashboard-grid{display:flex;gap:0;align-items:flex-start}
     .pedido-list-wrap{flex:1;min-width:0;background:var(--g-surface);border-radius:var(--g-radius-lg);border:1px solid var(--g-border);overflow:hidden}
     .acao-panel{width:320px;flex-shrink:0;background:var(--g-surface);border:1px solid var(--g-border);border-left:none;border-radius:0 var(--g-radius-lg) var(--g-radius-lg) 0;display:none;flex-direction:column;position:sticky;top:20px;max-height:calc(100vh - 40px);overflow-y:auto}
@@ -243,31 +388,66 @@ $v = time();
         <span class="sidebar-logo-title">Adonis</span>
     </div>
 
-    <?php
-    $first = true;
-    foreach ($sidebar_sections as $section_label => $links):
-        if (!$first) echo '<hr class="sidebar-divider">';
-        $first = false;
+    <nav style="flex:1;padding:8px 0">
+    <?php foreach ($nav_menu as $item):
+        if ($item['tipo'] === 'link'):
+            $is_active = (basename($current_page) === basename($item['href']) && $filtro_status === '');
     ?>
-    <div class="sidebar-section">
-        <div class="sidebar-section-label"><?php echo $section_label; ?></div>
-        <?php foreach ($links as $link):
-            // Item ativo: se status for vazio (Todos) só ativa quando filtro_status também for vazio E não há busca
-            // Para os demais, ativa quando filtro_status bater exatamente
-            $is_active = ($link['status'] === '' && $filtro_status === '')
-                      || ($link['status'] !== '' && $filtro_status === $link['status']);
-            $badge_count = $link['status'] !== '' ? ($stats_map[$link['status']] ?? 0) : 0;
-        ?>
-        <a href="<?php echo htmlspecialchars($link['href']); ?>" class="sidebar-link<?php echo $is_active ? ' active' : ''; ?>">
-            <span class="nav-icon"><?php echo $link['icon']; ?></span>
-            <?php echo htmlspecialchars($link['label']); ?>
-            <?php if ($badge_count > 0): ?>
-            <span class="nav-badge"><?php echo $badge_count; ?></span>
-            <?php endif; ?>
+        <a href="<?php echo $item['href']; ?>" class="nav-item-link<?php echo $is_active ? ' active' : ''; ?>">
+            <span class="nav-icon"><?php echo $item['icon']; ?></span>
+            <?php echo htmlspecialchars($item['label']); ?>
         </a>
-        <?php endforeach; ?>
-    </div>
+
+    <?php elseif ($item['tipo'] === 'group'):
+        // Verifica se algum subitem está ativo — se sim, abre o grupo
+        $grupo_aberto = grupoAtivo($item['itens'], $filtro_status, $current_page);
+        // Conta total do grupo
+        $grupo_total  = 0;
+        foreach ($item['itens'] as $it) {
+            if ($it['status'] !== null && $it['status'] !== '') {
+                $grupo_total += ($stats_map[$it['status']] ?? 0);
+            }
+        }
+    ?>
+        <div class="nav-group">
+            <div class="nav-group-toggle<?php echo $grupo_aberto ? ' open' : ''; ?>"
+                 onclick="toggleGroup('<?php echo $item['id']; ?>')" id="toggle-<?php echo $item['id']; ?>">
+                <span class="nav-icon"><?php echo $item['icon']; ?></span>
+                <span class="nav-label"><?php echo htmlspecialchars($item['label']); ?></span>
+                <?php if ($grupo_total > 0): ?>
+                <span class="nav-total"><?php echo $grupo_total; ?></span>
+                <?php endif; ?>
+                <span class="nav-chevron">▶</span>
+            </div>
+            <div class="nav-sub<?php echo $grupo_aberto ? ' open' : ''; ?>" id="sub-<?php echo $item['id']; ?>">
+                <?php foreach ($item['itens'] as $it):
+                    // Define se este subitem está ativo
+                    if ($it['status'] === null) {
+                        $sub_active = (basename($current_page) === basename($it['href']));
+                    } elseif ($it['status'] === '') {
+                        $sub_active = ($filtro_status === '' && basename($current_page) === 'dashboard.php');
+                    } else {
+                        $sub_active = ($filtro_status === $it['status']);
+                    }
+                    $sub_count = ($it['status'] !== null && $it['status'] !== '') ? ($stats_map[$it['status']] ?? 0) : 0;
+                ?>
+                <a href="<?php echo htmlspecialchars($it['href']); ?><?php echo (!empty($busca) && $it['status'] !== null) ? '&q='.urlencode($busca) : ''; ?>"
+                   class="nav-sub-item<?php echo $sub_active ? ' active' : ''; ?>">
+                    <?php echo htmlspecialchars($it['label']); ?>
+                    <?php if ($sub_count > 0): ?>
+                    <span class="sub-badge"><?php echo $sub_count; ?></span>
+                    <?php endif; ?>
+                </a>
+                <?php endforeach; ?>
+            </div>
+        </div>
+
+    <?php endif; ?>
+    <?php if (in_array($item['id'], ['nav-dashboard','nav-enc'])): ?>
+    <hr class="sidebar-divider">
+    <?php endif; ?>
     <?php endforeach; ?>
+    </nav>
 
     <div class="sidebar-user">
         <div class="sidebar-user-avatar"><?php echo strtoupper(substr($_SESSION['admin_nome']??'A',0,1)); ?></div>
@@ -282,7 +462,9 @@ $v = time();
 <main class="main-content">
     <div class="topbar">
         <button class="btn-menu" onclick="toggleSidebar()">☰</button>
-        <div class="topbar-logo"><img src="https://adns.luizpimentel.com/adonis-custom/frontend/public/assets/img/Logo-Adonis2.png" alt="Adonis"></div>
+        <div style="display:flex;align-items:center;gap:8px">
+            <img src="https://adns.luizpimentel.com/adonis-custom/frontend/public/assets/img/Logo-Adonis2.png" style="height:26px" alt="Adonis">
+        </div>
         <span class="topbar-title">Painel</span>
         <a href="logout.php" style="font-size:20px;color:var(--g-text-2);text-decoration:none">🚪</a>
     </div>
@@ -291,16 +473,16 @@ $v = time();
 
         <!-- STATS -->
         <div class="stats-row">
-            <div class="stat-chip blue" onclick="location.href='dashboard.php'" title="Ver todos">
+            <div class="stat-chip blue" onclick="location.href='dashboard.php'">
                 <div><div class="stat-chip-val"><?php echo $stats['total']; ?></div><div class="stat-chip-lbl">Total</div></div>
             </div>
-            <div class="stat-chip yellow" onclick="location.href='dashboard.php?status=Pre-OS'" title="Pré-OS e Em Análise">
+            <div class="stat-chip yellow" onclick="location.href='dashboard.php?status=Pre-OS'">
                 <div><div class="stat-chip-val"><?php echo $stats['pendentes']; ?></div><div class="stat-chip-lbl">Pendentes</div></div>
             </div>
-            <div class="stat-chip orange" onclick="location.href='dashboard.php?status=Orcada'" title="Orçadas e Aguardando aprovação">
+            <div class="stat-chip orange" onclick="location.href='dashboard.php?status=Orcada'">
                 <div><div class="stat-chip-val"><?php echo $stats['orcadas']; ?></div><div class="stat-chip-lbl">Orçadas</div></div>
             </div>
-            <div class="stat-chip green" onclick="location.href='dashboard.php?status=Em desenvolvimento'" title="Em execução">
+            <div class="stat-chip green" onclick="location.href='dashboard.php?status=Em desenvolvimento'">
                 <div><div class="stat-chip-val"><?php echo $stats['execucao']; ?></div><div class="stat-chip-lbl">Em Execução</div></div>
             </div>
         </div>
@@ -312,7 +494,7 @@ $v = time();
                 <span class="search-icon">🔍</span>
                 <input type="text" name="q" placeholder="Buscar por cliente, instrumento, ID..." value="<?php echo htmlspecialchars($busca); ?>" autocomplete="off" id="input-busca">
                 <?php if ($busca): ?>
-                <button type="button" onclick="limparBusca()" style="background:none;border:none;cursor:pointer;font-size:16px;color:var(--g-text-3);padding:0 8px" title="Limpar busca">✕</button>
+                <button type="button" onclick="limparBusca()" style="background:none;border:none;cursor:pointer;font-size:16px;color:var(--g-text-3);padding:0 8px" title="Limpar">✕</button>
                 <?php endif; ?>
             </div>
         </form>
@@ -351,7 +533,7 @@ $v = time();
                     $orc    = (float)($p['valor_orcamento']??0);
                 ?>
                 <div class="pedido-item" id="pedido-<?php echo $p['id']; ?>"
-                     onclick="abrirAcoes(<?php echo $p['id']; ?>, <?php echo htmlspecialchars(json_encode($p['cliente_nome']??'Sem nome'), ENT_QUOTES); ?>, <?php echo htmlspecialchars(json_encode($instr ?: 'Instrumento não informado'), ENT_QUOTES); ?>, <?php echo htmlspecialchars(json_encode($p['status']), ENT_QUOTES); ?>, <?php echo $acoes; ?>, <?php echo $tv; ?>, <?php echo $orc; ?>, <?php echo htmlspecialchars(json_encode($p['telefone']??''), ENT_QUOTES); ?>)">
+                     onclick="abrirAcoes(<?php echo $p['id']; ?>,<?php echo htmlspecialchars(json_encode($p['cliente_nome']??'Sem nome'),ENT_QUOTES); ?>,<?php echo htmlspecialchars(json_encode($instr?:'–'),ENT_QUOTES); ?>,<?php echo htmlspecialchars(json_encode($p['status']),ENT_QUOTES); ?>,<?php echo $acoes; ?>,<?php echo $tv; ?>,<?php echo $orc; ?>,<?php echo htmlspecialchars(json_encode($p['telefone']??''),ENT_QUOTES); ?>)">
                     <div class="pedido-avatar"><?php echo $ini; ?></div>
                     <div class="pedido-body">
                         <div class="pedido-row1">
@@ -368,7 +550,6 @@ $v = time();
                 <?php endif; ?>
             </div>
 
-            <!-- PAINEL DE AÇÕES (desktop) -->
             <div class="acao-panel" id="acao-panel">
                 <div id="acao-panel-content"></div>
             </div>
@@ -381,13 +562,13 @@ $v = time();
 
 <!-- BOTTOM NAV mobile -->
 <nav class="bottom-nav">
-    <a href="dashboard.php" class="<?php echo $filtro_status==='' ? 'active' : ''; ?>"><span class="nav-icon">📋</span>Pedidos</a>
-    <a href="dashboard.php?status=Pre-OS" class="<?php echo $filtro_status==='Pre-OS' ? 'active' : ''; ?>"><span class="nav-icon">⏳</span>Pendentes</a>
-    <a href="dashboard.php?status=Em desenvolvimento" class="<?php echo $filtro_status==='Em desenvolvimento' ? 'active' : ''; ?>"><span class="nav-icon">⚙️</span>Execução</a>
-    <a href="logout.php"><span class="nav-icon">🚪</span>Sair</a>
+    <a href="dashboard.php" class="<?php echo $filtro_status==='' ? 'active' : ''; ?>"><span>🏠</span>Painel</a>
+    <a href="dashboard.php?status=Pre-OS" class="<?php echo $filtro_status==='Pre-OS' ? 'active' : ''; ?>"><span>🗒️</span>Pré-OS</a>
+    <a href="dashboard.php?status=Em desenvolvimento" class="<?php echo $filtro_status==='Em desenvolvimento' ? 'active' : ''; ?>"><span>⚙️</span>Execução</a>
+    <a href="logout.php"><span>🚪</span>Sair</a>
 </nav>
 
-<!-- SHEET DE AÇÕES (mobile) -->
+<!-- SHEET MOBILE -->
 <div class="acao-sheet" id="acao-sheet">
     <div class="acao-sheet-overlay" onclick="fecharSheet()"></div>
     <div class="acao-sheet-box">
@@ -450,7 +631,7 @@ $v = time();
 const _statusMap = <?php echo json_encode(array_map(fn($v)=>$v['icone'].' '.$v['label'], $status_map)); ?>;
 const _badgeMap  = <?php echo json_encode(array_map(fn($v)=>['badge'=>$v['badge'],'icone'=>$v['icone'],'label'=>$v['label']], $status_map)); ?>;
 
-// ── Sidebar mobile ───────────────────────────────────────────
+// ─ Sidebar mobile
 function toggleSidebar(){
     document.getElementById('sidebar').classList.toggle('open');
     document.getElementById('sidebar-overlay').classList.toggle('open');
@@ -460,21 +641,40 @@ function closeSidebar(){
     document.getElementById('sidebar-overlay').classList.remove('open');
 }
 
-// ── Busca — limpar campo ─────────────────────────────────────
+// ─ Grupos colapsáveis
+function toggleGroup(id){
+    const toggle = document.getElementById('toggle-' + id);
+    const sub    = document.getElementById('sub-'    + id);
+    toggle.classList.toggle('open');
+    sub.classList.toggle('open');
+    // Persiste estado no localStorage
+    const estado = JSON.parse(localStorage.getItem('nav_grupos') || '{}');
+    estado[id] = toggle.classList.contains('open');
+    localStorage.setItem('nav_grupos', JSON.stringify(estado));
+}
+
+// Restaura grupos abertos do localStorage (sem sobrescrever os abertos pelo PHP)
+document.addEventListener('DOMContentLoaded', () => {
+    const estado = JSON.parse(localStorage.getItem('nav_grupos') || '{}');
+    for (const [id, aberto] of Object.entries(estado)) {
+        const toggle = document.getElementById('toggle-' + id);
+        const sub    = document.getElementById('sub-'    + id);
+        if (!toggle || !sub) continue;
+        // Só aplica se o PHP não já abriu (evita fechar grupo ativo)
+        if (aberto && !toggle.classList.contains('open')) {
+            toggle.classList.add('open');
+            sub.classList.add('open');
+        }
+    }
+});
+
+// ─ Busca
 function limparBusca(){
     const s = <?php echo json_encode($filtro_status); ?>;
     location.href = 'dashboard.php' + (s ? '?status=' + encodeURIComponent(s) : '');
 }
 
-// Submete busca ao pressionar Enter (já é padrão do form, mas garante manter status)
-document.getElementById('form-busca').addEventListener('submit', function(e){
-    // nada a bloquear, o hidden já carrega o status
-});
-
-// ── Chips: ao clicar mantém busca atual ─────────────────────
-// (já tratado no PHP pelo href com &q=)
-
-// ── Estado do painel ─────────────────────────────────────────
+// ─ Painel de ações
 let _idAtual = null, _telefoneAtual = '';
 let _orcEscolhido = null;
 
@@ -531,30 +731,30 @@ function fecharSheet(){
 }
 
 function renderAcoes(acoes, totalBase, status){
-    if(!acoes || acoes.length===0)
+    if(!acoes||acoes.length===0)
         return `<div class="acao-section"><div style="font-size:13px;color:var(--g-text-3);padding:8px 0">Nenhuma ação disponível.</div></div>`;
-    let html = `<div class="acao-section"><div class="acao-section-label">Ações disponíveis</div><div class="acao-btns">`;
+    let html=`<div class="acao-section"><div class="acao-section-label">Ações disponíveis</div><div class="acao-btns">`;
     for(const a of acoes){
-        const [s,label,cls,modal] = a;
-        if(modal==='modal-orc')       html += `<button class="btn ${cls}" onclick="_abrirOrcamento(${totalBase})">${label}</button>`;
-        else if(modal==='modal-rep')  html += `<button class="btn ${cls}" onclick="_abrirReprovacao()">${label}</button>`;
-        else                          html += `<button class="btn ${cls}" onclick="_enviar('${s.replace(/'/g,"\\'")}')"><span>${label}</span></button>`;
+        const[s,label,cls,modal]=a;
+        if(modal==='modal-orc')      html+=`<button class="btn ${cls}" onclick="_abrirOrcamento(${totalBase})">${label}</button>`;
+        else if(modal==='modal-rep') html+=`<button class="btn ${cls}" onclick="_abrirReprovacao()">${label}</button>`;
+        else                         html+=`<button class="btn ${cls}" onclick="_enviar('${s.replace(/'/g,"\\'")}')"><span>${label}</span></button>`;
     }
-    html += `</div></div>`;
+    html+=`</div></div>`;
     return html;
 }
 
-// ── Orçamento ────────────────────────────────────────────────
-function taxaMaq(v){ return v > 2000 ? 15.38 : 21.58; }
+// ─ Orçamento
+function taxaMaq(v){ return v>2000?15.38:21.58; }
 function fmt(v){ return 'R$ '+Number(v).toFixed(2).replace('.',',').replace(/\B(?=(\d{3})+(?!\d))/g,'.'); }
-let _orcTipoEscolhido = null;
+let _orcTipoEscolhido=null;
 
 function _abrirOrcamento(totalBase){
-    _orcTipoEscolhido = null;
-    document.getElementById('modal-input-valor').value = totalBase > 0 ? Number(totalBase).toFixed(2) : '';
-    document.getElementById('modal-input-prazo').value = '';
-    document.getElementById('modal-valor-final').value = '';
-    document.getElementById('modal-btn-orc').disabled = true;
+    _orcTipoEscolhido=null;
+    document.getElementById('modal-input-valor').value=totalBase>0?Number(totalBase).toFixed(2):'';
+    document.getElementById('modal-input-prazo').value='';
+    document.getElementById('modal-valor-final').value='';
+    document.getElementById('modal-btn-orc').disabled=true;
     document.getElementById('modal-sim-aviso').style.display='none';
     ['modal-card-base','modal-card-maquina'].forEach(id=>document.getElementById(id)?.classList.remove('ativo'));
     simularModal();
@@ -563,11 +763,9 @@ function _abrirOrcamento(totalBase){
 }
 
 function simularModal(){
-    const v = parseFloat(document.getElementById('modal-input-valor').value);
+    const v=parseFloat(document.getElementById('modal-input-valor').value);
     if(isNaN(v)||v<=0){document.getElementById('modal-sim-base').textContent='—';document.getElementById('modal-sim-maq').textContent='—';return;}
-    const taxa = taxaMaq(v);
-    const inteiro = Math.ceil(v*(1+taxa/100));
-    const real = inteiro/(1+taxa/100);
+    const taxa=taxaMaq(v); const inteiro=Math.ceil(v*(1+taxa/100)); const real=inteiro/(1+taxa/100);
     document.getElementById('modal-sim-base').textContent=fmt(v);
     document.getElementById('modal-sim-maq').textContent=fmt(inteiro);
     document.getElementById('modal-sim-maq-sub').innerHTML=`Elo/Amex 10x (${taxa.toFixed(2)}%)<br>Digitar ${fmt(real)} na máquina`;
@@ -577,9 +775,9 @@ function simularModal(){
 }
 
 function escolherModalValor(tipo){
-    const v = parseFloat(document.getElementById('modal-input-valor').value);
+    const v=parseFloat(document.getElementById('modal-input-valor').value);
     if(isNaN(v)||v<=0){_toast('Informe o valor primeiro',false);return;}
-    _orcTipoEscolhido = tipo;
+    _orcTipoEscolhido=tipo;
     document.getElementById('modal-card-base').classList.toggle('ativo',tipo==='base');
     document.getElementById('modal-card-maquina').classList.toggle('ativo',tipo==='maquina');
     const taxa=taxaMaq(v); const inteiro=Math.ceil(v*(1+taxa/100));
@@ -590,8 +788,7 @@ function escolherModalValor(tipo){
 
 function _atualizarAvisoModal(v){
     const taxa=taxaMaq(v); const inteiro=Math.ceil(v*(1+taxa/100)); const real=inteiro/(1+taxa/100);
-    const el=document.getElementById('modal-sim-aviso');
-    el.style.display='block';
+    const el=document.getElementById('modal-sim-aviso'); el.style.display='block';
     el.innerHTML=_orcTipoEscolhido==='base'
         ?`<strong>Enviando ao cliente: ${fmt(v)}</strong>`
         :`<strong>Enviando ao cliente: ${fmt(inteiro)}</strong><br>Digitar na máquina: <strong>${fmt(real)}</strong> em <strong>10x</strong>.`;
@@ -619,26 +816,23 @@ function confirmarModalReprovacao(){
     _enviar('Reprovada',{motivo:m});
 }
 
-function fecharModal(id){ document.getElementById(id).classList.remove('aberto'); }
+function fecharModal(id){document.getElementById(id).classList.remove('aberto');}
 document.querySelectorAll('.modal-overlay').forEach(o=>{
     o.addEventListener('click',e=>{if(e.target===o)o.classList.remove('aberto');});
 });
 
-// ── WhatsApp ─────────────────────────────────────────────────
-function _waReload(){ fecharModal('modal-wa'); setTimeout(()=>location.reload(),300); }
+// ─ WhatsApp
+function _waReload(){fecharModal('modal-wa');setTimeout(()=>location.reload(),300);}
 function _abrirWa(link,label){
     document.getElementById('wa-texto').innerHTML=`✅ Status atualizado para <strong>${label}</strong>. Avisar o cliente?`;
     document.getElementById('btn-wa').href=link;
     document.getElementById('modal-wa').classList.add('aberto');
 }
 
-// ── Fetch ─────────────────────────────────────────────────────
+// ─ Fetch
 function _toast(msg,ok){
-    const el=document.createElement('div');
-    el.className='g-toast';
-    el.textContent=msg;
-    document.body.appendChild(el);
-    setTimeout(()=>el.remove(),3000);
+    const el=document.createElement('div'); el.className='g-toast'; el.textContent=msg;
+    document.body.appendChild(el); setTimeout(()=>el.remove(),3000);
 }
 
 function _enviar(status,extras={}){
