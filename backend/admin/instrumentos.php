@@ -5,11 +5,10 @@ require_once '../config/Database.php';
 $db   = new Database();
 $conn = $db->getConnection();
 
-// Garante tabelas do catálogo
 $conn->exec("CREATE TABLE IF NOT EXISTS cat_tipos (
     id INT AUTO_INCREMENT PRIMARY KEY,
     nome VARCHAR(100) NOT NULL UNIQUE,
-    icone VARCHAR(10) DEFAULT '🎸',
+    icone VARCHAR(10) DEFAULT 'piano',
     ativo TINYINT(1) DEFAULT 1,
     criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) DEFAULT CHARSET=utf8mb4");
@@ -42,7 +41,6 @@ $aba = $_GET['aba'] ?? 'tipos';
 $abas_validas = ['tipos','marcas','modelos','cores'];
 if (!in_array($aba, $abas_validas)) $aba = 'tipos';
 
-// ── POST: CRUD ──────────────────────────────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $acao    = $_POST['acao']    ?? '';
     $tabela  = $_POST['tabela']  ?? '';
@@ -60,7 +58,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!$nome) { header('Location: instrumentos.php?aba='.$aba_redir.'&msg=erro:Nome obrigatório'); exit; }
 
         if ($tabela === 'cat_tipos') {
-            $icone = trim($_POST['icone'] ?? '🎸') ?: '🎸';
+            $icone = trim($_POST['icone'] ?? 'piano') ?: 'piano';
             if ($acao === 'criar') {
                 try {
                     $conn->prepare("INSERT INTO cat_tipos (nome, icone, ativo) VALUES (?,?,?)")->execute([$nome,$icone,$ativo]);
@@ -121,7 +119,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 if (isset($_GET['msg'])) $msg = $_GET['msg'];
 
-// ── Carregar dados da aba ───────────────────────────────────────────────────
 $tipos   = $conn->query("SELECT * FROM cat_tipos   ORDER BY nome")->fetchAll(PDO::FETCH_ASSOC);
 $marcas  = $conn->query("SELECT * FROM cat_marcas  ORDER BY nome")->fetchAll(PDO::FETCH_ASSOC);
 $modelos = $conn->query("SELECT m.*, b.nome as marca_nome FROM cat_modelos m LEFT JOIN cat_marcas b ON m.marca_id=b.id ORDER BY b.nome, m.nome")->fetchAll(PDO::FETCH_ASSOC);
@@ -144,10 +141,33 @@ include '_sidebar_data.php';
     <link rel="stylesheet" href="assets/css/pages.css?v=<?php echo $v; ?>">
     <style>
     .tab-bar{display:flex;gap:4px;margin-bottom:20px;border-bottom:2px solid var(--g-border);padding-bottom:0}
-    .tab-btn{padding:9px 18px;font-size:13.5px;font-weight:500;color:var(--g-text-2);cursor:pointer;border:none;background:none;border-bottom:2px solid transparent;margin-bottom:-2px;border-radius:6px 6px 0 0;transition:color .15s,border-color .15s;font-family:inherit}
+    .tab-btn{display:inline-flex;align-items:center;gap:6px;padding:9px 18px;font-size:13.5px;font-weight:500;color:var(--g-text-2);cursor:pointer;border:none;background:none;border-bottom:2px solid transparent;margin-bottom:-2px;border-radius:6px 6px 0 0;transition:color .15s,border-color .15s;font-family:inherit}
     .tab-btn:hover{color:var(--g-text);background:var(--g-hover)}
     .tab-btn.active{color:var(--g-blue);border-bottom-color:var(--g-blue)}
     .tab-panel{display:none}.tab-panel.active{display:block}
+    .btn-icon{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:8px;border:none;background:var(--g-hover);color:var(--g-text-2);cursor:pointer;transition:background .15s,color .15s}
+    .btn-icon:hover{background:var(--g-blue-light);color:var(--g-blue)}
+    .btn-icon.danger:hover{background:#fce8e6;color:var(--g-red)}
+    .btn-icon .material-symbols-outlined{font-size:16px}
+    .table-actions{display:flex;gap:6px;justify-content:center}
+    .row-inactive td{opacity:.5}
+    .data-table{width:100%;border-collapse:collapse}
+    .data-table thead th{text-align:left;padding:10px 16px;font-size:11px;font-weight:600;color:var(--g-text-2);text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--g-border);background:var(--g-bg)}
+    .data-table tbody td{padding:12px 16px;font-size:13px;border-bottom:1px solid var(--g-border);color:var(--g-text);vertical-align:middle}
+    .data-table tbody tr:last-child td{border-bottom:none}
+    .data-table tbody tr:hover td{background:var(--g-hover)}
+    .text-center{text-align:center}
+    .text-muted{color:var(--g-text-3)}
+    .form-label{display:block;font-size:11px;font-weight:600;color:var(--g-text-2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px;margin-top:16px}
+    .form-input{width:100%;padding:10px 14px;border:1px solid var(--g-border);border-radius:8px;font-size:14px;font-family:inherit;color:var(--g-text);background:var(--g-bg);outline:none;transition:border-color .15s}
+    .form-input:focus{border-color:var(--g-blue);background:var(--g-surface)}
+    .form-check{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;color:var(--g-text-2);text-transform:uppercase;letter-spacing:.4px;margin-top:14px;cursor:pointer}
+    .alert{padding:10px 16px;border-radius:8px;font-size:13px;margin-bottom:16px}
+    .alert-sucesso{background:#e6f4ea;color:#1e8e3e}
+    .alert-erro{background:#fce8e6;color:#c5221f}
+    .page-header{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:20px}
+    .page-title{font-family:'Google Sans',sans-serif;font-size:20px;font-weight:500;color:var(--g-text);display:flex;align-items:center;gap:8px}
+    .page-subtitle{font-size:13px;color:var(--g-text-2);margin-top:4px}
     </style>
 </head>
 <body>
@@ -159,53 +179,85 @@ include '_sidebar_data.php';
 
 <main class="main-content">
     <div class="topbar">
-        <button class="btn-menu" onclick="toggleSidebar()">☰</button>
+        <button class="btn-menu" onclick="toggleSidebar()">
+            <span class="material-symbols-outlined">menu</span>
+        </button>
         <span class="topbar-title">Catálogo</span>
     </div>
 
     <div class="page-content">
         <div class="page-header">
             <div>
-                <h1 class="page-title">🗂️ Catálogo de Instrumentos</h1>
+                <h1 class="page-title">
+                    <span class="material-symbols-outlined" style="font-size:22px">library_music</span>
+                    Catálogo de Instrumentos
+                </h1>
                 <div class="page-subtitle">Gerencie tipos, marcas, modelos e cores disponíveis no formulário</div>
             </div>
-            <button class="btn btn-primary" id="btn-novo" onclick="abrirModalNovo()">+ Novo Item</button>
+            <button class="btn btn-primary" id="btn-novo" onclick="abrirModalNovo()">
+                <span class="material-symbols-outlined" style="font-size:16px">add</span> Novo Item
+            </button>
         </div>
 
         <?php if ($msg): list($tipo_msg,$texto_msg) = explode(':', $msg, 2); ?>
-        <div class="alert alert-<?php echo $tipo_msg; ?>"><?php echo htmlspecialchars($texto_msg); ?></div>
+        <div class="alert alert-<?php echo htmlspecialchars($tipo_msg); ?>"><?php echo htmlspecialchars($texto_msg); ?></div>
         <?php endif; ?>
 
         <!-- ABAS -->
         <div class="tab-bar">
-            <button class="tab-btn <?php echo $aba==='tipos'   ? 'active' : ''; ?>" onclick="mudarAba('tipos')">🎸 Tipos</button>
-            <button class="tab-btn <?php echo $aba==='marcas'  ? 'active' : ''; ?>" onclick="mudarAba('marcas')">🏷️ Marcas</button>
-            <button class="tab-btn <?php echo $aba==='modelos' ? 'active' : ''; ?>" onclick="mudarAba('modelos')">📋 Modelos</button>
-            <button class="tab-btn <?php echo $aba==='cores'   ? 'active' : ''; ?>" onclick="mudarAba('cores')">🎨 Cores</button>
+            <button class="tab-btn <?php echo $aba==='tipos'   ? 'active' : ''; ?>" onclick="mudarAba('tipos')">
+                <span class="material-symbols-outlined" style="font-size:16px">piano</span> Tipos
+            </button>
+            <button class="tab-btn <?php echo $aba==='marcas'  ? 'active' : ''; ?>" onclick="mudarAba('marcas')">
+                <span class="material-symbols-outlined" style="font-size:16px">sell</span> Marcas
+            </button>
+            <button class="tab-btn <?php echo $aba==='modelos' ? 'active' : ''; ?>" onclick="mudarAba('modelos')">
+                <span class="material-symbols-outlined" style="font-size:16px">list_alt</span> Modelos
+            </button>
+            <button class="tab-btn <?php echo $aba==='cores'   ? 'active' : ''; ?>" onclick="mudarAba('cores')">
+                <span class="material-symbols-outlined" style="font-size:16px">palette</span> Cores
+            </button>
         </div>
 
         <!-- ABA: TIPOS -->
         <div class="tab-panel <?php echo $aba==='tipos' ? 'active' : ''; ?>" id="tab-tipos">
             <div class="table-wrap">
                 <?php if (empty($tipos)): ?>
-                <div class="empty-state"><div class="empty-state-icon">🎸</div><div class="empty-state-title">Nenhum tipo cadastrado</div><div class="empty-state-sub">Clique em "+ Novo Item" para adicionar</div></div>
+                <div class="empty-state">
+                    <div class="empty-state-icon"><span class="material-symbols-outlined">piano</span></div>
+                    <div class="empty-state-title">Nenhum tipo cadastrado</div>
+                    <div class="empty-state-sub">Clique em &ldquo;+ Novo Item&rdquo; para adicionar</div>
+                </div>
                 <?php else: ?>
                 <table class="data-table">
                     <thead><tr><th>Ícone</th><th>Nome</th><th class="text-center">Status</th><th class="text-center">Ações</th></tr></thead>
                     <tbody>
                     <?php foreach ($tipos as $item): ?>
                     <tr class="<?php echo !$item['ativo'] ? 'row-inactive' : ''; ?>">
-                        <td style="font-size:22px;text-align:center"><?php echo htmlspecialchars($item['icone']); ?></td>
+                        <td style="text-align:center">
+                            <span class="material-symbols-outlined" style="font-size:20px;color:var(--g-text-2)"><?php echo htmlspecialchars($item['icone']); ?></span>
+                        </td>
                         <td><strong><?php echo htmlspecialchars($item['nome']); ?></strong></td>
-                        <td class="text-center"><?php echo $item['ativo'] ? '<span class="badge badge-success">✅ Ativo</span>' : '<span class="badge badge-dark">⛔ Inativo</span>'; ?></td>
+                        <td class="text-center">
+                            <?php if ($item['ativo']): ?>
+                            <span class="badge badge-success"><span class="material-symbols-outlined" style="font-size:11px">check_circle</span> Ativo</span>
+                            <?php else: ?>
+                            <span class="badge badge-dark"><span class="material-symbols-outlined" style="font-size:11px">block</span> Inativo</span>
+                            <?php endif; ?>
+                        </td>
                         <td class="text-center">
                             <div class="table-actions">
-                                <button class="btn-icon" onclick='editarItem("cat_tipos",<?php echo $item["id"]; ?>,<?php echo htmlspecialchars(json_encode(["nome"=>$item["nome"],"icone"=>$item["icone"],"ativo"=>$item["ativo"]]),ENT_QUOTES); ?>)' title="Editar">✏️</button>
+                                <button class="btn-icon" title="Editar"
+                                    onclick='editarItem("cat_tipos",<?php echo $item["id"]; ?>,<?php echo htmlspecialchars(json_encode(["nome"=>$item["nome"],"icone"=>$item["icone"],"ativo"=>$item["ativo"]],JSON_UNESCAPED_UNICODE),ENT_QUOTES); ?>)'>
+                                    <span class="material-symbols-outlined">edit</span>
+                                </button>
                                 <form method="POST" style="display:inline" onsubmit="return confirm('Excluir tipo <?php echo htmlspecialchars(addslashes($item['nome'])); ?>?')">
                                     <input type="hidden" name="acao" value="excluir">
                                     <input type="hidden" name="tabela" value="cat_tipos">
                                     <input type="hidden" name="id" value="<?php echo $item['id']; ?>">
-                                    <button type="submit" class="btn-icon danger" title="Excluir">🗑️</button>
+                                    <button type="submit" class="btn-icon danger" title="Excluir">
+                                        <span class="material-symbols-outlined">delete</span>
+                                    </button>
                                 </form>
                             </div>
                         </td>
@@ -221,7 +273,11 @@ include '_sidebar_data.php';
         <div class="tab-panel <?php echo $aba==='marcas' ? 'active' : ''; ?>" id="tab-marcas">
             <div class="table-wrap">
                 <?php if (empty($marcas)): ?>
-                <div class="empty-state"><div class="empty-state-icon">🏷️</div><div class="empty-state-title">Nenhuma marca cadastrada</div><div class="empty-state-sub">Clique em "+ Novo Item" para adicionar</div></div>
+                <div class="empty-state">
+                    <div class="empty-state-icon"><span class="material-symbols-outlined">sell</span></div>
+                    <div class="empty-state-title">Nenhuma marca cadastrada</div>
+                    <div class="empty-state-sub">Clique em &ldquo;+ Novo Item&rdquo; para adicionar</div>
+                </div>
                 <?php else: ?>
                 <table class="data-table">
                     <thead><tr><th>Nome</th><th class="text-center">Status</th><th class="text-center">Ações</th></tr></thead>
@@ -229,15 +285,26 @@ include '_sidebar_data.php';
                     <?php foreach ($marcas as $item): ?>
                     <tr class="<?php echo !$item['ativo'] ? 'row-inactive' : ''; ?>">
                         <td><strong><?php echo htmlspecialchars($item['nome']); ?></strong></td>
-                        <td class="text-center"><?php echo $item['ativo'] ? '<span class="badge badge-success">✅ Ativo</span>' : '<span class="badge badge-dark">⛔ Inativo</span>'; ?></td>
+                        <td class="text-center">
+                            <?php if ($item['ativo']): ?>
+                            <span class="badge badge-success"><span class="material-symbols-outlined" style="font-size:11px">check_circle</span> Ativo</span>
+                            <?php else: ?>
+                            <span class="badge badge-dark"><span class="material-symbols-outlined" style="font-size:11px">block</span> Inativo</span>
+                            <?php endif; ?>
+                        </td>
                         <td class="text-center">
                             <div class="table-actions">
-                                <button class="btn-icon" onclick='editarItem("cat_marcas",<?php echo $item["id"]; ?>,<?php echo htmlspecialchars(json_encode(["nome"=>$item["nome"],"ativo"=>$item["ativo"]]),ENT_QUOTES); ?>)' title="Editar">✏️</button>
+                                <button class="btn-icon" title="Editar"
+                                    onclick='editarItem("cat_marcas",<?php echo $item["id"]; ?>,<?php echo htmlspecialchars(json_encode(["nome"=>$item["nome"],"ativo"=>$item["ativo"]],JSON_UNESCAPED_UNICODE),ENT_QUOTES); ?>)'>
+                                    <span class="material-symbols-outlined">edit</span>
+                                </button>
                                 <form method="POST" style="display:inline" onsubmit="return confirm('Excluir marca <?php echo htmlspecialchars(addslashes($item['nome'])); ?>?')">
                                     <input type="hidden" name="acao" value="excluir">
                                     <input type="hidden" name="tabela" value="cat_marcas">
                                     <input type="hidden" name="id" value="<?php echo $item['id']; ?>">
-                                    <button type="submit" class="btn-icon danger" title="Excluir">🗑️</button>
+                                    <button type="submit" class="btn-icon danger" title="Excluir">
+                                        <span class="material-symbols-outlined">delete</span>
+                                    </button>
                                 </form>
                             </div>
                         </td>
@@ -253,7 +320,11 @@ include '_sidebar_data.php';
         <div class="tab-panel <?php echo $aba==='modelos' ? 'active' : ''; ?>" id="tab-modelos">
             <div class="table-wrap">
                 <?php if (empty($modelos)): ?>
-                <div class="empty-state"><div class="empty-state-icon">📋</div><div class="empty-state-title">Nenhum modelo cadastrado</div><div class="empty-state-sub">Clique em "+ Novo Item" para adicionar</div></div>
+                <div class="empty-state">
+                    <div class="empty-state-icon"><span class="material-symbols-outlined">list_alt</span></div>
+                    <div class="empty-state-title">Nenhum modelo cadastrado</div>
+                    <div class="empty-state-sub">Clique em &ldquo;+ Novo Item&rdquo; para adicionar</div>
+                </div>
                 <?php else: ?>
                 <table class="data-table">
                     <thead><tr><th>Nome</th><th>Marca</th><th class="text-center">Status</th><th class="text-center">Ações</th></tr></thead>
@@ -262,15 +333,26 @@ include '_sidebar_data.php';
                     <tr class="<?php echo !$item['ativo'] ? 'row-inactive' : ''; ?>">
                         <td><strong><?php echo htmlspecialchars($item['nome']); ?></strong></td>
                         <td><?php echo $item['marca_nome'] ? htmlspecialchars($item['marca_nome']) : '<span class="text-muted">—</span>'; ?></td>
-                        <td class="text-center"><?php echo $item['ativo'] ? '<span class="badge badge-success">✅ Ativo</span>' : '<span class="badge badge-dark">⛔ Inativo</span>'; ?></td>
+                        <td class="text-center">
+                            <?php if ($item['ativo']): ?>
+                            <span class="badge badge-success"><span class="material-symbols-outlined" style="font-size:11px">check_circle</span> Ativo</span>
+                            <?php else: ?>
+                            <span class="badge badge-dark"><span class="material-symbols-outlined" style="font-size:11px">block</span> Inativo</span>
+                            <?php endif; ?>
+                        </td>
                         <td class="text-center">
                             <div class="table-actions">
-                                <button class="btn-icon" onclick='editarItem("cat_modelos",<?php echo $item["id"]; ?>,<?php echo htmlspecialchars(json_encode(["nome"=>$item["nome"],"marca_id"=>$item["marca_id"],"ativo"=>$item["ativo"]]),ENT_QUOTES); ?>)' title="Editar">✏️</button>
+                                <button class="btn-icon" title="Editar"
+                                    onclick='editarItem("cat_modelos",<?php echo $item["id"]; ?>,<?php echo htmlspecialchars(json_encode(["nome"=>$item["nome"],"marca_id"=>$item["marca_id"],"ativo"=>$item["ativo"]],JSON_UNESCAPED_UNICODE),ENT_QUOTES); ?>)'>
+                                    <span class="material-symbols-outlined">edit</span>
+                                </button>
                                 <form method="POST" style="display:inline" onsubmit="return confirm('Excluir modelo <?php echo htmlspecialchars(addslashes($item['nome'])); ?>?')">
                                     <input type="hidden" name="acao" value="excluir">
                                     <input type="hidden" name="tabela" value="cat_modelos">
                                     <input type="hidden" name="id" value="<?php echo $item['id']; ?>">
-                                    <button type="submit" class="btn-icon danger" title="Excluir">🗑️</button>
+                                    <button type="submit" class="btn-icon danger" title="Excluir">
+                                        <span class="material-symbols-outlined">delete</span>
+                                    </button>
                                 </form>
                             </div>
                         </td>
@@ -286,7 +368,11 @@ include '_sidebar_data.php';
         <div class="tab-panel <?php echo $aba==='cores' ? 'active' : ''; ?>" id="tab-cores">
             <div class="table-wrap">
                 <?php if (empty($cores)): ?>
-                <div class="empty-state"><div class="empty-state-icon">🎨</div><div class="empty-state-title">Nenhuma cor cadastrada</div><div class="empty-state-sub">Clique em "+ Novo Item" para adicionar</div></div>
+                <div class="empty-state">
+                    <div class="empty-state-icon"><span class="material-symbols-outlined">palette</span></div>
+                    <div class="empty-state-title">Nenhuma cor cadastrada</div>
+                    <div class="empty-state-sub">Clique em &ldquo;+ Novo Item&rdquo; para adicionar</div>
+                </div>
                 <?php else: ?>
                 <table class="data-table">
                     <thead><tr><th>Nome</th><th class="text-center">Status</th><th class="text-center">Ações</th></tr></thead>
@@ -294,15 +380,26 @@ include '_sidebar_data.php';
                     <?php foreach ($cores as $item): ?>
                     <tr class="<?php echo !$item['ativo'] ? 'row-inactive' : ''; ?>">
                         <td><strong><?php echo htmlspecialchars($item['nome']); ?></strong></td>
-                        <td class="text-center"><?php echo $item['ativo'] ? '<span class="badge badge-success">✅ Ativo</span>' : '<span class="badge badge-dark">⛔ Inativo</span>'; ?></td>
+                        <td class="text-center">
+                            <?php if ($item['ativo']): ?>
+                            <span class="badge badge-success"><span class="material-symbols-outlined" style="font-size:11px">check_circle</span> Ativo</span>
+                            <?php else: ?>
+                            <span class="badge badge-dark"><span class="material-symbols-outlined" style="font-size:11px">block</span> Inativo</span>
+                            <?php endif; ?>
+                        </td>
                         <td class="text-center">
                             <div class="table-actions">
-                                <button class="btn-icon" onclick='editarItem("cat_cores",<?php echo $item["id"]; ?>,<?php echo htmlspecialchars(json_encode(["nome"=>$item["nome"],"ativo"=>$item["ativo"]]),ENT_QUOTES); ?>)' title="Editar">✏️</button>
+                                <button class="btn-icon" title="Editar"
+                                    onclick='editarItem("cat_cores",<?php echo $item["id"]; ?>,<?php echo htmlspecialchars(json_encode(["nome"=>$item["nome"],"ativo"=>$item["ativo"]],JSON_UNESCAPED_UNICODE),ENT_QUOTES); ?>)'>
+                                    <span class="material-symbols-outlined">edit</span>
+                                </button>
                                 <form method="POST" style="display:inline" onsubmit="return confirm('Excluir cor <?php echo htmlspecialchars(addslashes($item['nome'])); ?>?')">
                                     <input type="hidden" name="acao" value="excluir">
                                     <input type="hidden" name="tabela" value="cat_cores">
                                     <input type="hidden" name="id" value="<?php echo $item['id']; ?>">
-                                    <button type="submit" class="btn-icon danger" title="Excluir">🗑️</button>
+                                    <button type="submit" class="btn-icon danger" title="Excluir">
+                                        <span class="material-symbols-outlined">delete</span>
+                                    </button>
                                 </form>
                             </div>
                         </td>
@@ -319,10 +416,18 @@ include '_sidebar_data.php';
 </div>
 
 <nav class="bottom-nav">
-    <a href="dashboard.php"><span>🏠</span>Painel</a>
-    <a href="clientes.php"><span>👥</span>Clientes</a>
-    <a href="servicos.php"><span>🔧</span>Serviços</a>
-    <a href="logout.php"><span>🚪</span>Sair</a>
+    <a href="dashboard.php">
+        <span class="material-symbols-outlined nav-icon">dashboard</span>Painel
+    </a>
+    <a href="clientes.php">
+        <span class="material-symbols-outlined nav-icon">group</span>Clientes
+    </a>
+    <a href="servicos.php">
+        <span class="material-symbols-outlined nav-icon">build</span>Serviços
+    </a>
+    <a href="logout.php">
+        <span class="material-symbols-outlined nav-icon">logout</span>Sair
+    </a>
 </nav>
 
 <!-- MODAL CRIAR / EDITAR -->
@@ -335,16 +440,15 @@ include '_sidebar_data.php';
             <input type="hidden" name="id"     id="f-id"     value="">
             <input type="hidden" name="tabela" id="f-tabela" value="">
 
-            <!-- Ícone (só tipos) -->
             <div id="campo-icone" style="display:none">
-                <label class="form-label">ÍCONE (EMOJI)</label>
-                <input class="form-input" type="text" name="icone" id="f-icone" placeholder="🎸" maxlength="5">
+                <label class="form-label">Ícone (nome do Material Symbol)</label>
+                <input class="form-input" type="text" name="icone" id="f-icone" placeholder="Ex: piano, guitar, music_note" maxlength="50">
+                <div style="font-size:11px;color:var(--g-text-3);margin-top:4px">Consulte os ícones em <a href="https://fonts.google.com/icons" target="_blank">fonts.google.com/icons</a></div>
             </div>
 
             <label class="form-label">NOME *</label>
             <input class="form-input" type="text" name="nome" id="f-nome" required placeholder="Digite o nome...">
 
-            <!-- Marca vinculada (só modelos) -->
             <div id="campo-marca" style="display:none">
                 <label class="form-label">MARCA (OPCIONAL)</label>
                 <select class="form-input" name="marca_id" id="f-marca">
@@ -355,7 +459,7 @@ include '_sidebar_data.php';
                 </select>
             </div>
 
-            <label class="form-check" style="margin-top:8px">
+            <label class="form-check" style="margin-top:14px">
                 <input type="checkbox" name="ativo" id="f-ativo" value="1">
                 ATIVO (VISÍVEL NO FORMULÁRIO)
             </label>
@@ -405,7 +509,7 @@ function abrirModalNovo() {
     document.getElementById('f-tabela').value = tabela;
     document.getElementById('f-nome').value   = '';
     document.getElementById('f-ativo').checked = true;
-    document.getElementById('f-icone').value  = '🎸';
+    document.getElementById('f-icone').value  = 'piano';
     document.getElementById('f-marca').value  = '';
     document.getElementById('campo-icone').style.display  = tabela === 'cat_tipos'   ? '' : 'none';
     document.getElementById('campo-marca').style.display  = tabela === 'cat_modelos' ? '' : 'none';
@@ -420,7 +524,7 @@ function editarItem(tabela, id, dados) {
     document.getElementById('f-tabela').value = tabela;
     document.getElementById('f-nome').value   = dados.nome || '';
     document.getElementById('f-ativo').checked = !!dados.ativo;
-    document.getElementById('f-icone').value  = dados.icone || '🎸';
+    document.getElementById('f-icone').value  = dados.icone || 'piano';
     document.getElementById('f-marca').value  = dados.marca_id || '';
     document.getElementById('campo-icone').style.display  = tabela === 'cat_tipos'   ? '' : 'none';
     document.getElementById('campo-marca').style.display  = tabela === 'cat_modelos' ? '' : 'none';
