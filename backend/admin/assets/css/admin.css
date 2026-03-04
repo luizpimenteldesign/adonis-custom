@@ -1,12 +1,23 @@
 /* ============================================================
    ADONIS ADMIN — Google / Material Design 3
-   Fonte: Google Sans / Roboto
+   Fonte: Google Sans / Roboto + Material Symbols Outlined
    Paleta: branco + cinza Google + azul Google #1a73e8
    ============================================================ */
 
 @import url('https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&family=Roboto:wght@300;400;500;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200');
 
-/* ── Reset & Base ─────────────────────────────────────────── */
+/* Ajuste global Material Symbols */
+.material-symbols-outlined {
+  font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 20;
+  font-size: 20px;
+  line-height: 1;
+  vertical-align: middle;
+  user-select: none;
+  flex-shrink: 0;
+}
+
+/* ── Reset & Base ───────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
@@ -47,7 +58,7 @@ body {
 a { color: var(--g-blue); text-decoration: none; }
 a:hover { text-decoration: underline; }
 
-/* ── Top App Bar (Google style) ───────────────────────────── */
+/* ── Top App Bar (Google style) ─────────────────────── */
 .header {
   position: sticky;
   top: 0;
@@ -111,7 +122,7 @@ a:hover { text-decoration: underline; }
 }
 .back-button:hover { background: var(--g-hover); text-decoration: none; }
 
-/* ── Bottom Navigation Bar ─────────────────────────────────── */
+/* ── Bottom Navigation Bar ─────────────────────────── */
 .bottom-nav {
   position: fixed;
   bottom: 0; left: 0; right: 0;
@@ -139,16 +150,33 @@ a:hover { text-decoration: underline; }
 }
 .bottom-nav a.active,
 .bottom-nav a:hover { color: var(--g-blue); }
-.bottom-nav a .nav-icon { font-size: 20px; line-height: 1; }
+.bottom-nav a .nav-icon { font-size: 22px; line-height: 1; }
 
-/* ── Container ─────────────────────────────────────────────── */
+/* ── Sidebar nav-icon override ───────────────────────── */
+.sidebar .nav-icon.material-symbols-outlined,
+.sidebar .nav-chevron.material-symbols-outlined {
+  font-size: 18px;
+  color: inherit;
+}
+.sidebar .nav-chevron.material-symbols-outlined {
+  font-size: 16px;
+  transition: transform .2s;
+}
+.sidebar .nav-group-toggle.open .nav-chevron.material-symbols-outlined {
+  transform: rotate(90deg);
+}
+.sidebar .sidebar-logout.material-symbols-outlined {
+  font-size: 18px;
+}
+
+/* ── Container ───────────────────────────────────────── */
 .container {
   max-width: 720px;
   margin: 0 auto;
   padding: 12px 12px 0;
 }
 
-/* ── Card Google style ──────────────────────────────────────── */
+/* ── Card Google style ────────────────────────────────── */
 .card {
   background: var(--g-surface);
   border-radius: var(--g-radius-lg);
@@ -172,7 +200,7 @@ a:hover { text-decoration: underline; }
   color: var(--g-text);
 }
 
-/* ── Stats Cards (Dashboard) ──────────────────────────────── */
+/* ── Stats Cards (Dashboard) ──────────────────────── */
 .stats-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -216,7 +244,7 @@ a:hover { text-decoration: underline; }
 .stat-card.yellow .stat-value { color: var(--g-yellow); }
 .stat-card.red   .stat-value { color: var(--g-red); }
 
-/* ── Search Bar (Gmail style) ─────────────────────────────── */
+/* ── Search Bar (Gmail style) ─────────────────────── */
 .search-bar {
   display: flex;
   align-items: center;
@@ -244,7 +272,7 @@ a:hover { text-decoration: underline; }
 }
 .search-bar input::placeholder { color: var(--g-text-3); }
 
-/* ── Filter Chips ──────────────────────────────────────────── */
+/* ── Filter Chips ──────────────────────────────────── */
 .chips-row {
   display: flex;
   gap: 8px;
@@ -278,7 +306,7 @@ a:hover { text-decoration: underline; }
   text-decoration: none;
 }
 
-/* ── Gmail-style List (Dashboard) ──────────────────────────── */
+/* ── Gmail-style List (Dashboard) ────────────────────── */
 .pedido-list {
   background: var(--g-surface);
   border-radius: var(--g-radius-lg);
@@ -369,7 +397,7 @@ a:hover { text-decoration: underline; }
   text-overflow: ellipsis;
 }
 
-/* ── Badges ─────────────────────────────────────────────────── */
+/* ── Badges ────────────────────────────────────────────── */
 .badge {
   display: inline-flex;
   align-items: center;
@@ -390,7 +418,7 @@ a:hover { text-decoration: underline; }
 .badge-dark     { background: #f1f3f4; color: #5f6368; }
 .badge-secondary{ background: #f1f3f4; color: #5f6368; }
 
-/* ── Botões Google style ──────────────────────────────────── */
+/* ── Botões Google style ────────────────────────────── */
 .btn {
   display: inline-flex;
   align-items: center;
@@ -423,7 +451,7 @@ a:hover { text-decoration: underline; }
 .btn-logout    { background: transparent; color: var(--g-text-2); border: 1px solid var(--g-border); padding: 6px 14px; font-size: 13px; border-radius: 20px; }
 .btn-logout:hover { background: var(--g-hover); }
 
-/* ── FAB (Floating Action Button) ─────────────────────────── */
+/* ── FAB (Floating Action Button) ────────────────────── */
 .fab {
   position: fixed;
   bottom: calc(var(--bottom-nav-h) + 16px);
@@ -490,7 +518,7 @@ a:hover { text-decoration: underline; }
 }
 .fab-mini:active { transform: scale(.9); }
 
-/* ── Tabs (detalhes) ─────────────────────────────────────── */
+/* ── Tabs (detalhes) ───────────────────────────────── */
 .tabs {
   display: flex;
   border-bottom: 1px solid var(--g-border);
@@ -527,7 +555,7 @@ a:hover { text-decoration: underline; }
 .tab-panel { display: none; padding: 16px 0; }
 .tab-panel.active { display: block; }
 
-/* ── Info Grid ───────────────────────────────────────────── */
+/* ── Info Grid ────────────────────────────────────────── */
 .info-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -554,7 +582,7 @@ a:hover { text-decoration: underline; }
 }
 .info-item.full { grid-column: 1 / -1; }
 
-/* ── Table ──────────────────────────────────────────────── */
+/* ── Table ──────────────────────────────────────────── */
 .table-wrap { overflow-x: auto; }
 table { width: 100%; border-collapse: collapse; }
 thead th {
@@ -588,7 +616,7 @@ tfoot td {
 .total-prazo { color: var(--g-blue); }
 .total-obs { font-size: 11px; color: var(--g-text-3); font-weight: 400; display: block; margin-top: 2px; }
 
-/* ── Timeline ───────────────────────────────────────────── */
+/* ── Timeline ────────────────────────────────────────── */
 .timeline { list-style: none; padding: 0; position: relative; }
 .timeline::before {
   content: '';
@@ -621,7 +649,7 @@ tfoot td {
 .timeline-detalhe.valor  { background: #e6f4ea; color: #1e8e3e; }
 .timeline-detalhe.motivo { background: #fce8e6; color: #c5221f; }
 
-/* ── Status Atual (hero) ────────────────────────────────── */
+/* ── Status Atual (hero) ────────────────────────────── */
 .status-hero {
   padding: 20px;
   display: flex;
@@ -664,7 +692,7 @@ tfoot td {
   color: var(--g-red);
 }
 
-/* ── Pagamento Card ─────────────────────────────────────── */
+/* ── Pagamento Card ────────────────────────────────── */
 .pgto-card {
   border-radius: var(--g-radius-lg);
   border: 1px solid #a8d5b5;
@@ -711,7 +739,7 @@ tfoot td {
   display: flex; align-items: center; gap: 8px;
 }
 
-/* ── Modal ──────────────────────────────────────────────── */
+/* ── Modal ──────────────────────────────────────────── */
 .modal-overlay {
   display: none;
   position: fixed; inset: 0;
@@ -815,7 +843,7 @@ tfoot td {
   line-height: 1.6;
 }
 
-/* ── Token box ───────────────────────────────────────────── */
+/* ── Token box ────────────────────────────────────────── */
 .token-box {
   font-family: 'Roboto Mono', monospace;
   font-size: 11px;
@@ -828,7 +856,7 @@ tfoot td {
   margin: 0 20px 16px;
 }
 
-/* ── Observações ─────────────────────────────────────────── */
+/* ── Observações ───────────────────────────────────────── */
 .observacoes {
   padding: 0 20px 16px;
   font-size: 14px;
@@ -837,7 +865,7 @@ tfoot td {
   white-space: pre-wrap;
 }
 
-/* ── Fotos grid ──────────────────────────────────────────── */
+/* ── Fotos grid ────────────────────────────────────────── */
 .photos-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -854,7 +882,7 @@ tfoot td {
 }
 .photo-item img:hover { opacity: .85; }
 
-/* ── Toast ───────────────────────────────────────────────── */
+/* ── Toast ─────────────────────────────────────────────── */
 .g-toast {
   position: fixed;
   bottom: calc(var(--bottom-nav-h) + 16px);
@@ -871,7 +899,7 @@ tfoot td {
 }
 @keyframes toastIn { from { opacity: 0; transform: translateX(-50%) translateY(8px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
 
-/* ── WhatsApp modal ─────────────────────────────────────── */
+/* ── WhatsApp modal ─────────────────────────────────── */
 .btn-wa {
   display: flex; align-items: center; justify-content: center; gap: 10px;
   background: #25d366; color: #fff;
@@ -892,7 +920,7 @@ tfoot td {
   margin-top: 6px;
 }
 
-/* ── Login page ──────────────────────────────────────────── */
+/* ── Login page ────────────────────────────────────────── */
 .login-page {
   min-height: 100vh;
   display: flex;
@@ -947,17 +975,25 @@ tfoot td {
   margin-bottom: 16px;
 }
 
-/* ── Empty state ─────────────────────────────────────────── */
+/* ── Empty state ────────────────────────────────────────── */
 .empty-state {
   text-align: center;
   padding: 48px 20px;
   color: var(--g-text-2);
 }
-.empty-state-icon { font-size: 48px; margin-bottom: 12px; }
+.empty-state-icon {
+  font-size: 48px;
+  margin-bottom: 12px;
+  color: var(--g-text-3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.empty-state-icon .material-symbols-outlined { font-size: 48px; }
 .empty-state-title { font-family: 'Google Sans', sans-serif; font-size: 18px; font-weight: 500; margin-bottom: 6px; }
 .empty-state-sub { font-size: 14px; color: var(--g-text-3); }
 
-/* ── Grupos de botões de fase (detalhes) ─────────────────── */
+/* ── Grupos de botões de fase (detalhes) ──────────────────── */
 .fase-group {
   padding: 0 16px 12px;
 }
@@ -976,10 +1012,10 @@ tfoot td {
   gap: 8px;
 }
 
-/* ── Divider ─────────────────────────────────────────────── */
+/* ── Divider ────────────────────────────────────────────────── */
 .divider { border: none; border-top: 1px solid var(--g-border); margin: 0; }
 
-/* ── Utilitários ─────────────────────────────────────────── */
+/* ── Utilitários ───────────────────────────────────────────── */
 .text-center { text-align: center; }
 .mt-8 { margin-top: 8px; }
 .mt-12 { margin-top: 12px; }
