@@ -335,12 +335,21 @@ $v = time();
                     $ini    = iniciais($p['cliente_nome'] ?? '?');
                     $instr  = trim(($p['instr_tipo']??'').' '.($p['instr_marca']??'').' '.($p['instr_modelo']??''));
                     $data   = $p['atualizado_em'] ? date('d/m', strtotime($p['atualizado_em'])) : '–';
-                    $acoes  = json_encode($acoes_por_status[$p['status']] ?? []);
                     $tv     = $totais_servicos[$p['id']] ?? 0;
                     $orc    = (float)($p['valor_orcamento']??0);
+                    // Dados serializados com segurança em data-* attributes
+                    $data_payload = htmlspecialchars(json_encode([
+                        'id'       => (int)$p['id'],
+                        'nome'     => $p['cliente_nome'] ?? 'Sem nome',
+                        'instr'    => $instr ?: '–',
+                        'status'   => $p['status'],
+                        'acoes'    => $acoes_por_status[$p['status']] ?? [],
+                        'tv'       => $tv,
+                        'orc'      => $orc,
+                        'telefone' => $p['telefone'] ?? '',
+                    ], JSON_UNESCAPED_UNICODE), ENT_QUOTES);
                 ?>
-                <div class="pedido-item" id="pedido-<?php echo $p['id']; ?>"
-                     onclick="abrirAcoes(<?php echo $p['id']; ?>,<?php echo htmlspecialchars(json_encode($p['cliente_nome']??'Sem nome'),ENT_QUOTES); ?>,<?php echo htmlspecialchars(json_encode($instr?:'–'),ENT_QUOTES); ?>,<?php echo htmlspecialchars(json_encode($p['status']),ENT_QUOTES); ?>,<?php echo $acoes; ?>,<?php echo $tv; ?>,<?php echo $orc; ?>,<?php echo htmlspecialchars(json_encode($p['telefone']??''),ENT_QUOTES); ?>)">
+                <div class="pedido-item" id="pedido-<?php echo $p['id']; ?>" data-pedido="<?php echo $data_payload; ?>">
                     <div class="pedido-avatar"><?php echo $ini; ?></div>
                     <div class="pedido-body">
                         <div class="pedido-row1">
@@ -445,8 +454,8 @@ $v = time();
 </div>
 
 <script>
-const _statusMap = <?php echo json_encode(array_map(fn($v)=>$v['icone'].' '.$v['label'], $status_map)); ?>;
-const _badgeMap  = <?php echo json_encode(array_map(fn($v)=>['badge'=>$v['badge'],'icone'=>$v['icone'],'label'=>$v['label']], $status_map)); ?>;
+const _statusMap = <?php echo json_encode(array_map(fn($v)=>$v['label'], $status_map), JSON_UNESCAPED_UNICODE); ?>;
+const _badgeMap  = <?php echo json_encode(array_map(fn($v)=>['badge'=>$v['badge'],'icone'=>$v['icone'],'label'=>$v['label']], $status_map), JSON_UNESCAPED_UNICODE); ?>;
 
 function iconHtml(name, size){
     return `<span class="material-symbols-outlined" style="font-size:${size||16}px;vertical-align:middle">${name}</span>`;
@@ -474,6 +483,7 @@ function toggleGroup(id){
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+    // Restaurar estado dos grupos
     const estado = JSON.parse(localStorage.getItem('nav_grupos') || '{}');
     for (const [id, aberto] of Object.entries(estado)) {
         const toggle = document.getElementById('toggle-' + id);
@@ -484,6 +494,18 @@ document.addEventListener('DOMContentLoaded', () => {
             sub.classList.add('open');
         }
     }
+
+    // ─ Event delegation para clique nos pedidos (evita quebra por caracteres especiais)
+    document.querySelector('.pedido-list-wrap')?.addEventListener('click', function(e){
+        const item = e.target.closest('.pedido-item[data-pedido]');
+        if (!item) return;
+        try {
+            const d = JSON.parse(item.dataset.pedido);
+            abrirAcoes(d.id, d.nome, d.instr, d.status, d.acoes, d.tv, d.orc, d.telefone);
+        } catch(err) {
+            console.error('Erro ao parsear pedido:', err);
+        }
+    });
 });
 
 // ─ BUSCA LIVE — debounce 400ms + Enter imediato
@@ -672,7 +694,7 @@ document.querySelectorAll('.modal-overlay').forEach(o=>{
 // ─ WhatsApp
 function _waReload(){fecharModal('modal-wa');setTimeout(()=>location.reload(),300);}
 function _abrirWa(link,label){
-    document.getElementById('wa-texto').innerHTML=`Status atualizado para <strong>${label}</strong>. Avisar o cliente?`;
+    document.getElementById('wa-texto').innerHTML=`Status atualizado para <strong>${escHtml(label)}</strong>. Avisar o cliente?`;
     document.getElementById('btn-wa').href=link;
     document.getElementById('modal-wa').classList.add('aberto');
 }
