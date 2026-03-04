@@ -5,7 +5,6 @@ require_once '../config/Database.php';
 $db   = new Database();
 $conn = $db->getConnection();
 
-// Garante que a coluna prazo_padrao_dias existe
 try {
     $conn->query("ALTER TABLE servicos ADD COLUMN prazo_padrao_dias INT DEFAULT NULL");
 } catch (Exception $e) { /* já existe */ }
@@ -13,16 +12,15 @@ try {
 $busca = trim($_GET['q'] ?? '');
 $msg   = isset($_GET['msg']) ? $_GET['msg'] : '';
 
-// POST: criar / editar / excluir
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $acao = $_POST['acao'] ?? '';
 
     if ($acao === 'criar' || $acao === 'editar') {
-        $nome       = trim($_POST['nome'] ?? '');
-        $descricao  = trim($_POST['descricao'] ?? '');
-        $valor      = str_replace(',', '.', trim($_POST['valor_base'] ?? '0'));
-        $prazo      = ($_POST['prazo_padrao_dias'] ?? '') !== '' ? (int)$_POST['prazo_padrao_dias'] : null;
-        $ativo      = isset($_POST['ativo']) ? 1 : 0;
+        $nome      = trim($_POST['nome'] ?? '');
+        $descricao = trim($_POST['descricao'] ?? '');
+        $valor     = str_replace(',', '.', trim($_POST['valor_base'] ?? '0'));
+        $prazo     = ($_POST['prazo_padrao_dias'] ?? '') !== '' ? (int)$_POST['prazo_padrao_dias'] : null;
+        $ativo     = isset($_POST['ativo']) ? 1 : 0;
 
         if (!$nome) { header('Location: servicos.php?msg=erro:Nome obrigatório'); exit; }
 
@@ -71,7 +69,7 @@ include '_sidebar_data.php';
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Serviços — Adonis Admin</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="assets/css/admin.css?v=<?php echo $v; ?>">
     <link rel="stylesheet" href="assets/css/sidebar.css?v=<?php echo $v; ?>">
     <link rel="stylesheet" href="assets/css/pages.css?v=<?php echo $v; ?>">
@@ -85,17 +83,23 @@ include '_sidebar_data.php';
 
 <main class="main-content">
     <div class="topbar">
-        <button class="btn-menu" onclick="toggleSidebar()">☰</button>
+        <button class="btn-menu" onclick="toggleSidebar()">
+            <span class="material-symbols-outlined">menu</span>
+        </button>
         <span class="topbar-title">Serviços</span>
     </div>
 
     <div class="page-content">
         <div class="page-header">
             <div>
-                <h1 class="page-title">🔧 Serviços</h1>
+                <h1 class="page-title">
+                    <span class="material-symbols-outlined" style="vertical-align:middle;margin-right:6px">build</span>Serviços
+                </h1>
                 <div class="page-subtitle"><?php echo count($servicos); ?> serviço<?php echo count($servicos) !== 1 ? 's' : ''; ?> cadastrado<?php echo count($servicos) !== 1 ? 's' : ''; ?></div>
             </div>
-            <button class="btn btn-primary" onclick="abrirModal()">+ Novo Serviço</button>
+            <button class="btn btn-primary" onclick="abrirModal()">
+                <span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle">add</span> Novo Serviço
+            </button>
         </div>
 
         <?php if ($msg): list($tipo, $texto) = explode(':', $msg, 2); ?>
@@ -104,10 +108,12 @@ include '_sidebar_data.php';
 
         <form method="GET" action="servicos.php" style="margin-bottom:16px">
             <div class="search-bar">
-                <span class="search-icon">🔍</span>
+                <span class="search-icon material-symbols-outlined">search</span>
                 <input type="text" name="q" placeholder="Buscar por nome ou descrição..." value="<?php echo htmlspecialchars($busca); ?>" autocomplete="off">
                 <?php if ($busca): ?>
-                <button type="button" onclick="location.href='servicos.php'" style="background:none;border:none;cursor:pointer;font-size:16px;color:var(--g-text-3);padding:0 8px">✕</button>
+                <button type="button" onclick="location.href='servicos.php'" style="background:none;border:none;cursor:pointer;color:var(--g-text-3);padding:0 4px;display:flex;align-items:center" title="Limpar">
+                    <span class="material-symbols-outlined" style="font-size:18px">close</span>
+                </button>
                 <?php endif; ?>
             </div>
         </form>
@@ -115,7 +121,7 @@ include '_sidebar_data.php';
         <div class="table-wrap">
             <?php if (empty($servicos)): ?>
             <div class="empty-state">
-                <div class="empty-state-icon">🔧</div>
+                <div class="empty-state-icon"><span class="material-symbols-outlined">build</span></div>
                 <div class="empty-state-title">Nenhum serviço encontrado</div>
                 <div class="empty-state-sub"><?php echo $busca ? 'Tente outro termo de busca' : 'Clique em "+ Novo Serviço" para cadastrar'; ?></div>
             </div>
@@ -137,7 +143,7 @@ include '_sidebar_data.php';
                 <tr class="<?php echo !$s['ativo'] ? 'row-inactive' : ''; ?>">
                     <td><strong><?php echo htmlspecialchars($s['nome']); ?></strong></td>
                     <td style="font-size:13px;color:var(--g-text-2)"><?php echo $s['descricao'] ? htmlspecialchars($s['descricao']) : '<span class="text-muted">—</span>'; ?></td>
-                    <td class="text-right"><strong>R$ <?php echo number_format((float)$s['valor_base'], 2, ',', '.'); ?></strong></td>
+                    <td class="text-right"><strong>R$&nbsp;<?php echo number_format((float)$s['valor_base'], 2, ',', '.'); ?></strong></td>
                     <td class="text-center">
                         <?php if ($s['prazo_padrao_dias']): ?>
                         <span class="badge badge-info"><?php echo $s['prazo_padrao_dias']; ?> d.u.</span>
@@ -150,23 +156,33 @@ include '_sidebar_data.php';
                     </td>
                     <td class="text-center">
                         <?php if ($s['ativo']): ?>
-                        <span class="badge badge-success">✅ Ativo</span>
+                        <span class="badge badge-success">
+                            <span class="material-symbols-outlined" style="font-size:11px;vertical-align:middle">check_circle</span> Ativo
+                        </span>
                         <?php else: ?>
-                        <span class="badge badge-dark">⛔ Inativo</span>
+                        <span class="badge badge-dark">
+                            <span class="material-symbols-outlined" style="font-size:11px;vertical-align:middle">cancel</span> Inativo
+                        </span>
                         <?php endif; ?>
                     </td>
                     <td class="text-center">
                         <div class="table-actions">
                             <button class="btn-icon" title="Editar"
-                                onclick="editarServico(<?php echo $s['id']; ?>,<?php echo htmlspecialchars(json_encode($s['nome']),ENT_QUOTES); ?>,<?php echo htmlspecialchars(json_encode($s['descricao']),ENT_QUOTES); ?>,<?php echo $s['valor_base']; ?>,<?php echo $s['ativo']; ?>,<?php echo $s['prazo_padrao_dias'] !== null ? $s['prazo_padrao_dias'] : 'null'; ?>)">✏️</button>
+                                onclick="editarServico(<?php echo $s['id']; ?>,<?php echo htmlspecialchars(json_encode($s['nome']),ENT_QUOTES); ?>,<?php echo htmlspecialchars(json_encode($s['descricao']),ENT_QUOTES); ?>,<?php echo $s['valor_base']; ?>,<?php echo $s['ativo']; ?>,<?php echo $s['prazo_padrao_dias'] !== null ? $s['prazo_padrao_dias'] : 'null'; ?>)">
+                                <span class="material-symbols-outlined">edit</span>
+                            </button>
                             <?php if ($s['total_uso'] == 0): ?>
                             <form method="POST" style="display:inline" onsubmit="return confirm('Excluir serviço &quot;<?php echo htmlspecialchars(addslashes($s['nome'])); ?>&quot;?')">
                                 <input type="hidden" name="acao" value="excluir">
                                 <input type="hidden" name="id" value="<?php echo $s['id']; ?>">
-                                <button type="submit" class="btn-icon danger" title="Excluir">🗑️</button>
+                                <button type="submit" class="btn-icon danger" title="Excluir">
+                                    <span class="material-symbols-outlined">delete</span>
+                                </button>
                             </form>
                             <?php else: ?>
-                            <span class="btn-icon disabled" title="Em uso — não pode excluir">🔒</span>
+                            <span class="btn-icon disabled" title="Em uso — não pode excluir">
+                                <span class="material-symbols-outlined">lock</span>
+                            </span>
                             <?php endif; ?>
                         </div>
                     </td>
@@ -181,10 +197,18 @@ include '_sidebar_data.php';
 </div>
 
 <nav class="bottom-nav">
-    <a href="dashboard.php"><span>🏠</span>Painel</a>
-    <a href="clientes.php"><span>👥</span>Clientes</a>
-    <a href="servicos.php" class="active"><span>🔧</span>Serviços</a>
-    <a href="logout.php"><span>🚪</span>Sair</a>
+    <a href="dashboard.php">
+        <span class="material-symbols-outlined nav-icon">dashboard</span>Painel
+    </a>
+    <a href="clientes.php">
+        <span class="material-symbols-outlined nav-icon">group</span>Clientes
+    </a>
+    <a href="servicos.php" class="active">
+        <span class="material-symbols-outlined nav-icon">build</span>Serviços
+    </a>
+    <a href="logout.php">
+        <span class="material-symbols-outlined nav-icon">logout</span>Sair
+    </a>
 </nav>
 
 <!-- MODAL CRIAR / EDITAR -->
