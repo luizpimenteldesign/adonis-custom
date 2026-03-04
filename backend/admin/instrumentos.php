@@ -8,7 +8,6 @@ $conn = $db->getConnection();
 $conn->exec("CREATE TABLE IF NOT EXISTS cat_tipos (
     id INT AUTO_INCREMENT PRIMARY KEY,
     nome VARCHAR(100) NOT NULL UNIQUE,
-    icone VARCHAR(10) DEFAULT 'piano',
     ativo TINYINT(1) DEFAULT 1,
     criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) DEFAULT CHARSET=utf8mb4");
@@ -58,15 +57,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!$nome) { header('Location: instrumentos.php?aba='.$aba_redir.'&msg=erro:Nome obrigatório'); exit; }
 
         if ($tabela === 'cat_tipos') {
-            $icone = trim($_POST['icone'] ?? 'piano') ?: 'piano';
             if ($acao === 'criar') {
                 try {
-                    $conn->prepare("INSERT INTO cat_tipos (nome, icone, ativo) VALUES (?,?,?)")->execute([$nome,$icone,$ativo]);
+                    $conn->prepare("INSERT INTO cat_tipos (nome, ativo) VALUES (?,?)")->execute([$nome,$ativo]);
                     $msg = 'sucesso:Tipo criado!';
                 } catch(Exception $e) { $msg = 'erro:Já existe um tipo com esse nome.'; }
             } else {
                 $id = (int)$_POST['id'];
-                $conn->prepare("UPDATE cat_tipos SET nome=?, icone=?, ativo=? WHERE id=?")->execute([$nome,$icone,$ativo,$id]);
+                $conn->prepare("UPDATE cat_tipos SET nome=?, ativo=? WHERE id=?")->execute([$nome,$ativo,$id]);
                 $msg = 'sucesso:Tipo atualizado!';
             }
 
@@ -119,10 +117,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 if (isset($_GET['msg'])) $msg = $_GET['msg'];
 
-$tipos   = $conn->query("SELECT * FROM cat_tipos   ORDER BY nome")->fetchAll(PDO::FETCH_ASSOC);
-$marcas  = $conn->query("SELECT * FROM cat_marcas  ORDER BY nome")->fetchAll(PDO::FETCH_ASSOC);
-$modelos = $conn->query("SELECT m.*, b.nome as marca_nome FROM cat_modelos m LEFT JOIN cat_marcas b ON m.marca_id=b.id ORDER BY b.nome, m.nome")->fetchAll(PDO::FETCH_ASSOC);
-$cores   = $conn->query("SELECT * FROM cat_cores   ORDER BY nome")->fetchAll(PDO::FETCH_ASSOC);
+$tipos   = $conn->query("SELECT id, nome, ativo FROM cat_tipos ORDER BY nome")->fetchAll(PDO::FETCH_ASSOC);
+$marcas  = $conn->query("SELECT id, nome, ativo FROM cat_marcas ORDER BY nome")->fetchAll(PDO::FETCH_ASSOC);
+$modelos = $conn->query("SELECT m.id, m.nome, m.ativo, m.marca_id, b.nome as marca_nome FROM cat_modelos m LEFT JOIN cat_marcas b ON m.marca_id=b.id ORDER BY b.nome, m.nome")->fetchAll(PDO::FETCH_ASSOC);
+$cores   = $conn->query("SELECT id, nome, ativo FROM cat_cores ORDER BY nome")->fetchAll(PDO::FETCH_ASSOC);
 
 $current_page = 'instrumentos.php';
 $v = time();
@@ -230,13 +228,10 @@ include '_sidebar_data.php';
                 </div>
                 <?php else: ?>
                 <table class="data-table">
-                    <thead><tr><th>Ícone</th><th>Nome</th><th class="text-center">Status</th><th class="text-center">Ações</th></tr></thead>
+                    <thead><tr><th>Nome</th><th class="text-center">Status</th><th class="text-center">Ações</th></tr></thead>
                     <tbody>
                     <?php foreach ($tipos as $item): ?>
                     <tr class="<?php echo !$item['ativo'] ? 'row-inactive' : ''; ?>">
-                        <td style="text-align:center">
-                            <span class="material-symbols-outlined" style="font-size:20px;color:var(--g-text-2)"><?php echo htmlspecialchars($item['icone']); ?></span>
-                        </td>
                         <td><strong><?php echo htmlspecialchars($item['nome']); ?></strong></td>
                         <td class="text-center">
                             <?php if ($item['ativo']): ?>
@@ -248,7 +243,7 @@ include '_sidebar_data.php';
                         <td class="text-center">
                             <div class="table-actions">
                                 <button class="btn-icon" title="Editar"
-                                    onclick='editarItem("cat_tipos",<?php echo $item["id"]; ?>,<?php echo htmlspecialchars(json_encode(["nome"=>$item["nome"],"icone"=>$item["icone"],"ativo"=>$item["ativo"]],JSON_UNESCAPED_UNICODE),ENT_QUOTES); ?>)'>
+                                    onclick='editarItem("cat_tipos",<?php echo $item["id"]; ?>,<?php echo htmlspecialchars(json_encode(["nome"=>$item["nome"],"ativo"=>$item["ativo"]],JSON_UNESCAPED_UNICODE),ENT_QUOTES); ?>)'>
                                     <span class="material-symbols-outlined">edit</span>
                                 </button>
                                 <form method="POST" style="display:inline" onsubmit="return confirm('Excluir tipo <?php echo htmlspecialchars(addslashes($item['nome'])); ?>?')">
@@ -440,12 +435,6 @@ include '_sidebar_data.php';
             <input type="hidden" name="id"     id="f-id"     value="">
             <input type="hidden" name="tabela" id="f-tabela" value="">
 
-            <div id="campo-icone" style="display:none">
-                <label class="form-label">Ícone (nome do Material Symbol)</label>
-                <input class="form-input" type="text" name="icone" id="f-icone" placeholder="Ex: piano, guitar, music_note" maxlength="50">
-                <div style="font-size:11px;color:var(--g-text-3);margin-top:4px">Consulte os ícones em <a href="https://fonts.google.com/icons" target="_blank">fonts.google.com/icons</a></div>
-            </div>
-
             <label class="form-label">NOME *</label>
             <input class="form-input" type="text" name="nome" id="f-nome" required placeholder="Digite o nome...">
 
@@ -504,30 +493,26 @@ const _tituloMap = {
 function abrirModalNovo() {
     const tabela = _tabelaMap[_abaCorrente];
     document.getElementById('modal-cat-titulo').textContent = _tituloMap[tabela][0];
-    document.getElementById('f-acao').value   = 'criar';
-    document.getElementById('f-id').value     = '';
-    document.getElementById('f-tabela').value = tabela;
-    document.getElementById('f-nome').value   = '';
+    document.getElementById('f-acao').value    = 'criar';
+    document.getElementById('f-id').value      = '';
+    document.getElementById('f-tabela').value  = tabela;
+    document.getElementById('f-nome').value    = '';
     document.getElementById('f-ativo').checked = true;
-    document.getElementById('f-icone').value  = 'piano';
-    document.getElementById('f-marca').value  = '';
-    document.getElementById('campo-icone').style.display  = tabela === 'cat_tipos'   ? '' : 'none';
-    document.getElementById('campo-marca').style.display  = tabela === 'cat_modelos' ? '' : 'none';
+    document.getElementById('f-marca').value   = '';
+    document.getElementById('campo-marca').style.display = tabela === 'cat_modelos' ? '' : 'none';
     document.getElementById('modal-catalogo').classList.add('aberto');
     setTimeout(() => document.getElementById('f-nome').focus(), 150);
 }
 
 function editarItem(tabela, id, dados) {
     document.getElementById('modal-cat-titulo').textContent = _tituloMap[tabela][1];
-    document.getElementById('f-acao').value   = 'editar';
-    document.getElementById('f-id').value     = id;
-    document.getElementById('f-tabela').value = tabela;
-    document.getElementById('f-nome').value   = dados.nome || '';
+    document.getElementById('f-acao').value    = 'editar';
+    document.getElementById('f-id').value      = id;
+    document.getElementById('f-tabela').value  = tabela;
+    document.getElementById('f-nome').value    = dados.nome || '';
     document.getElementById('f-ativo').checked = !!dados.ativo;
-    document.getElementById('f-icone').value  = dados.icone || 'piano';
-    document.getElementById('f-marca').value  = dados.marca_id || '';
-    document.getElementById('campo-icone').style.display  = tabela === 'cat_tipos'   ? '' : 'none';
-    document.getElementById('campo-marca').style.display  = tabela === 'cat_modelos' ? '' : 'none';
+    document.getElementById('f-marca').value   = dados.marca_id || '';
+    document.getElementById('campo-marca').style.display = tabela === 'cat_modelos' ? '' : 'none';
     document.getElementById('modal-catalogo').classList.add('aberto');
     setTimeout(() => document.getElementById('f-nome').focus(), 150);
 }
