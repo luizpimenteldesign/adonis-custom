@@ -2,6 +2,7 @@
 /**
  * _sidebar.php — sidebar colapsável compartilhada
  * Requer: $sidebar_nav, $sidebar_stats, $filtro_status, $current_page
+ * Ícones: Material Symbols Outlined (carregado via admin.css ou head)
  */
 ?>
 <aside class="sidebar" id="sidebar">
@@ -16,7 +17,7 @@
         if ($item['tipo'] === 'link'):
     ?>
         <a href="<?php echo $item['href']; ?>" class="nav-item-link<?php echo $is_group_link_active?' active':''; ?>">
-            <span class="nav-icon"><?php echo $item['icon']; ?></span>
+            <span class="nav-icon material-symbols-outlined"><?php echo $item['icon']; ?></span>
             <?php echo htmlspecialchars($item['label']); ?>
         </a>
 
@@ -30,12 +31,12 @@
         <div class="nav-group">
             <div class="nav-group-toggle<?php echo $grupo_aberto?' open':''; ?>"
                  onclick="toggleGroup('<?php echo $item['id']; ?>')" id="toggle-<?php echo $item['id']; ?>">
-                <span class="nav-icon"><?php echo $item['icon']; ?></span>
+                <span class="nav-icon material-symbols-outlined"><?php echo $item['icon']; ?></span>
                 <span class="nav-label"><?php echo htmlspecialchars($item['label']); ?></span>
                 <?php if ($grupo_total > 0): ?>
                 <span class="nav-total"><?php echo $grupo_total; ?></span>
                 <?php endif; ?>
-                <span class="nav-chevron">▶</span>
+                <span class="nav-chevron material-symbols-outlined">chevron_right</span>
             </div>
             <div class="nav-sub<?php echo $grupo_aberto?' open':''; ?>" id="sub-<?php echo $item['id']; ?>">
                 <?php foreach ($item['itens'] as $it):
@@ -72,6 +73,6 @@
             <div class="sidebar-user-name"><?php echo htmlspecialchars($_SESSION['admin_nome']??'Admin'); ?></div>
             <div class="sidebar-user-role">Administrador</div>
         </div>
-        <a href="logout.php" class="sidebar-logout" title="Sair">🚪</a>
+        <a href="logout.php" class="sidebar-logout material-symbols-outlined" title="Sair">logout</a>
     </div>
 </aside>

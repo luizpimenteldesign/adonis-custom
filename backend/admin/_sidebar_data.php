@@ -21,14 +21,14 @@ try {
 $sidebar_nav = [
     [
         'id'    => 'nav-dashboard',
-        'icon'  => '🏠',
+        'icon'  => 'dashboard',
         'label' => 'Dashboard',
         'href'  => 'dashboard.php',
         'tipo'  => 'link',
     ],
     [
         'id'    => 'nav-os',
-        'icon'  => '📋',
+        'icon'  => 'receipt_long',
         'label' => 'Ordens de Serviço',
         'tipo'  => 'group',
         'itens' => [
@@ -41,20 +41,20 @@ $sidebar_nav = [
     ],
     [
         'id'    => 'nav-exec',
-        'icon'  => '🔧',
+        'icon'  => 'build',
         'label' => 'Execução',
         'tipo'  => 'group',
         'itens' => [
             ['href'=>'dashboard.php?status=Aprovada',             'label'=>'Aguard. Pagamento',  'status'=>'Aprovada'],
             ['href'=>'dashboard.php?status=Instrumento recebido', 'label'=>'Instr. Recebido',    'status'=>'Instrumento recebido'],
-            ['href'=>'dashboard.php?status=Em desenvolvimento',   'label'=>'Em Execução',       'status'=>'Em desenvolvimento'],
+            ['href'=>'dashboard.php?status=Em desenvolvimento',   'label'=>'Em Execução',        'status'=>'Em desenvolvimento'],
             ['href'=>'dashboard.php?status=Servico finalizado',   'label'=>'Serviço Finalizado', 'status'=>'Servico finalizado'],
             ['href'=>'dashboard.php?status=Pronto para retirada', 'label'=>'Pronto p/ Retirada', 'status'=>'Pronto para retirada'],
         ],
     ],
     [
         'id'    => 'nav-enc',
-        'icon'  => '🗃️',
+        'icon'  => 'archive',
         'label' => 'Encerrados',
         'tipo'  => 'group',
         'itens' => [
@@ -65,18 +65,18 @@ $sidebar_nav = [
     ],
     [
         'id'    => 'nav-cad',
-        'icon'  => '🗂️',
+        'icon'  => 'folder_open',
         'label' => 'Cadastros',
         'tipo'  => 'group',
         'itens' => [
             ['href'=>'clientes.php',     'label'=>'Clientes',     'status'=>null],
-            ['href'=>'instrumentos.php', 'label'=>'Instrumentos', 'status'=>null],
+            ['href'=>'instrumentos.php', 'label'=>'Catálogo',     'status'=>null],
             ['href'=>'servicos.php',     'label'=>'Serviços',     'status'=>null],
         ],
     ],
     [
         'id'    => 'nav-cfg',
-        'icon'  => '⚙️',
+        'icon'  => 'settings',
         'label' => 'Configurações',
         'href'  => 'configuracoes.php',
         'tipo'  => 'link',
