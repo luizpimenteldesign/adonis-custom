@@ -25,7 +25,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 if (isset($_GET['msg'])) $msg = $_GET['msg'];
 
 try {
-    $sql = 'SELECT c.*, COUNT(p.id) as total_pedidos FROM clientes c LEFT JOIN pre_os p ON p.cliente_id = c.id'
+    $sql = 'SELECT c.*, COUNT(DISTINCT p.id) as total_pedidos, COUNT(DISTINCT i.id) as total_instrumentos
+            FROM clientes c
+            LEFT JOIN pre_os p ON p.cliente_id = c.id
+            LEFT JOIN instrumentos i ON i.cliente_id = c.id'
          . ($busca ? ' WHERE c.nome LIKE :q OR c.email LIKE :q OR c.telefone LIKE :q' : '')
          . ' GROUP BY c.id ORDER BY c.nome';
     $stmt = $conn->prepare($sql);
@@ -33,6 +36,20 @@ try {
     else $stmt->execute();
     $clientes = $stmt->fetchAll(PDO::FETCH_ASSOC);
 } catch (Exception $e) { $clientes = []; }
+
+// Carrega todos os instrumentos agrupados por cliente (para o modal JS)
+try {
+    $instr_rows = $conn->query(
+        'SELECT i.*, c.nome as cliente_nome
+         FROM instrumentos i
+         LEFT JOIN clientes c ON i.cliente_id = c.id
+         ORDER BY i.tipo, i.marca'
+    )->fetchAll(PDO::FETCH_ASSOC);
+    $instr_por_cliente = [];
+    foreach ($instr_rows as $r) {
+        $instr_por_cliente[$r['cliente_id']][] = $r;
+    }
+} catch (Exception $e) { $instr_por_cliente = []; }
 
 $current_page = 'clientes.php';
 $v = time();
@@ -49,6 +66,17 @@ include '_sidebar_data.php';
     <link rel="stylesheet" href="assets/css/admin.css?v=<?php echo $v; ?>">
     <link rel="stylesheet" href="assets/css/sidebar.css?v=<?php echo $v; ?>">
     <link rel="stylesheet" href="assets/css/pages.css?v=<?php echo $v; ?>">
+    <style>
+    .instr-list{display:flex;flex-direction:column;gap:10px;margin-top:4px}
+    .instr-card{background:var(--g-bg);border:1px solid var(--g-border);border-radius:10px;padding:12px 14px;display:flex;align-items:flex-start;gap:12px}
+    .instr-card-icon{font-size:24px;flex-shrink:0;margin-top:2px}
+    .instr-card-body{flex:1;min-width:0}
+    .instr-card-title{font-size:14px;font-weight:500;color:var(--g-text)}
+    .instr-card-sub{font-size:12px;color:var(--g-text-2);margin-top:2px}
+    .instr-card-tags{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
+    .instr-tag{font-size:11px;padding:2px 8px;border-radius:10px;background:var(--g-hover);color:var(--g-text-2);border:1px solid var(--g-border)}
+    .modal-section-title{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--g-text-3);margin:16px 0 8px}
+    </style>
 </head>
 <body>
 
@@ -100,6 +128,7 @@ include '_sidebar_data.php';
                         <th>Telefone</th>
                         <th>E-mail</th>
                         <th class="text-center">Pedidos</th>
+                        <th class="text-center">Instrumentos</th>
                         <th class="text-center">Cadastro</th>
                         <th class="text-center">Ações</th>
                     </tr>
@@ -123,10 +152,26 @@ include '_sidebar_data.php';
                         <a href="dashboard.php?q=<?php echo urlencode($c['nome']); ?>" class="badge badge-info"><?php echo $c['total_pedidos']; ?> pedido<?php echo $c['total_pedidos']!=1?'s':''; ?></a>
                         <?php else: ?><span class="text-muted">0</span><?php endif; ?>
                     </td>
+                    <td class="text-center">
+                        <?php
+                            $qtd_instr = (int)$c['total_instrumentos'];
+                            $instr_data = $instr_por_cliente[$c['id']] ?? [];
+                        ?>
+                        <?php if ($qtd_instr > 0): ?>
+                        <button class="badge badge-info" style="border:none;cursor:pointer"
+                            onclick='abrirInstrumentos(<?php echo $c["id"]; ?>, <?php echo htmlspecialchars(json_encode($c["nome"]), ENT_QUOTES); ?>, <?php echo htmlspecialchars(json_encode($instr_data), ENT_QUOTES); ?>)'>
+                            <?php echo $qtd_instr; ?> instrumento<?php echo $qtd_instr!=1?'s':''; ?>
+                        </button>
+                        <?php else: ?><span class="text-muted">0</span><?php endif; ?>
+                    </td>
                     <td class="text-center text-muted" style="font-size:12px"><?php echo date('d/m/Y', strtotime($c['criado_em'])); ?></td>
                     <td class="text-center">
                         <div class="table-actions">
                             <a href="dashboard.php?q=<?php echo urlencode($c['nome']); ?>" class="btn-icon" title="Ver pedidos">📋</a>
+                            <?php if ($qtd_instr > 0): ?>
+                            <button class="btn-icon" title="Ver instrumentos"
+                                onclick='abrirInstrumentos(<?php echo $c["id"]; ?>, <?php echo htmlspecialchars(json_encode($c["nome"]), ENT_QUOTES); ?>, <?php echo htmlspecialchars(json_encode($instr_data), ENT_QUOTES); ?>)'>🎸</button>
+                            <?php endif; ?>
                             <?php if ($c['total_pedidos'] == 0): ?>
                             <form method="POST" style="display:inline" onsubmit="return confirm('Excluir cliente <?php echo htmlspecialchars(addslashes($c['nome'])); ?>?')">
                                 <input type="hidden" name="acao" value="excluir">
@@ -155,6 +200,75 @@ include '_sidebar_data.php';
     <a href="logout.php"><span>🚪</span>Sair</a>
 </nav>
 
+<!-- MODAL: INSTRUMENTOS DO CLIENTE -->
+<div class="modal-overlay" id="modal-instrumentos">
+    <div class="modal-box" style="max-width:520px">
+        <div class="modal-drag"></div>
+        <div class="modal-title" id="modal-instr-titulo">🎸 Instrumentos do Cliente</div>
+        <div id="modal-instr-body" style="margin-top:4px"></div>
+        <div class="modal-actions">
+            <button type="button" class="btn btn-secondary" onclick="fecharModalInstr()">Fechar</button>
+            <a href="#" id="modal-instr-link" class="btn btn-primary">📋 Ver Pedidos</a>
+        </div>
+    </div>
+</div>
+
 <script src="assets/js/sidebar.js?v=<?php echo $v; ?>"></script>
+<script>
+const instr_icons = {
+    'Guitarra':'🎸','Baixo':'🎸','Violão':'🎸',
+    'Amplificador':'🔊','Pedal Pedalboard':'🟢','Outro':'🎵'
+};
+
+function abrirInstrumentos(clienteId, clienteNome, instrumentos) {
+    document.getElementById('modal-instr-titulo').textContent = '🎸 Instrumentos — ' + clienteNome;
+    document.getElementById('modal-instr-link').href = 'dashboard.php?q=' + encodeURIComponent(clienteNome);
+
+    let html = '';
+    if (!instrumentos || instrumentos.length === 0) {
+        html = '<div class="empty-state" style="padding:24px 0"><div class="empty-state-icon">🎸</div><div class="empty-state-title">Nenhum instrumento cadastrado</div></div>';
+    } else {
+        html = '<div class="instr-list">';
+        for (const i of instrumentos) {
+            const tipo   = i.tipo   === 'Outro' ? (i.tipo_outro   || 'Outro') : (i.tipo   || '—');
+            const marca  = i.marca  === 'Outro' ? (i.marca_outro  || '')      : (i.marca  || '');
+            const modelo = i.modelo === 'Outro' ? (i.modelo_outro || '')      : (i.modelo || '');
+            const cor    = i.cor    === 'Outro' ? (i.cor_outro    || '')      : (i.cor    || '');
+            const serie  = i.numero_serie || '';
+            const icon   = instr_icons[i.tipo] || '🎵';
+            const subtitulo = [marca, modelo].filter(Boolean).join(' · ');
+
+            html += `<div class="instr-card">
+                <div class="instr-card-icon">${icon}</div>
+                <div class="instr-card-body">
+                    <div class="instr-card-title">${esc(tipo)}</div>
+                    ${subtitulo ? `<div class="instr-card-sub">${esc(subtitulo)}</div>` : ''}
+                    <div class="instr-card-tags">
+                        ${cor    ? `<span class="instr-tag">🎨 ${esc(cor)}</span>` : ''}
+                        ${serie  ? `<span class="instr-tag"># ${esc(serie)}</span>` : ''}
+                    </div>
+                </div>
+            </div>`;
+        }
+        html += '</div>';
+    }
+
+    document.getElementById('modal-instr-body').innerHTML = html;
+    document.getElementById('modal-instrumentos').classList.add('aberto');
+}
+
+function fecharModalInstr() {
+    document.getElementById('modal-instrumentos').classList.remove('aberto');
+}
+
+document.getElementById('modal-instrumentos').addEventListener('click', function(e) {
+    if (e.target === this) fecharModalInstr();
+});
+
+function esc(s) {
+    if (!s) return '';
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+</script>
 </body>
 </html>
