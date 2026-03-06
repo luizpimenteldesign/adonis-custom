@@ -6,9 +6,9 @@
     <meta name="description" content="Solicite orçamento para manutenção e customização de instrumentos musicais">
     <title>Solicitar Orçamento - Adonis Luthieria</title>
 
-    <!-- FAVICON CORRIGIDO -->
-    <link rel="icon" type="image/x-icon" href="/frontend/public/assets/img/favicon.ico">
-    <link rel="shortcut icon" type="image/x-icon" href="/frontend/public/assets/img/favicon.ico">
+    <!-- FAVICON -->
+    <link rel="icon" type="image/png" href="/frontend/public/assets/img/favicon.png">
+    <link rel="shortcut icon" type="image/png" href="/frontend/public/assets/img/favicon.png">
 
     <!-- CSS -->
     <link rel="stylesheet" href="/frontend/public/assets/css/style.css">
