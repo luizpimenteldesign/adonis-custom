@@ -72,6 +72,7 @@ $sidebar_nav = [
             ['href'=>'clientes.php',     'label'=>'Clientes',     'status'=>null],
             ['href'=>'instrumentos.php', 'label'=>'Catálogo',     'status'=>null],
             ['href'=>'servicos.php',     'label'=>'Serviços',     'status'=>null],
+            ['href'=>'insumos.php',      'label'=>'Insumos',      'status'=>null],
         ],
     ],
     [
