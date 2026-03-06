@@ -268,12 +268,7 @@
     <!-- FOOTER -->
     <footer class="footer">
         <div class="footer-container">
-            <p class="footer-text">© 2026 Adonis Custom Luthieria. Todos os direitos reservados.</p>
-            <div class="footer-links">
-                <a href="#" class="footer-link">Política de Privacidade</a>
-                <a href="#" class="footer-link">Termos de Uso</a>
-                <a href="#" class="footer-link">Contato</a>
-            </div>
+            <p class="footer-text">© 2026 Adonis Custom Luthieria. Todos os direitos reservados. | Desenvolvido por <a href="https://luizpimentel.com" target="_blank" style="color: inherit; text-decoration: none;">LP Design</a></p>
         </div>
     </footer>
 
