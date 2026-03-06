@@ -21,10 +21,18 @@ try {
     $insumos = $stmt->fetchAll(PDO::FETCH_ASSOC);
 } catch (Exception $e) { $insumos = []; }
 
+// Carrega todos os servicos agrupados por categoria para o modal
 try {
-    $categorias = $conn->query("SELECT DISTINCT categoria FROM servicos WHERE ativo = 1 AND categoria IS NOT NULL AND categoria != '' ORDER BY categoria")
-                       ->fetchAll(PDO::FETCH_COLUMN);
-} catch (Exception $e) { $categorias = []; }
+    $todos_servicos = $conn->query(
+        "SELECT id, nome, categoria FROM servicos WHERE ativo = 1 AND categoria IS NOT NULL AND categoria != '' ORDER BY categoria, nome"
+    )->fetchAll(PDO::FETCH_ASSOC);
+    $categorias = [];
+    $servicos_por_categoria = [];
+    foreach ($todos_servicos as $s) {
+        if (!in_array($s['categoria'], $categorias)) $categorias[] = $s['categoria'];
+        $servicos_por_categoria[$s['categoria']][] = $s;
+    }
+} catch (Exception $e) { $categorias = []; $servicos_por_categoria = []; }
 
 $current_page = 'insumos.php';
 $v = time();
@@ -41,6 +49,22 @@ include '_sidebar_data.php';
     <link rel="stylesheet" href="assets/css/admin.css?v=<?php echo $v; ?>">
     <link rel="stylesheet" href="assets/css/sidebar.css?v=<?php echo $v; ?>">
     <link rel="stylesheet" href="assets/css/pages.css?v=<?php echo $v; ?>">
+    <style>
+    .cat-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+    .cat-chip{display:flex;align-items:center;gap:4px;padding:4px 10px;border-radius:20px;border:1px solid var(--g-border);background:var(--g-bg);font-size:13px;cursor:pointer;user-select:none;transition:background .15s,border-color .15s}
+    .cat-chip:hover{background:var(--g-hover)}
+    .cat-chip.ativa{background:var(--primary);border-color:var(--primary);color:#fff}
+    .cat-chip .material-symbols-outlined{font-size:14px}
+    .servicos-grupos{display:flex;flex-direction:column;gap:0;margin-top:12px;border:1px solid var(--g-border);border-radius:8px;overflow:hidden}
+    .grupo-cat{border-bottom:1px solid var(--g-border)}
+    .grupo-cat:last-child{border-bottom:none}
+    .grupo-cat-titulo{padding:8px 12px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--g-text-3);background:var(--g-hover)}
+    .grupo-cat-itens{display:flex;flex-direction:column;gap:0}
+    .servico-check-item{display:flex;align-items:center;gap:10px;padding:8px 12px;font-size:14px;cursor:pointer;border-top:1px solid var(--g-border);transition:background .1s}
+    .servico-check-item:first-child{border-top:none}
+    .servico-check-item:hover{background:var(--g-hover)}
+    .servico-check-item input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:var(--primary)}
+    </style>
 </head>
 <body>
 
@@ -198,17 +222,20 @@ include '_sidebar_data.php';
             <label class="form-label">QUANTIDADE EM ESTOQUE</label>
             <input class="form-input" type="number" id="f-estoque" min="0" step="0.001" placeholder="0">
 
-            <label class="form-label" style="margin-top:16px">CATEGORIA DE SERVIÇOS</label>
-            <select class="form-input" id="f-categoria" onchange="carregarServicos()">
-                <option value="">Selecione uma categoria...</option>
+            <label class="form-label" style="margin-top:16px">CATEGORIAS DE SERVIÇOS</label>
+            <p style="font-size:12px;color:var(--g-text-3);margin:2px 0 6px">Selecione uma ou mais categorias para exibir os serviços relacionados.</p>
+            <div class="cat-chips" id="cat-chips">
                 <?php foreach ($categorias as $cat): ?>
-                <option value="<?php echo htmlspecialchars($cat); ?>"><?php echo htmlspecialchars($cat); ?></option>
+                <div class="cat-chip" data-cat="<?php echo htmlspecialchars($cat); ?>" onclick="toggleCategoria(this)">
+                    <span class="material-symbols-outlined">add</span>
+                    <?php echo htmlspecialchars($cat); ?>
+                </div>
                 <?php endforeach; ?>
-            </select>
+            </div>
 
             <div id="bloco-servicos" style="display:none;margin-top:12px">
-                <label class="form-label">SERVIÇOS DESTA CATEGORIA (múltipla seleção)</label>
-                <div id="lista-servicos" style="display:flex;flex-direction:column;gap:6px;max-height:180px;overflow-y:auto;background:var(--g-bg);border:1px solid var(--g-border);border-radius:8px;padding:10px"></div>
+                <label class="form-label">SERVIÇOS VINCULADOS</label>
+                <div class="servicos-grupos" id="grupos-servicos"></div>
             </div>
 
             <label class="form-check" style="margin-top:12px">
@@ -224,22 +251,92 @@ include '_sidebar_data.php';
     </div>
 </div>
 
+<!-- dados dos servicos embutidos para uso no JS sem chamadas AJAX adicionais -->
+<script>
+const SERVICOS_POR_CAT = <?php echo json_encode($servicos_por_categoria, JSON_UNESCAPED_UNICODE); ?>;
+</script>
 <script src="assets/js/sidebar.js?v=<?php echo $v; ?>"></script>
 <script>
 let servicosSelecionados = [];
+let categoriasAtivas = [];
+
+function toggleCategoria(chip) {
+    const cat = chip.dataset.cat;
+    const idx = categoriasAtivas.indexOf(cat);
+    if (idx === -1) {
+        categoriasAtivas.push(cat);
+        chip.classList.add('ativa');
+        chip.querySelector('.material-symbols-outlined').textContent = 'check';
+    } else {
+        categoriasAtivas.splice(idx, 1);
+        chip.classList.remove('ativa');
+        chip.querySelector('.material-symbols-outlined').textContent = 'add';
+    }
+    renderGrupos();
+}
+
+function renderGrupos() {
+    const bloco  = document.getElementById('bloco-servicos');
+    const grupos = document.getElementById('grupos-servicos');
+
+    if (!categoriasAtivas.length) {
+        bloco.style.display = 'none';
+        grupos.innerHTML = '';
+        return;
+    }
+
+    grupos.innerHTML = '';
+    categoriasAtivas.forEach(cat => {
+        const servicos = SERVICOS_POR_CAT[cat] || [];
+        if (!servicos.length) return;
+
+        const grupo = document.createElement('div');
+        grupo.className = 'grupo-cat';
+
+        let html = `<div class="grupo-cat-titulo">${esc(cat)}</div><div class="grupo-cat-itens">`;
+        servicos.forEach(s => {
+            const checked = servicosSelecionados.includes(s.id) ? 'checked' : '';
+            html += `<label class="servico-check-item">
+                <input type="checkbox" value="${s.id}" ${checked} onchange="toggleServico(${s.id}, this.checked)">
+                ${esc(s.nome)}
+            </label>`;
+        });
+        html += '</div>';
+        grupo.innerHTML = html;
+        grupos.appendChild(grupo);
+    });
+
+    bloco.style.display = 'block';
+}
+
+function toggleServico(id, checked) {
+    if (checked) {
+        if (!servicosSelecionados.includes(id)) servicosSelecionados.push(id);
+    } else {
+        servicosSelecionados = servicosSelecionados.filter(s => s !== id);
+    }
+}
+
+function resetModal() {
+    servicosSelecionados = [];
+    categoriasAtivas = [];
+    document.querySelectorAll('.cat-chip').forEach(chip => {
+        chip.classList.remove('ativa');
+        chip.querySelector('.material-symbols-outlined').textContent = 'add';
+    });
+    document.getElementById('bloco-servicos').style.display = 'none';
+    document.getElementById('grupos-servicos').innerHTML = '';
+}
 
 function abrirModal() {
     document.getElementById('modal-titulo').textContent = 'Novo Insumo';
-    document.getElementById('f-id').value       = '';
-    document.getElementById('f-nome').value     = '';
-    document.getElementById('f-unidade').value  = '';
-    document.getElementById('f-valor').value    = '';
-    document.getElementById('f-estoque').value  = '';
-    document.getElementById('f-categoria').value = '';
-    document.getElementById('f-ativo').checked  = true;
-    document.getElementById('bloco-servicos').style.display = 'none';
-    document.getElementById('lista-servicos').innerHTML = '';
-    servicosSelecionados = [];
+    document.getElementById('f-id').value      = '';
+    document.getElementById('f-nome').value    = '';
+    document.getElementById('f-unidade').value = '';
+    document.getElementById('f-valor').value   = '';
+    document.getElementById('f-estoque').value = '';
+    document.getElementById('f-ativo').checked = true;
+    resetModal();
     document.getElementById('modal-insumo').classList.add('aberto');
     setTimeout(() => document.getElementById('f-nome').focus(), 150);
 }
@@ -257,36 +354,27 @@ function editarInsumo(id) {
             document.getElementById('f-valor').value   = parseFloat(ins.valor_unitario).toFixed(2);
             document.getElementById('f-estoque').value = parseFloat(ins.quantidade_estoque);
             document.getElementById('f-ativo').checked = ins.ativo == 1;
+
+            // pre-seleciona servicos e ativa as categorias correspondentes
+            resetModal();
             servicosSelecionados = (ins.servicos || []).map(Number);
+
+            // descobre quais categorias tem servicos selecionados
+            Object.entries(SERVICOS_POR_CAT).forEach(([cat, servicos]) => {
+                const temSelecionado = servicos.some(s => servicosSelecionados.includes(s.id));
+                if (temSelecionado) {
+                    categoriasAtivas.push(cat);
+                    const chip = document.querySelector(`.cat-chip[data-cat="${cat}"]`);
+                    if (chip) {
+                        chip.classList.add('ativa');
+                        chip.querySelector('.material-symbols-outlined').textContent = 'check';
+                    }
+                }
+            });
+
+            renderGrupos();
             document.getElementById('modal-insumo').classList.add('aberto');
         });
-}
-
-function carregarServicos() {
-    const cat = document.getElementById('f-categoria').value;
-    const bloco = document.getElementById('bloco-servicos');
-    const lista = document.getElementById('lista-servicos');
-    if (!cat) { bloco.style.display = 'none'; lista.innerHTML = ''; return; }
-    fetch('insumos-api.php?categoria=' + encodeURIComponent(cat))
-        .then(r => r.json())
-        .then(data => {
-            if (!data.ok || !data.servicos.length) { bloco.style.display = 'none'; return; }
-            lista.innerHTML = '';
-            data.servicos.forEach(s => {
-                const checked = servicosSelecionados.includes(s.id) ? 'checked' : '';
-                lista.innerHTML += `<label style="display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer">
-                    <input type="checkbox" value="${s.id}" ${checked} onchange="toggleServico(${s.id})">
-                    ${esc(s.nome)}
-                </label>`;
-            });
-            bloco.style.display = 'block';
-        });
-}
-
-function toggleServico(id) {
-    const idx = servicosSelecionados.indexOf(id);
-    if (idx === -1) servicosSelecionados.push(id);
-    else servicosSelecionados.splice(idx, 1);
 }
 
 function salvarInsumo() {
@@ -322,7 +410,7 @@ function toggleAtivo(id, ativo) {
         fetch('insumos-api.php?id=' + id, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ativo: 1, nome: '', unidade: '' })
+            body: JSON.stringify({ ativo: 1, nome: '_reativar_', unidade: '_reativar_' })
         }).then(r => r.json()).then(data => { if (data.ok) location.reload(); else alert('Erro: ' + data.erro); });
     }
 }
