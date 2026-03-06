@@ -1,31 +1,31 @@
 # ADONIS LUTHIERIA — CONFIGURAÇÃO APACHE
 
-# Habilita FollowSymLinks (necessário para mod_rewrite)
 Options +FollowSymLinks -Indexes
-
-# Ativa mod_rewrite
 RewriteEngine On
 RewriteBase /
 
-# Força HTTPS (se disponível)
+# Força HTTPS
 RewriteCond %{HTTPS} off
 RewriteRule ^(.*)$ https://%{HTTP_HOST}/$1 [R=301,L]
 
-# Bloqueia acesso direto a arquivos sensíveis
+# Bloqueia arquivos sensíveis
 <FilesMatch "\.(env|git|gitignore|htaccess|log|sql|zip|config)$">
     Require all denied
 </FilesMatch>
 
-# Bloqueia acesso à pasta database
+# Bloqueia pasta database
 RewriteRule ^database/ - [F,L]
 
 # ROTEAMENTO PRINCIPAL
 
-# Se acessar raiz → redireciona para frontend/index.php
-RewriteRule ^$ frontend/index.php [L]
-RewriteRule ^index\.php$ frontend/index.php [L]
+# Raíz → site institucional (index.html)
+RewriteRule ^$ index.html [L]
+RewriteRule ^index\.html$ index.html [L]
 
-# Se acessar /admin → redireciona para backend/admin/login.php
+# /orcamento → formulário de orçamento
+RewriteRule ^orcamento/?$ frontend/index.php [L]
+
+# /admin → painel backend
 RewriteRule ^admin/?$ backend/admin/login.php [L]
 
 # Se arquivo ou diretório existe, serve diretamente
@@ -33,17 +33,15 @@ RewriteCond %{REQUEST_FILENAME} -f [OR]
 RewriteCond %{REQUEST_FILENAME} -d
 RewriteRule ^ - [L]
 
-# Configurações de segurança adicionais
+# Segurança
 <IfModule mod_headers.c>
     Header set X-Content-Type-Options "nosniff"
     Header set X-Frame-Options "SAMEORIGIN"
     Header set X-XSS-Protection "1; mode=block"
 </IfModule>
 
-# Define charset padrão
 AddDefaultCharset UTF-8
 
-# Habilita compressão GZIP
 <IfModule mod_deflate.c>
     AddOutputFilterByType DEFLATE text/html text/plain text/xml text/css text/javascript application/javascript application/json
 </IfModule>
