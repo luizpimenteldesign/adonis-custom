@@ -23,6 +23,7 @@
 }
 .alert-sucesso{background:#e6f4ea;color:#1e7e34;border:1px solid #c8e6c9}
 .alert-erro   {background:#fce8e6;color:#c62828;border:1px solid #ffcdd2}
+.alert-warning{background:#fff8e1;color:#f57c00;border:1px solid #ffecb3}
 
 /* Tabela */
 .table-wrap{
@@ -89,9 +90,126 @@
 
 .text-muted{color:var(--g-text-3)}
 
-/* Botão primario */
-.btn-primary{background:var(--g-blue);color:#fff;border:none;border-radius:10px;padding:9px 18px;font-size:13.5px;font-family:inherit;font-weight:500;cursor:pointer;transition:opacity .15s}
+/* Botões globais */
+.btn{
+    border:none;border-radius:10px;padding:9px 18px;
+    font-size:13.5px;font-family:inherit;font-weight:500;
+    cursor:pointer;transition:opacity .15s;
+    display:inline-flex;align-items:center;gap:6px;
+    text-decoration:none;
+}
+.btn-primary{background:var(--g-blue);color:#fff}
 .btn-primary:hover{opacity:.88}
+.btn-secondary{
+    background:var(--g-bg);color:var(--g-text);
+    border:1px solid var(--g-border);
+}
+.btn-secondary:hover{background:var(--g-hover)}
+
+/* =============================================
+   FORMULÁRIOS — Página Configurações, Perfil, Novo Pedido
+   ============================================= */
+
+/* Seções de formulário */
+.config-section,
+.form-section{
+    background:var(--g-surface);border:1px solid var(--g-border);
+    border-radius:12px;padding:20px 24px;margin-bottom:16px;
+}
+
+.config-section-title,
+.form-section-title{
+    font-size:15px;font-weight:600;color:var(--g-text);
+    margin-bottom:16px;display:flex;align-items:center;gap:8px;
+}
+
+/* Grid 2 colunas */
+.config-grid,
+.form-grid{
+    display:grid;grid-template-columns:1fr 1fr;gap:16px;
+}
+@media (max-width:640px){
+    .config-grid,.form-grid{grid-template-columns:1fr}
+}
+
+/* Campo individual */
+.config-field{
+    display:flex;flex-direction:column;
+}
+
+/* Labels */
+.form-label{
+    display:block;font-size:11px;font-weight:600;
+    color:var(--g-text-2);text-transform:uppercase;
+    letter-spacing:.4px;margin:0 0 6px;
+}
+
+/* Inputs */
+.form-input{
+    width:100%;padding:10px 12px;
+    border:1px solid var(--g-border);border-radius:8px;
+    font-size:13.5px;color:var(--g-text);
+    background:var(--g-bg);font-family:inherit;
+    outline:none;box-sizing:border-box;
+    transition:all .15s;
+}
+.form-input:focus{
+    border-color:var(--g-blue);background:var(--g-surface);
+    box-shadow:0 0 0 3px rgba(26,115,232,.08);
+}
+.form-input::placeholder{color:var(--g-text-3)}
+textarea.form-input{resize:vertical;min-height:64px;line-height:1.5}
+
+/* Hint abaixo de input */
+.form-hint{
+    font-size:12px;color:var(--g-text-3);margin-top:4px;
+}
+.form-hint a{color:var(--g-blue);text-decoration:none}
+.form-hint a:hover{text-decoration:underline}
+
+/* Checkbox customizado */
+.form-check{
+    display:flex;align-items:center;gap:8px;
+    font-size:12px;font-weight:500;color:var(--g-text-2);
+    text-transform:uppercase;letter-spacing:.3px;
+    cursor:pointer;user-select:none;
+}
+.form-check input[type="checkbox"]{
+    width:18px;height:18px;cursor:pointer;
+}
+
+/* =============================================
+   PERFIL — Header do usuário
+   ============================================= */
+.profile-header{
+    background:var(--g-surface);border:1px solid var(--g-border);
+    border-radius:12px;padding:24px;margin-bottom:24px;
+    display:flex;align-items:center;gap:20px;
+}
+.profile-avatar{
+    width:80px;height:80px;border-radius:50%;
+    background:linear-gradient(135deg,var(--g-primary),#0a7ea4);
+    color:white;display:flex;align-items:center;justify-content:center;
+    font-size:32px;font-weight:600;flex-shrink:0;
+}
+.profile-info{flex:1}
+.profile-name{
+    font-size:20px;font-weight:600;color:var(--g-text);
+    margin-bottom:4px;
+}
+.profile-email{
+    font-size:14px;color:var(--g-text-2);margin-bottom:8px;
+}
+.profile-meta{
+    display:flex;gap:16px;flex-wrap:wrap;
+}
+.profile-meta-item{
+    display:flex;align-items:center;gap:6px;
+    font-size:13px;color:var(--g-text-3);
+}
+@media (max-width:640px){
+    .profile-header{flex-direction:column;text-align:center}
+}
 
 /* Modal — inputs extras */
 .modal-box label{display:block;font-size:11px;font-weight:600;color:var(--g-text-2);text-transform:uppercase;letter-spacing:.4px;margin:12px 0 4px}
