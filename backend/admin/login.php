@@ -1,7 +1,7 @@
 <?php
 /**
  * LOGIN ADMINISTRATIVO - SISTEMA ADONIS
- * Versão: 1.5
+ * Versão: 1.6
  */
 
 session_start();
@@ -82,6 +82,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login — Adonis Admin</title>
+    <link rel="icon" type="image/png" href="/frontend/public/assets/img/favicon.png">
+    <link rel="shortcut icon" type="image/png" href="/frontend/public/assets/img/favicon.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="/backend/admin/assets/css/admin.css">
