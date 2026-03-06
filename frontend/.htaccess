@@ -1,0 +1,29 @@
+# FRONTEND - PERMISSÕES DE ACESSO
+
+# Permite acesso público ao frontend
+Options -Indexes +FollowSymLinks
+Require all granted
+
+# Define index.php como arquivo padrão
+DirectoryIndex index.php index.html
+
+# Habilita mod_rewrite
+RewriteEngine On
+
+# Se acessar diretório sem arquivo, serve index.php
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^$ index.php [L]
+
+# Permite acesso a todos os arquivos públicos
+<FilesMatch "\.(php|html|css|js|jpg|jpeg|png|gif|svg|webp|ico|woff|woff2|ttf|eot)$">
+    Require all granted
+</FilesMatch>
+
+# Configurações de segurança
+<IfModule mod_headers.c>
+    Header set X-Content-Type-Options "nosniff"
+    Header set X-XSS-Protection "1; mode=block"
+</IfModule>
+
+AddDefaultCharset UTF-8
