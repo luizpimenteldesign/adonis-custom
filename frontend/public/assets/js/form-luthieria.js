@@ -1,13 +1,13 @@
 /**
  * FORMULÁRIO LUTHIERIA - SISTEMA ADONIS
- * Versão: 5.0
- * Data: 26/01/2026
+ * Versão: 5.1
+ * Data: 06/03/2026
  */
 
 // ========================================
 // CONFIGURAÇÕES GLOBAIS
 // ========================================
-const API_URL = 'https://adns.luizpimentel.com/adonis-custom/backend/api';
+const API_URL = '/backend/api';
 
 // Cache de elementos DOM
 const elementos = {
@@ -52,7 +52,7 @@ const modelosPorTipo = {
 // INICIALIZAÇÃO
 // ========================================
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('Iniciando formulário v5.0...');
+    console.log('Iniciando formulário v5.1...');
     inicializarElementos();
     carregarServicos();
     configurarEventos();
@@ -550,5 +550,5 @@ function mostrarLoading(mostrar) {
 }
 
 // LOGS E DEBUG
-console.log('✅ Form Luthieria JS v5.0 carregado');
+console.log('✅ Form Luthieria JS v5.1 carregado');
 console.log('🔗 API URL:', API_URL);
