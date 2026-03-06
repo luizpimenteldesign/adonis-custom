@@ -1,14 +1,48 @@
-# Bloquear acesso a arquivos sensíveis
-<FilesMatch "^(error_log|auth\.php|config\.php|\.env)$">
-    Order Allow,Deny
-    Deny from all
+# BACKEND ADMIN - CONFIGURAÇÃO DE ACESSO E SEGURANÇA
+
+# PERMITE ACESSO PÚBLICO (autenticação via auth.php em cada página)
+Require all granted
+
+# Bloqueia listagem de diretórios
+Options -Indexes +FollowSymLinks
+
+# Define arquivos padrão
+DirectoryIndex login.php dashboard.php index.php
+
+# Habilita mod_rewrite
+RewriteEngine On
+
+# Se acessar diretório sem arquivo, redireciona para login
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^$ login.php [L]
+
+# Permite acesso a páginas PHP e assets
+<FilesMatch "\.(php|css|js|jpg|jpeg|png|gif|svg|webp|ico|woff|woff2|ttf|eot|json)$">
+    Require all granted
 </FilesMatch>
 
-# Bloquear listagem de diretórios
-Options -Indexes
-
-# Bloquear utilitários após uso
-<FilesMatch "(criar_tabela_historico|criar_coluna_prazo)\.php$">
-    Order Allow,Deny
-    Deny from all
+# Bloqueia acesso a arquivos sensíveis
+<FilesMatch "\.(env|log|sql|backup|config\.php)$">
+    Require all denied
 </FilesMatch>
+
+# Bloqueia acesso direto a arquivos internos
+<FilesMatch "^(auth|_sidebar|_sidebar_data|criar_tabela_historico|criar_coluna_prazo)\.php$">
+    Require all denied
+</FilesMatch>
+
+# Configurações de segurança
+<IfModule mod_headers.c>
+    Header set X-Content-Type-Options "nosniff"
+    Header set X-Frame-Options "SAMEORIGIN"
+    Header set X-XSS-Protection "1; mode=block"
+    Header set Referrer-Policy "strict-origin-when-cross-origin"
+</IfModule>
+
+AddDefaultCharset UTF-8
+
+# Compressão GZIP
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html text/css text/javascript application/javascript application/json
+</IfModule>
