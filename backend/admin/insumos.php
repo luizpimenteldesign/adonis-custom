@@ -21,7 +21,6 @@ try {
     $insumos = $stmt->fetchAll(PDO::FETCH_ASSOC);
 } catch (Exception $e) { $insumos = []; }
 
-// Categorias para o select do modal
 try {
     $categorias = $conn->query("SELECT DISTINCT categoria FROM servicos WHERE ativo = 1 AND categoria IS NOT NULL AND categoria != '' ORDER BY categoria")
                        ->fetchAll(PDO::FETCH_COLUMN);
@@ -143,6 +142,9 @@ include '_sidebar_data.php';
                             </button>
                             <button class="btn-icon <?php echo $ins['ativo'] ? 'danger' : ''; ?>" title="<?php echo $ins['ativo'] ? 'Desativar' : 'Reativar'; ?>" onclick="toggleAtivo(<?php echo $ins['id']; ?>, <?php echo $ins['ativo']; ?>)">
                                 <span class="material-symbols-outlined"><?php echo $ins['ativo'] ? 'block' : 'check_circle'; ?></span>
+                            </button>
+                            <button class="btn-icon danger" title="Excluir" onclick="excluirInsumo(<?php echo $ins['id']; ?>, <?php echo htmlspecialchars(json_encode($ins['nome']), ENT_QUOTES); ?>)">
+                                <span class="material-symbols-outlined">delete</span>
                             </button>
                         </div>
                     </td>
@@ -320,9 +322,19 @@ function toggleAtivo(id, ativo) {
         fetch('insumos-api.php?id=' + id, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ativo: 1 })
+            body: JSON.stringify({ ativo: 1, nome: '', unidade: '' })
         }).then(r => r.json()).then(data => { if (data.ok) location.reload(); else alert('Erro: ' + data.erro); });
     }
+}
+
+function excluirInsumo(id, nome) {
+    if (!confirm('Excluir o insumo "' + nome + '" permanentemente? Esta acao nao pode ser desfeita.')) return;
+    fetch('insumos-api.php?id=' + id + '&excluir=1', { method: 'DELETE' })
+        .then(r => r.json())
+        .then(data => {
+            if (data.ok) location.href = 'insumos.php?msg=sucesso:Insumo excluido com sucesso.';
+            else alert('Erro ao excluir: ' + data.erro);
+        });
 }
 
 function fecharModal() {

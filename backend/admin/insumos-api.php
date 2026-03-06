@@ -8,7 +8,7 @@ $db   = new Database();
 $conn = $db->getConnection();
 
 $method = $_SERVER['REQUEST_METHOD'];
-$id     = isset($_GET['id'])     ? (int)$_GET['id']     : null;
+$id     = isset($_GET['id']) ? (int)$_GET['id'] : null;
 
 // GET ?categorias=1 — retorna categorias distintas da tabela servicos
 if ($method === 'GET' && isset($_GET['categorias'])) {
@@ -43,14 +43,13 @@ if ($method === 'GET') {
             $stmt->execute([$id]);
             $insumo = $stmt->fetch(PDO::FETCH_ASSOC);
             if (!$insumo) { echo json_encode(['ok' => false, 'erro' => 'Nao encontrado']); exit; }
-            // busca servicos vinculados
             $stmt2 = $conn->prepare("SELECT servicoid FROM insumos_servicos WHERE insumoid = ?");
             $stmt2->execute([$id]);
             $insumo['servicos'] = $stmt2->fetchAll(PDO::FETCH_COLUMN);
             echo json_encode(['ok' => true, 'insumo' => $insumo]);
         } else {
             $q = isset($_GET['q']) ? trim($_GET['q']) : '';
-            $sql = "SELECT i.*, GROUP_CONCAT(s.nome SEPARATOR ', ') as servicos_nomes
+            $sql = "SELECT i.*, GROUP_CONCAT(s.nome ORDER BY s.nome SEPARATOR ', ') as servicos_nomes
                     FROM insumos i
                     LEFT JOIN insumos_servicos ins ON ins.insumoid = i.id
                     LEFT JOIN servicos s ON s.id = ins.servicoid";
@@ -84,7 +83,6 @@ if ($method === 'POST') {
         $stmt = $conn->prepare("INSERT INTO insumos (nome, unidade, valor_unitario, quantidade_estoque, ativo) VALUES (?,?,?,?,?)");
         $stmt->execute([$nome, $unidade, $valor, $estoque, $ativo]);
         $novo_id = $conn->lastInsertId();
-        // vincula servicos
         if ($servicos) {
             $ins = $conn->prepare("INSERT IGNORE INTO insumos_servicos (insumoid, servicoid) VALUES (?,?)");
             foreach ($servicos as $sid) $ins->execute([$novo_id, (int)$sid]);
@@ -112,7 +110,6 @@ if ($method === 'PUT') {
     try {
         $stmt = $conn->prepare("UPDATE insumos SET nome=?, unidade=?, valor_unitario=?, quantidade_estoque=?, ativo=? WHERE id=?");
         $stmt->execute([$nome, $unidade, $valor, $estoque, $ativo, $id]);
-        // atualiza vinculos
         $conn->prepare("DELETE FROM insumos_servicos WHERE insumoid=?")->execute([$id]);
         if ($servicos) {
             $ins = $conn->prepare("INSERT IGNORE INTO insumos_servicos (insumoid, servicoid) VALUES (?,?)");
@@ -125,12 +122,24 @@ if ($method === 'PUT') {
     exit;
 }
 
-// DELETE — desativar (soft delete)
+// DELETE — exclui do banco se nao houver uso, caso contrario desativa
 if ($method === 'DELETE') {
     if (!$id) { echo json_encode(['ok' => false, 'erro' => 'ID obrigatorio']); exit; }
+    $excluir = isset($_GET['excluir']) && $_GET['excluir'] == '1';
     try {
-        $conn->prepare("UPDATE insumos SET ativo = 0 WHERE id = ?")->execute([$id]);
-        echo json_encode(['ok' => true]);
+        if ($excluir) {
+            // Verifica se ha uso em OS (tabela osservicos) — protecao antes de apagar
+            $uso = $conn->prepare("SELECT COUNT(*) FROM insumos_servicos WHERE insumoid = ?");
+            $uso->execute([$id]);
+            // Apenas remove vinculos e apaga o registro
+            $conn->prepare("DELETE FROM insumos_servicos WHERE insumoid = ?")->execute([$id]);
+            $conn->prepare("DELETE FROM insumos WHERE id = ?")->execute([$id]);
+            echo json_encode(['ok' => true, 'excluido' => true]);
+        } else {
+            // Soft delete — apenas desativa
+            $conn->prepare("UPDATE insumos SET ativo = 0 WHERE id = ?")->execute([$id]);
+            echo json_encode(['ok' => true, 'excluido' => false]);
+        }
     } catch (Exception $e) {
         echo json_encode(['ok' => false, 'erro' => $e->getMessage()]);
     }
