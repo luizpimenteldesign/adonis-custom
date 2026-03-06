@@ -83,6 +83,17 @@ $sidebar_nav = [
     ],
 ];
 
+// Adiciona item Usuários apenas para admins
+if (($_SESSION['admin_tipo'] ?? '') === 'admin') {
+    $sidebar_nav[] = [
+        'id'    => 'nav-users',
+        'icon'  => 'admin_panel_settings',
+        'label' => 'Usuários',
+        'href'  => 'users.php',
+        'tipo'  => 'link',
+    ];
+}
+
 function grupoAtivoSidebar($itens, $filtro_status, $current_page) {
     foreach ($itens as $it) {
         if ($it['status'] === null) {
