@@ -1,8 +1,8 @@
 <?php
 /**
  * PÁGINA PÚBLICA DE ACOMPANHAMENTO DO PEDIDO
- * Versão: 5.5 - botão wa.me "Falar com Adonis" + integração WhatsApp helper
- * Data: 28/02/2026
+ * Versão: 5.6 - Material Design sem emojis
+ * Data: 06/03/2026
  */
 
 require_once '../../backend/config/Database.php';
@@ -86,36 +86,27 @@ if (!empty($token)) {
     }
 }
 
-// Monta link wa.me para o cliente falar com o Adonis
 $wa_msg_cliente = 'Olá, Adonis! Estou acompanhando meu pedido'
     . ($pedido ? ' #' . $pedido['id'] . ' (' . trim(($pedido['instrumento_tipo'] ?? '') . ' ' . ($pedido['instrumento_marca'] ?? '')) . ')' : '')
     . ' e gostaria de tirar uma dúvida.';
 $wa_link_adonis = wa_link_cliente($wa_msg_cliente);
 
 $statusInfo = [
-    'Pre-OS'                          => ['label'=>'Recebido',                      'cor'=>'#1565c0','bg'=>'#e3f2fd','icone'=>'🗒️', 'desc'=>'Seu pedido foi recebido e está na fila para análise.'],
-    'Em analise'                      => ['label'=>'Em Análise',                    'cor'=>'#00695c','bg'=>'#e0f2f1','icone'=>'🔍', 'desc'=>'Nosso técnico está avaliando o instrumento e preparando o orçamento.'],
-    'Orcada'                          => ['label'=>'Orçamento Pronto',              'cor'=>'#e65100','bg'=>'#fff3e0','icone'=>'💰', 'desc'=>'O orçamento está disponível. Escolha a forma de pagamento e aprove abaixo.'],
-    'Aguardando aprovacao'            => ['label'=>'Aguardando Aprovação',          'cor'=>'#f57f17','bg'=>'#fffde7','icone'=>'⏳', 'desc'=>'Aguardando sua confirmação para iniciar o serviço.'],
-    'Aprovada'                        => ['label'=>'Aguardando Pagamento',          'cor'=>'#1565c0','bg'=>'#e3f2fd','icone'=>'💳', 'desc'=>'Orçamento aprovado! Agora realize o pagamento e envie/traga seu instrumento.'],
-    'Pagamento recebido'              => ['label'=>'Pagamento Recebido',            'cor'=>'#2e7d32','bg'=>'#e8f5e9','icone'=>'✅', 'desc'=>'Pagamento confirmado! Aguardando recebimento do instrumento.'],
-    'Instrumento recebido'            => ['label'=>'Instrumento Recebido',          'cor'=>'#1b5e20','bg'=>'#e8f5e9','icone'=>'📦', 'desc'=>'Instrumento recebido! Em breve o serviço será iniciado.'],
-    'Servico iniciado'                => ['label'=>'Serviço Iniciado',              'cor'=>'#4a148c','bg'=>'#f3e5f5','icone'=>'🔧', 'desc'=>'Seu instrumento está nas mãos do técnico. O serviço foi iniciado.'],
-    'Em desenvolvimento'              => ['label'=>'Em Desenvolvimento',            'cor'=>'#6a1b9a','bg'=>'#f3e5f5','icone'=>'⚙️', 'desc'=>'Estamos trabalhando no seu instrumento com todo cuidado.'],
-    'Servico finalizado'              => ['label'=>'Serviço Finalizado',            'cor'=>'#1b5e20','bg'=>'#e8f5e9','icone'=>'🎸', 'desc'=>'Serviço concluído! Seu instrumento está pronto.'],
-    'Pronto para retirada'            => ['label'=>'Pronto para Retirada',          'cor'=>'#e65100','bg'=>'#fff3e0','icone'=>'🎉', 'desc'=>'Seu instrumento está pronto! Pode vir buscar.'],
-    'Aguardando pagamento retirada'   => ['label'=>'Pagamento Pendente (Retirada)', 'cor'=>'#f57f17','bg'=>'#fffde7','icone'=>'💵', 'desc'=>'Serviço concluído! Realize o pagamento restante (50%) para retirar.'],
-    'Entregue'                        => ['label'=>'Instrumento Entregue',          'cor'=>'#37474f','bg'=>'#eceff1','icone'=>'🏁', 'desc'=>'Instrumento entregue. Obrigado pela confiança!'],
-    'Reprovada'                       => ['label'=>'Orçamento Não Aprovado',        'cor'=>'#b71c1c','bg'=>'#ffebee','icone'=>'❌', 'desc'=>'O orçamento não foi aprovado.'],
-    'Cancelada'                       => ['label'=>'Cancelado',                     'cor'=>'#37474f','bg'=>'#eceff1','icone'=>'🚫', 'desc'=>'Este pedido foi cancelado.'],
-];
-
-$icones_hist = [
-    'Pre-OS'=>'🗒️','Em analise'=>'🔍','Orcada'=>'💰','Aguardando aprovacao'=>'⏳',
-    'Aprovada'=>'💳','Pagamento recebido'=>'✅','Instrumento recebido'=>'📦',
-    'Servico iniciado'=>'🔧','Em desenvolvimento'=>'⚙️','Servico finalizado'=>'🎸',
-    'Pronto para retirada'=>'🎉','Aguardando pagamento retirada'=>'💵',
-    'Entregue'=>'🏁','Reprovada'=>'❌','Cancelada'=>'🚫',
+    'Pre-OS'                          => ['label'=>'Recebido',                      'cor'=>'#1565c0','bg'=>'#e3f2fd','desc'=>'Seu pedido foi recebido e está na fila para análise.'],
+    'Em analise'                      => ['label'=>'Em Análise',                    'cor'=>'#00695c','bg'=>'#e0f2f1','desc'=>'Nosso técnico está avaliando o instrumento e preparando o orçamento.'],
+    'Orcada'                          => ['label'=>'Orçamento Pronto',              'cor'=>'#e65100','bg'=>'#fff3e0','desc'=>'O orçamento está disponível. Escolha a forma de pagamento e aprove abaixo.'],
+    'Aguardando aprovacao'            => ['label'=>'Aguardando Aprovação',          'cor'=>'#f57f17','bg'=>'#fffde7','desc'=>'Aguardando sua confirmação para iniciar o serviço.'],
+    'Aprovada'                        => ['label'=>'Aguardando Pagamento',          'cor'=>'#1565c0','bg'=>'#e3f2fd','desc'=>'Orçamento aprovado! Agora realize o pagamento e envie/traga seu instrumento.'],
+    'Pagamento recebido'              => ['label'=>'Pagamento Recebido',            'cor'=>'#2e7d32','bg'=>'#e8f5e9','desc'=>'Pagamento confirmado! Aguardando recebimento do instrumento.'],
+    'Instrumento recebido'            => ['label'=>'Instrumento Recebido',          'cor'=>'#1b5e20','bg'=>'#e8f5e9','desc'=>'Instrumento recebido! Em breve o serviço será iniciado.'],
+    'Servico iniciado'                => ['label'=>'Serviço Iniciado',              'cor'=>'#4a148c','bg'=>'#f3e5f5','desc'=>'Seu instrumento está nas mãos do técnico. O serviço foi iniciado.'],
+    'Em desenvolvimento'              => ['label'=>'Em Desenvolvimento',            'cor'=>'#6a1b9a','bg'=>'#f3e5f5','desc'=>'Estamos trabalhando no seu instrumento com todo cuidado.'],
+    'Servico finalizado'              => ['label'=>'Serviço Finalizado',            'cor'=>'#1b5e20','bg'=>'#e8f5e9','desc'=>'Serviço concluído! Seu instrumento está pronto.'],
+    'Pronto para retirada'            => ['label'=>'Pronto para Retirada',          'cor'=>'#e65100','bg'=>'#fff3e0','desc'=>'Seu instrumento está pronto! Pode vir buscar.'],
+    'Aguardando pagamento retirada'   => ['label'=>'Pagamento Pendente (Retirada)', 'cor'=>'#f57f17','bg'=>'#fffde7','desc'=>'Serviço concluído! Realize o pagamento restante (50%) para retirar.'],
+    'Entregue'                        => ['label'=>'Instrumento Entregue',          'cor'=>'#37474f','bg'=>'#eceff1','desc'=>'Instrumento entregue. Obrigado pela confiança!'],
+    'Reprovada'                       => ['label'=>'Orçamento Não Aprovado',        'cor'=>'#b71c1c','bg'=>'#ffebee','desc'=>'O orçamento não foi aprovado.'],
+    'Cancelada'                       => ['label'=>'Cancelado',                     'cor'=>'#37474f','bg'=>'#eceff1','desc'=>'Este pedido foi cancelado.'],
 ];
 
 $pode_aprovar = $pedido && in_array($pedido['status'], ['Orcada','Aguardando aprovacao']) && !empty($pedido['valor_orcamento']);
@@ -133,129 +124,125 @@ $show_detalhe_pgto   = $show_pos_aprovacao && !empty($pagamento_aprovado);
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Acompanhar Pedido — Adonis Custom</title>
     <meta name="robots" content="noindex,nofollow">
+    <link rel="icon" type="image/png" href="assets/img/favicon.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
         *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
         body{font-family:'Roboto',sans-serif;background:#f0f2f5;color:#333;min-height:100vh}
-        .header{background:#111;padding:14px 24px;display:flex;align-items:center;gap:14px;box-shadow:0 2px 10px rgba(0,0,0,.3);position:sticky;top:0;z-index:100}
-        .header img{height:36px}
-        .header span{color:#ccc;font-size:15px;font-weight:500}
-        .busca-token{background:#fff;border-radius:12px;padding:28px;box-shadow:0 2px 8px rgba(0,0,0,.08);margin-bottom:24px;text-align:center}
-        .busca-token h2{font-size:18px;margin-bottom:6px;color:#222}
-        .busca-token p{font-size:13px;color:#888;margin-bottom:18px}
-        .busca-token form{display:flex;gap:10px;max-width:480px;margin:0 auto}
-        .busca-token input{flex:1;padding:11px 16px;border:2px solid #ddd;border-radius:8px;font-size:14px;font-family:inherit;letter-spacing:.5px;transition:border-color .2s}
-        .busca-token input:focus{outline:none;border-color:#0d9488}
-        .busca-token button{padding:11px 22px;background:#0d9488;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;white-space:nowrap}
-        .container{max-width:740px;margin:0 auto;padding:32px 20px 100px}
-        .card{background:#fff;border-radius:12px;padding:24px;box-shadow:0 2px 8px rgba(0,0,0,.07);margin-bottom:20px}
-        .card-title{font-size:15px;font-weight:700;color:#444;margin-bottom:16px;padding-bottom:10px;border-bottom:2px solid #f0f0f0;display:flex;align-items:center;gap:8px}
-        .status-card{border-radius:12px;padding:24px 28px;display:flex;align-items:center;gap:20px;margin-bottom:20px;border:1px solid rgba(0,0,0,.06)}
-        .status-icone{font-size:52px;flex-shrink:0;line-height:1}
-        .status-label{font-size:24px;font-weight:700}
-        .status-desc{font-size:14px;margin-top:6px;opacity:.8;line-height:1.5}
-        .orc-card{border-radius:12px;padding:20px 24px;margin-bottom:20px;background:#e8f5e9;border-left:5px solid #43a047;display:flex;align-items:center;gap:20px}
-        .orc-emoji{font-size:36px;flex-shrink:0}
-        .orc-label{font-size:11px;color:#388e3c;font-weight:700;text-transform:uppercase;letter-spacing:.5px}
-        .orc-valor{font-size:32px;font-weight:700;color:#2e7d32;line-height:1.1;margin:2px 0}
-        .pix-endereco-box{background:#f0fdfa;border-radius:12px;padding:18px 20px;margin-bottom:20px;border:2px solid #0d9488}
-        .pix-endereco-titulo{font-size:13px;font-weight:700;color:#0d9488;text-transform:uppercase;letter-spacing:.5px;margin-bottom:14px;display:flex;align-items:center;gap:8px}
-        .pix-row{display:flex;justify-content:space-between;align-items:flex-start;padding:9px 0;border-bottom:1px solid #ccf0ec;font-size:14px}
+        .header{background:#1a1a1a;padding:20px 24px;display:flex;align-items:center;gap:14px;box-shadow:0 2px 10px rgba(0,0,0,.2);position:sticky;top:0;z-index:100}
+        .header img{height:50px}
+        .header span{color:#ccc;font-size:16px;font-weight:400}
+        .busca-token{background:#fff;border-radius:8px;padding:32px;box-shadow:0 2px 8px rgba(0,0,0,.08);margin-bottom:24px;text-align:center}
+        .busca-token h2{font-size:20px;margin-bottom:8px;color:#1a1a1a;font-weight:500}
+        .busca-token p{font-size:14px;color:#666;margin-bottom:20px}
+        .busca-token form{display:flex;gap:12px;max-width:520px;margin:0 auto}
+        .busca-token input{flex:1;padding:12px 16px;border:2px solid #e0e0e0;border-radius:6px;font-size:14px;font-family:inherit;transition:border-color .2s}
+        .busca-token input:focus{outline:none;border-color:#ff6b35}
+        .busca-token button{padding:12px 28px;background:#ff6b35;color:#fff;border:none;border-radius:6px;font-size:14px;font-weight:600;cursor:pointer;transition:background .2s}
+        .busca-token button:hover{background:#e55a2b}
+        .container{max-width:800px;margin:0 auto;padding:40px 20px 100px}
+        .card{background:#fff;border-radius:8px;padding:28px;box-shadow:0 2px 8px rgba(0,0,0,.07);margin-bottom:24px}
+        .card-title{font-size:16px;font-weight:600;color:#1a1a1a;margin-bottom:20px;padding-bottom:12px;border-bottom:2px solid #f5f5f5;display:flex;align-items:center;gap:10px}
+        .status-card{border-radius:8px;padding:28px;margin-bottom:24px;border:2px solid;box-shadow:0 2px 8px rgba(0,0,0,.06)}
+        .status-label{font-size:24px;font-weight:600;margin-bottom:8px}
+        .status-desc{font-size:14px;opacity:.85;line-height:1.6}
+        .orc-card{border-radius:8px;padding:24px;margin-bottom:24px;background:#e8f5e9;border-left:5px solid #43a047}
+        .orc-label{font-size:12px;color:#388e3c;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px}
+        .orc-valor{font-size:32px;font-weight:700;color:#2e7d32;line-height:1.1}
+        .pix-endereco-box{background:#f0fdfa;border-radius:8px;padding:24px;margin-bottom:24px;border:2px solid #0d9488}
+        .pix-endereco-titulo{font-size:14px;font-weight:700;color:#0d9488;text-transform:uppercase;letter-spacing:.5px;margin-bottom:16px}
+        .pix-row{display:flex;justify-content:space-between;align-items:flex-start;padding:10px 0;border-bottom:1px solid #ccf0ec;font-size:14px}
         .pix-row:last-child{border-bottom:none}
         .pix-row-lbl{color:#555;font-weight:500;flex-shrink:0;margin-right:12px}
         .pix-row-val{font-weight:700;color:#00695c;text-align:right;word-break:break-all}
-        .maps-link{display:inline-flex;align-items:center;gap:6px;margin-top:8px;font-size:13px;color:#1565c0;font-weight:600;text-decoration:none}
+        .maps-link{display:inline-flex;align-items:center;gap:6px;margin-top:10px;font-size:13px;color:#1565c0;font-weight:600;text-decoration:none}
         .maps-link:hover{text-decoration:underline}
-        .btn-copiar-pix{display:inline-flex;align-items:center;gap:6px;margin-top:8px;padding:8px 16px;background:#0d9488;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;transition:background .2s}
+        .btn-copiar-pix{display:inline-flex;align-items:center;gap:6px;margin-top:10px;padding:10px 18px;background:#0d9488;color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;transition:background .2s}
         .btn-copiar-pix:hover{background:#0a7c72}
-        .info-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px}
-        .info-item{background:#f8f9fa;border-radius:8px;padding:12px 14px}
-        .info-label{font-size:10px;color:#999;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}
-        .info-value{font-size:14px;color:#333;font-weight:500}
-        .servico-item{padding:9px 0;border-bottom:1px solid #f0f0f0;font-size:14px;color:#444;display:flex;align-items:center;gap:8px}
+        .info-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+        .info-item{background:#f8f9fa;border-radius:6px;padding:16px}
+        .info-label{font-size:11px;color:#999;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+        .info-value{font-size:14px;color:#333;font-weight:600}
+        .servico-item{padding:10px 0;border-bottom:1px solid #f0f0f0;font-size:14px;color:#444}
         .servico-item:last-child{border-bottom:none}
-        .servico-item::before{content:'•';color:#0d9488;font-size:18px;flex-shrink:0}
-        .pgto-opcoes{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:18px}
-        .pgto-btn{border:2px solid #e0e0e0;border-radius:10px;padding:14px 10px;text-align:center;cursor:pointer;transition:all .2s;background:#fff;font-family:inherit}
+        .pgto-opcoes{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:20px}
+        .pgto-btn{border:2px solid #e0e0e0;border-radius:6px;padding:16px;text-align:center;cursor:pointer;transition:all .2s;background:#fff;font-family:inherit}
         .pgto-btn:hover{border-color:#0d9488;background:#f0fdfb}
-        .pgto-btn.ativo{border-color:#0d9488;background:#e0f2f1;box-shadow:0 0 0 3px rgba(13,148,136,.15)}
-        .pgto-btn .pgto-icone{font-size:28px;display:block;margin-bottom:6px}
-        .pgto-btn .pgto-nome{font-size:13px;font-weight:600;color:#333}
-        .pgto-btn .pgto-sub{font-size:11px;color:#0d9488;margin-top:3px}
-        .pgto-resultado{background:#f8f9fa;border-radius:10px;padding:18px;margin-bottom:18px;display:none}
+        .pgto-btn.ativo{border-color:#0d9488;background:#e0f2f1;box-shadow:0 0 0 3px rgba(13,148,136,.1)}
+        .pgto-btn .pgto-nome{font-size:14px;font-weight:600;color:#333;margin-bottom:6px}
+        .pgto-btn .pgto-sub{font-size:12px;color:#0d9488}
+        .pgto-resultado{background:#f8f9fa;border-radius:6px;padding:20px;margin-bottom:20px;display:none}
         .pgto-resultado.visivel{display:block}
-        .pgto-res-titulo{font-size:13px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px}
-        .pgto-linha{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #eee;font-size:14px}
+        .pgto-res-titulo{font-size:14px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:.5px;margin-bottom:14px}
+        .pgto-linha{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #eee;font-size:14px}
         .pgto-linha:last-child{border-bottom:none}
-        .pgto-linha.destaque{background:#e8f5e9;border-radius:8px;padding:10px 12px;margin:4px -4px;border:none}
+        .pgto-linha.destaque{background:#e8f5e9;border-radius:6px;padding:12px;margin:6px -4px;border:none}
         .pgto-linha .lbl{color:#666}
         .pgto-linha .val{font-weight:700;color:#222}
-        .pgto-linha.destaque .val{color:#2e7d32;font-size:16px}
-        .pix-box{background:#e0f2f1;border-radius:8px;padding:12px 14px;margin-top:12px;border-left:3px solid #0d9488}
-        .pix-box-label{font-size:11px;color:#00695c;font-weight:700;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px}
-        .pix-box-chave{font-size:15px;font-weight:700;color:#00695c;word-break:break-all;margin-bottom:8px}
-        .pix-box-btn{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;background:#0d9488;color:#fff;border:none;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:background .2s}
+        .pgto-linha.destaque .val{color:#2e7d32;font-size:17px}
+        .pix-box{background:#e0f2f1;border-radius:6px;padding:14px 16px;margin-top:14px;border-left:3px solid #0d9488}
+        .pix-box-label{font-size:12px;color:#00695c;font-weight:700;text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px}
+        .pix-box-chave{font-size:15px;font-weight:700;color:#00695c;word-break:break-all;margin-bottom:10px}
+        .pix-box-btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;background:#0d9488;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:background .2s}
         .pix-box-btn:hover{background:#0a7c72}
-        .parcelas-lista{display:flex;flex-direction:column;gap:6px;max-height:280px;overflow-y:auto}
-        .parcela-item{display:flex;justify-content:space-between;align-items:center;padding:9px 12px;border-radius:8px;background:#f5f5f5;font-size:13px;cursor:pointer;border:2px solid transparent;transition:all .15s}
+        .parcelas-lista{display:flex;flex-direction:column;gap:8px;max-height:300px;overflow-y:auto}
+        .parcela-item{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-radius:6px;background:#f5f5f5;font-size:13px;cursor:pointer;border:2px solid transparent;transition:all .15s}
         .parcela-item:hover{background:#e0f2f1;border-color:#0d9488}
         .parcela-item.ativo{background:#e0f2f1;border-color:#0d9488}
         .parc-n{font-weight:700;color:#333}
         .parc-v{font-weight:700;color:#0d9488}
-        .acoes{display:flex;gap:12px;margin-top:20px}
-        .btn-aprovar{flex:1;padding:14px;background:#2e7d32;color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;transition:background .2s}
+        .acoes{display:flex;gap:12px;margin-top:24px}
+        .btn-aprovar{flex:1;padding:16px;background:#2e7d32;color:#fff;border:none;border-radius:6px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;transition:background .2s}
         .btn-aprovar:hover{background:#1b5e20}
         .btn-aprovar:disabled{background:#bbb;cursor:not-allowed}
-        .btn-reprovar{padding:14px 20px;background:#fff;color:#c62828;border:2px solid #ef9a9a;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .2s}
+        .btn-reprovar{padding:16px 24px;background:#fff;color:#c62828;border:2px solid #ef9a9a;border-radius:6px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .2s}
         .btn-reprovar:hover{background:#ffebee;border-color:#c62828}
         .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;justify-content:center;align-items:center;padding:20px}
         .modal-overlay.aberto{display:flex}
-        .modal-box{background:#fff;border-radius:12px;padding:28px;width:100%;max-width:440px;box-shadow:0 8px 32px rgba(0,0,0,.2)}
-        .modal-title{font-size:17px;font-weight:700;margin-bottom:14px;color:#333}
-        .modal-box label{display:block;font-size:13px;font-weight:600;color:#555;margin-bottom:6px}
-        .modal-box textarea{width:100%;padding:10px 14px;border:2px solid #e0e0e0;border-radius:8px;font-size:14px;font-family:inherit;resize:vertical;min-height:100px;transition:border-color .2s}
+        .modal-box{background:#fff;border-radius:8px;padding:32px;width:100%;max-width:480px;box-shadow:0 8px 32px rgba(0,0,0,.25)}
+        .modal-title{font-size:18px;font-weight:700;margin-bottom:16px;color:#333}
+        .modal-box label{display:block;font-size:14px;font-weight:600;color:#555;margin-bottom:8px}
+        .modal-box textarea{width:100%;padding:12px 16px;border:2px solid #e0e0e0;border-radius:6px;font-size:14px;font-family:inherit;resize:vertical;min-height:120px;transition:border-color .2s}
         .modal-box textarea:focus{outline:none;border-color:#ef5350}
-        .modal-actions{display:flex;gap:10px;margin-top:16px;justify-content:flex-end}
-        .btn-modal-cancel{padding:10px 18px;background:#f5f5f5;border:none;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit}
-        .btn-modal-confirm{padding:10px 20px;background:#c62828;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit}
+        .modal-actions{display:flex;gap:12px;margin-top:20px;justify-content:flex-end}
+        .btn-modal-cancel{padding:12px 20px;background:#f5f5f5;border:none;border-radius:6px;font-size:14px;cursor:pointer;font-family:inherit}
+        .btn-modal-confirm{padding:12px 24px;background:#c62828;color:#fff;border:none;border-radius:6px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit}
         .timeline{list-style:none;padding:0;margin:0;position:relative}
         .timeline::before{content:'';position:absolute;left:16px;top:6px;bottom:6px;width:2px;background:#e8e8e8}
-        .tl-item{display:flex;gap:14px;padding-bottom:22px;position:relative}
+        .tl-item{display:flex;gap:16px;padding-bottom:24px;position:relative}
         .tl-item:last-child{padding-bottom:0}
-        .tl-dot{width:32px;height:32px;border-radius:50%;background:#0d9488;color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;z-index:1;box-shadow:0 0 0 3px #fff}
-        .tl-body{padding-top:4px;flex:1}
+        .tl-dot{width:34px;height:34px;border-radius:50%;background:#0d9488;color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;z-index:1;box-shadow:0 0 0 3px #fff;font-weight:600}
+        .tl-body{padding-top:6px;flex:1}
         .tl-status{font-weight:600;font-size:14px;color:#333}
-        .tl-data{font-size:11px;color:#aaa;margin-top:2px}
-        .tl-detalhe{margin-top:6px;padding:7px 11px;border-radius:6px;font-size:13px}
-        .tl-detalhe.valor{background:#e8f5e9;color:#2e7d32}
+        .tl-data{font-size:12px;color:#aaa;margin-top:4px}
+        .tl-detalhe{margin-top:8px;padding:8px 12px;border-radius:6px;font-size:13px}
+        .tl-detalhe.valor{background:#e8f5e9;color:#2e7d32;font-weight:600}
         .tl-detalhe.motivo{background:#ffebee;color:#c62828}
-        .prazo-badge{display:inline-flex;align-items:center;gap:6px;background:#e3f2fd;color:#1565c0;border-radius:8px;padding:8px 16px;font-size:14px;font-weight:600;margin-bottom:20px}
-        .erro-box{text-align:center;padding:48px 20px}
-        .erro-icone{font-size:56px;display:block;margin-bottom:14px}
-        .erro-box h2{font-size:20px;color:#c62828;margin-bottom:8px}
-        .erro-box p{font-size:13px;color:#999}
-        /* ── Botão flutuante WhatsApp ── */
+        .prazo-badge{display:inline-flex;align-items:center;gap:8px;background:#e3f2fd;color:#1565c0;border-radius:6px;padding:10px 18px;font-size:14px;font-weight:600;margin-bottom:24px}
+        .erro-box{text-align:center;padding:60px 20px}
+        .erro-box h2{font-size:22px;color:#c62828;margin-bottom:10px;font-weight:600}
+        .erro-box p{font-size:14px;color:#999}
         .wa-fab{
-            position:fixed;bottom:24px;right:24px;z-index:900;
-            display:flex;align-items:center;gap:10px;
+            position:fixed;bottom:28px;right:28px;z-index:900;
+            display:flex;align-items:center;gap:12px;
             background:#25d366;color:#fff;
-            padding:14px 20px;border-radius:50px;
+            padding:16px 24px;border-radius:50px;
             text-decoration:none;font-size:14px;font-weight:700;
-            box-shadow:0 4px 16px rgba(37,211,102,.45);
+            box-shadow:0 4px 20px rgba(37,211,102,.4);
             transition:background .2s,transform .2s
         }
-        .wa-fab:hover{background:#1ebe5d;transform:scale(1.04)}
+        .wa-fab:hover{background:#1ebe5d;transform:translateY(-2px)}
         .wa-fab svg{width:22px;height:22px;flex-shrink:0;fill:#fff}
-        .footer{text-align:center;padding:28px 20px 40px;font-size:12px;color:#ccc}
-        @media(max-width:520px){
-            .status-card,.orc-card{flex-direction:column;text-align:center;gap:12px}
+        .footer{text-align:center;padding:32px 20px 48px;font-size:13px;color:#999}
+        @media(max-width:640px){
+            .status-card{padding:20px}
             .busca-token form,.acoes{flex-direction:column}
-            .header span,.orc-emoji{display:none}
+            .header span{display:none}
             .pix-row{flex-direction:column;gap:4px}
             .pix-row-val{text-align:left}
             .wa-fab span{display:none}
-            .wa-fab{padding:14px}
+            .wa-fab{padding:16px}
         }
     </style>
 </head>
@@ -267,7 +254,7 @@ $show_detalhe_pgto   = $show_pos_aprovacao && !empty($pagamento_aprovado);
 
 <div class="container">
     <div class="busca-token">
-        <h2>🔍 Consultar meu pedido</h2>
+        <h2>Consultar meu pedido</h2>
         <p>Digite o código de acompanhamento que você recebeu</p>
         <form method="GET">
             <input type="text" name="token" placeholder="Cole seu código aqui..."
@@ -277,37 +264,31 @@ $show_detalhe_pgto   = $show_pos_aprovacao && !empty($pagamento_aprovado);
     </div>
 
     <?php if (!empty($token) && $erro): ?>
-        <div class="erro-box"><span class="erro-icone">😕</span><h2>Pedido não encontrado</h2><p><?php echo htmlspecialchars($erro); ?></p></div>
+        <div class="erro-box"><h2>Pedido não encontrado</h2><p><?php echo htmlspecialchars($erro); ?></p></div>
 
     <?php elseif ($pedido):
-        $si = $statusInfo[$pedido['status']] ?? ['label'=>$pedido['status'],'cor'=>'#666','bg'=>'#f5f5f5','icone'=>'•','desc'=>''];
+        $si = $statusInfo[$pedido['status']] ?? ['label'=>$pedido['status'],'cor'=>'#666','bg'=>'#f5f5f5','desc'=>''];
     ?>
 
-        <div class="status-card" style="background:<?php echo $si['bg']; ?>;color:<?php echo $si['cor']; ?>">
-            <div class="status-icone"><?php echo $si['icone']; ?></div>
-            <div>
-                <div class="status-label"><?php echo $si['label']; ?></div>
-                <div class="status-desc"><?php echo $si['desc']; ?></div>
-            </div>
+        <div class="status-card" style="background:<?php echo $si['bg']; ?>;border-color:<?php echo $si['cor']; ?>">
+            <div class="status-label" style="color:<?php echo $si['cor']; ?>"><?php echo $si['label']; ?></div>
+            <div class="status-desc" style="color:<?php echo $si['cor']; ?>"><?php echo $si['desc']; ?></div>
         </div>
 
         <?php if (!empty($pedido['prazo_orcamento'])): ?>
-        <div class="prazo-badge">📅 Prazo estimado: <strong><?php echo (int)$pedido['prazo_orcamento']; ?> dias úteis</strong></div>
+        <div class="prazo-badge">Prazo estimado: <strong><?php echo (int)$pedido['prazo_orcamento']; ?> dias úteis</strong></div>
         <?php endif; ?>
 
         <?php if (!empty($pedido['valor_orcamento'])): ?>
         <div class="orc-card">
-            <div class="orc-emoji">💰</div>
-            <div>
-                <div class="orc-label">Valor do Orçamento</div>
-                <div class="orc-valor">R$ <?php echo number_format($pedido['valor_orcamento'],2,',','.'); ?></div>
-            </div>
+            <div class="orc-label">Valor do Orçamento</div>
+            <div class="orc-valor">R$ <?php echo number_format($pedido['valor_orcamento'],2,',','.'); ?></div>
         </div>
         <?php endif; ?>
 
         <?php if ($show_pos_aprovacao): ?>
         <div class="pix-endereco-box">
-            <div class="pix-endereco-titulo">📋 Informações para pagamento e entrega</div>
+            <div class="pix-endereco-titulo">Informações para pagamento e entrega</div>
 
             <?php if ($show_detalhe_pgto):
                 $fp   = $pagamento_aprovado['forma_pagamento'] ?? '';
@@ -352,97 +333,94 @@ $show_detalhe_pgto   = $show_pos_aprovacao && !empty($pagamento_aprovado);
             <?php endif; ?>
 
             <div class="pix-row" style="border-bottom:none;padding-bottom:4px">
-                <span class="pix-row-lbl">🟢 Chave PIX</span>
+                <span class="pix-row-lbl">Chave PIX</span>
                 <span class="pix-row-val" id="chave-pix-bloco"><?php echo ADONIS_PIX; ?></span>
             </div>
-            <button class="btn-copiar-pix" onclick="copiarPixBloco(this)">📋 Copiar chave PIX</button>
-            <div style="margin-top:10px;font-size:12px;color:#555;background:#e0f2f1;border-radius:6px;padding:10px 14px;line-height:1.7">
-                ⚠️ Após realizar o pagamento, <strong>envie o comprovante via WhatsApp</strong> para confirmarmos o recebimento.
+            <button class="btn-copiar-pix" onclick="copiarPixBloco(this)">Copiar chave PIX</button>
+            <div style="margin-top:12px;font-size:12px;color:#555;background:#e0f2f1;border-radius:6px;padding:12px 16px;line-height:1.7">
+                Após realizar o pagamento, envie o comprovante via WhatsApp para confirmarmos o recebimento.
             </div>
 
-            <div style="border-top:1px dashed #b2dfdb;margin-top:14px;padding-top:14px">
-                <div style="font-size:12px;font-weight:700;color:#00695c;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">📍 Endereço para entrega do instrumento</div>
+            <div style="border-top:1px dashed #b2dfdb;margin-top:16px;padding-top:16px">
+                <div style="font-size:12px;font-weight:700;color:#00695c;text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">Endereço para entrega do instrumento</div>
                 <div style="font-size:14px;color:#333;font-weight:500"><?php echo ADONIS_ENDERECO; ?></div>
-                <a class="maps-link" href="<?php echo ADONIS_MAPS; ?>" target="_blank" rel="noopener">🗺️ Ver no Google Maps</a>
+                <a class="maps-link" href="<?php echo ADONIS_MAPS; ?>" target="_blank" rel="noopener">Ver no Google Maps</a>
             </div>
         </div>
         <?php endif; ?>
 
         <?php if ($pode_aprovar): ?>
         <div class="card" id="card-pagamento">
-            <div class="card-title">💳 Forma de Pagamento &amp; Aprovação</div>
+            <div class="card-title">Forma de Pagamento &amp; Aprovação</div>
             <div class="pgto-opcoes">
                 <button class="pgto-btn" onclick="selecionarPgto('pix')" id="btn-pix">
-                    <span class="pgto-icone">🟢</span>
-                    <span class="pgto-nome">PIX / Dinheiro</span>
-                    <span class="pgto-sub">5% de desconto</span>
+                    <div class="pgto-nome">PIX / Dinheiro</div>
+                    <div class="pgto-sub">5% de desconto</div>
                 </button>
                 <button class="pgto-btn" onclick="selecionarPgto('entrada')" id="btn-entrada">
-                    <span class="pgto-icone">🔑</span>
-                    <span class="pgto-nome">Entrada + Retirada</span>
-                    <span class="pgto-sub">50% + 50%</span>
+                    <div class="pgto-nome">Entrada + Retirada</div>
+                    <div class="pgto-sub">50% + 50%</div>
                 </button>
                 <button class="pgto-btn" onclick="selecionarPgto('cartao')" id="btn-cartao">
-                    <span class="pgto-icone">📳</span>
-                    <span class="pgto-nome">Cartão de Crédito</span>
-                    <span class="pgto-sub">parcelado em até 10x</span>
+                    <div class="pgto-nome">Cartão de Crédito</div>
+                    <div class="pgto-sub">até 10x</div>
                 </button>
             </div>
 
             <div class="pgto-resultado" id="res-pix">
-                <div class="pgto-res-titulo">🟢 PIX ou Dinheiro — à vista</div>
+                <div class="pgto-res-titulo">PIX ou Dinheiro — à vista</div>
                 <div class="pgto-linha"><span class="lbl">Valor do orçamento</span><span class="val" id="pix-original"></span></div>
                 <div class="pgto-linha"><span class="lbl">Desconto à vista (5%)</span><span class="val" style="color:#2e7d32" id="pix-desconto"></span></div>
                 <div class="pgto-linha destaque"><span class="lbl">Você paga</span><span class="val" id="pix-final"></span></div>
                 <div class="pix-box">
-                    <div class="pix-box-label">🟢 Chave PIX para pagamento</div>
+                    <div class="pix-box-label">Chave PIX para pagamento</div>
                     <div class="pix-box-chave" id="pix-chave-sel"><?php echo ADONIS_PIX; ?></div>
-                    <button class="pix-box-btn" onclick="copiarPixSel('pix-chave-sel', this)">📋 Copiar chave PIX</button>
+                    <button class="pix-box-btn" onclick="copiarPixSel('pix-chave-sel', this)">Copiar chave PIX</button>
                 </div>
-                <div style="margin-top:10px;font-size:12px;color:#555;line-height:1.6">⚠️ Após pagar, <strong>envie o comprovante via WhatsApp</strong> para confirmarmos o recebimento.</div>
+                <div style="margin-top:12px;font-size:12px;color:#555;line-height:1.6">Após pagar, envie o comprovante via WhatsApp para confirmarmos o recebimento.</div>
             </div>
 
             <div class="pgto-resultado" id="res-entrada">
-                <div class="pgto-res-titulo">🔑 Entrada + Pagamento na Retirada</div>
+                <div class="pgto-res-titulo">Entrada + Pagamento na Retirada</div>
                 <div class="pgto-linha"><span class="lbl">Valor total</span><span class="val" id="ent-total"></span></div>
                 <div class="pgto-linha"><span class="lbl">Entrada agora (50%)</span><span class="val" style="color:#1565c0" id="ent-entrada"></span></div>
                 <div class="pgto-linha destaque"><span class="lbl">Na retirada (50%)</span><span class="val" id="ent-retirada"></span></div>
                 <div class="pix-box" style="margin-top:12px">
-                    <div class="pix-box-label">🟢 Pague a entrada via PIX</div>
+                    <div class="pix-box-label">Pague a entrada via PIX</div>
                     <div class="pix-box-chave" id="ent-chave-sel"><?php echo ADONIS_PIX; ?></div>
-                    <button class="pix-box-btn" onclick="copiarPixSel('ent-chave-sel', this)">📋 Copiar chave PIX</button>
+                    <button class="pix-box-btn" onclick="copiarPixSel('ent-chave-sel', this)">Copiar chave PIX</button>
                 </div>
-                <div style="margin-top:10px;font-size:12px;color:#555;line-height:1.6">💡 Envie o comprovante via WhatsApp após o pagamento da entrada. O restante (50%) será cobrado na retirada.</div>
+                <div style="margin-top:12px;font-size:12px;color:#555;line-height:1.6">Envie o comprovante via WhatsApp após o pagamento da entrada. O restante (50%) será cobrado na retirada.</div>
             </div>
 
             <div class="pgto-resultado" id="res-cartao">
-                <div class="pgto-res-titulo">📳 Cartão de Crédito</div>
-                <div style="font-size:12px;color:#999;margin-bottom:10px">Selecione a quantidade de parcelas:</div>
+                <div class="pgto-res-titulo">Cartão de Crédito</div>
+                <div style="font-size:12px;color:#999;margin-bottom:12px">Selecione a quantidade de parcelas:</div>
                 <div class="parcelas-lista" id="parcelas-lista"></div>
-                <div class="pgto-linha destaque" style="margin-top:12px;display:none" id="res-parc-selecionada">
+                <div class="pgto-linha destaque" style="margin-top:14px;display:none" id="res-parc-selecionada">
                     <span class="lbl" id="parc-sel-label"></span>
                     <span class="val" id="parc-sel-valor"></span>
                 </div>
-                <div style="margin-top:12px;font-size:12px;color:#555;background:#fff8e1;border-radius:6px;padding:10px 14px;line-height:1.6;border-left:3px solid #ffc107">
-                    💳 O pagamento no cartão será realizado <strong>na retirada do instrumento</strong>.
+                <div style="margin-top:14px;font-size:12px;color:#555;background:#fff8e1;border-radius:6px;padding:12px 16px;line-height:1.6;border-left:3px solid #ffc107">
+                    O pagamento no cartão será realizado na retirada do instrumento.
                 </div>
             </div>
 
-            <div style="margin-top:4px;padding:14px;background:#f0f4ff;border-radius:10px;border-left:3px solid #1565c0">
-                <div style="font-size:11px;font-weight:700;color:#1565c0;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">📍 Onde entregar o instrumento</div>
-                <div style="font-size:13px;color:#333;font-weight:500;margin-bottom:4px"><?php echo ADONIS_ENDERECO; ?></div>
-                <a class="maps-link" href="<?php echo ADONIS_MAPS; ?>" target="_blank" rel="noopener">🗺️ Ver no Google Maps</a>
+            <div style="margin-top:6px;padding:16px;background:#f0f4ff;border-radius:6px;border-left:3px solid #1565c0">
+                <div style="font-size:12px;font-weight:700;color:#1565c0;text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">Onde entregar o instrumento</div>
+                <div style="font-size:13px;color:#333;font-weight:500;margin-bottom:6px"><?php echo ADONIS_ENDERECO; ?></div>
+                <a class="maps-link" href="<?php echo ADONIS_MAPS; ?>" target="_blank" rel="noopener">Ver no Google Maps</a>
             </div>
 
             <div class="acoes">
-                <button class="btn-aprovar" id="btn-aprovar" onclick="confirmarAprovacao()" disabled>✅ Selecione a forma de pagamento</button>
-                <button class="btn-reprovar" onclick="abrirReprovacao()">❌ Não aprovar</button>
+                <button class="btn-aprovar" id="btn-aprovar" onclick="confirmarAprovacao()" disabled>Selecione a forma de pagamento</button>
+                <button class="btn-reprovar" onclick="abrirReprovacao()">Não aprovar</button>
             </div>
         </div>
         <?php endif; ?>
 
         <div class="card">
-            <div class="card-title">📋 Dados do Pedido</div>
+            <div class="card-title">Dados do Pedido</div>
             <div class="info-grid">
                 <div class="info-item"><div class="info-label">Número</div><div class="info-value">#<?php echo $pedido['id']; ?></div></div>
                 <div class="info-item"><div class="info-label">Cliente</div><div class="info-value"><?php echo htmlspecialchars($pedido['cliente_nome']); ?></div></div>
@@ -457,7 +435,7 @@ $show_detalhe_pgto   = $show_pos_aprovacao && !empty($pagamento_aprovado);
 
         <?php if (!empty($servicos)): ?>
         <div class="card">
-            <div class="card-title">🔧 Serviços Solicitados</div>
+            <div class="card-title">Serviços Solicitados</div>
             <?php foreach ($servicos as $s): ?>
             <div class="servico-item"><?php echo htmlspecialchars($s['nome']); ?></div>
             <?php endforeach; ?>
@@ -466,19 +444,19 @@ $show_detalhe_pgto   = $show_pos_aprovacao && !empty($pagamento_aprovado);
 
         <?php if (!empty($historico)): ?>
         <div class="card">
-            <div class="card-title">🕓 Histórico de Atualizações</div>
+            <div class="card-title">Histórico de Atualizações</div>
             <ul class="timeline">
-                <?php foreach ($historico as $h): ?>
+                <?php foreach ($historico as $idx => $h): ?>
                 <li class="tl-item">
-                    <div class="tl-dot"><?php echo $icones_hist[$h['status']] ?? '•'; ?></div>
+                    <div class="tl-dot"><?php echo $idx + 1; ?></div>
                     <div class="tl-body">
                         <div class="tl-status"><?php echo htmlspecialchars($statusInfo[$h['status']]['label'] ?? $h['status']); ?></div>
                         <div class="tl-data"><?php echo date('d/m/Y às H:i', strtotime($h['criado_em'])); ?></div>
                         <?php if (!empty($h['valor_orcamento'])): ?>
-                        <div class="tl-detalhe valor">💰 R$ <?php echo number_format($h['valor_orcamento'],2,',','.'); ?><?php if (!empty($h['prazo_orcamento'])): ?> &nbsp;• <strong><?php echo (int)$h['prazo_orcamento']; ?> dias úteis</strong><?php endif; ?></div>
+                        <div class="tl-detalhe valor">R$ <?php echo number_format($h['valor_orcamento'],2,',','.'); ?><?php if (!empty($h['prazo_orcamento'])): ?> • <strong><?php echo (int)$h['prazo_orcamento']; ?> dias úteis</strong><?php endif; ?></div>
                         <?php endif; ?>
                         <?php if (!empty($h['motivo'])): ?>
-                        <div class="tl-detalhe motivo">⚠️ <?php echo htmlspecialchars($h['motivo']); ?></div>
+                        <div class="tl-detalhe motivo"><?php echo htmlspecialchars($h['motivo']); ?></div>
                         <?php endif; ?>
                     </div>
                 </li>
@@ -489,14 +467,14 @@ $show_detalhe_pgto   = $show_pos_aprovacao && !empty($pagamento_aprovado);
 
         <?php if (!empty($pedido['observacoes'])): ?>
         <div class="card">
-            <div class="card-title">📝 Suas Observações</div>
+            <div class="card-title">Suas Observações</div>
             <div style="font-size:14px;color:#555;line-height:1.8"><?php echo nl2br(htmlspecialchars($pedido['observacoes'])); ?></div>
         </div>
         <?php endif; ?>
 
         <?php if (!empty($pedido['motivo_reprovacao'])): ?>
         <div class="card" style="border-left:4px solid #ef5350">
-            <div class="card-title" style="color:#c62828">❌ Motivo da Não Aprovação</div>
+            <div class="card-title" style="color:#c62828">Motivo da Não Aprovação</div>
             <div style="font-size:14px;color:#555;line-height:1.7"><?php echo nl2br(htmlspecialchars($pedido['motivo_reprovacao'])); ?></div>
         </div>
         <?php endif; ?>
@@ -504,7 +482,6 @@ $show_detalhe_pgto   = $show_pos_aprovacao && !empty($pagamento_aprovado);
     <?php endif; ?>
 </div>
 
-<!-- ── Botão flutuante WhatsApp ── -->
 <a class="wa-fab" href="<?php echo htmlspecialchars($wa_link_adonis); ?>" target="_blank" rel="noopener" title="Falar com Adonis pelo WhatsApp">
     <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
         <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
@@ -514,29 +491,29 @@ $show_detalhe_pgto   = $show_pos_aprovacao && !empty($pagamento_aprovado);
 
 <div class="modal-overlay" id="modal-reprovacao">
     <div class="modal-box">
-        <div class="modal-title">❌ Motivo da Não Aprovação</div>
+        <div class="modal-title">Motivo da Não Aprovação</div>
         <label>Conte-nos o motivo (obrigatório):</label>
         <textarea id="motivo-reprovacao" placeholder="Ex: O valor ficou acima do meu orçamento..."></textarea>
         <div class="modal-actions">
             <button class="btn-modal-cancel" onclick="fecharModal()">Cancelar</button>
-            <button class="btn-modal-confirm" onclick="enviarReprovacao()">❌ Confirmar Reprovação</button>
+            <button class="btn-modal-confirm" onclick="enviarReprovacao()">Confirmar Reprovação</button>
         </div>
     </div>
 </div>
 
-<div class="footer">Adonis Custom &mdash; Acompanhamento de Pedidos</div>
+<div class="footer">© 2026 Adonis Custom Luthieria. Todos os direitos reservados. | Desenvolvido por <a href="https://luizpimentel.com" target="_blank" style="color:inherit;text-decoration:none">LP Design</a></div>
 
 <script>
 function copiarPixBloco(btn) {
     const texto = document.getElementById('chave-pix-bloco').textContent.trim();
     navigator.clipboard.writeText(texto)
-    .then(() => { btn.textContent='✅ Copiado!'; setTimeout(()=>btn.innerHTML='📋 Copiar chave PIX',2000); })
+    .then(() => { btn.textContent='Copiado!'; setTimeout(()=>btn.textContent='Copiar chave PIX',2000); })
     .catch(() => alert('Chave PIX: '+texto));
 }
 function copiarPixSel(idEl, btn) {
     const texto = document.getElementById(idEl).textContent.trim();
     navigator.clipboard.writeText(texto)
-    .then(() => { btn.textContent='✅ Copiado!'; setTimeout(()=>btn.innerHTML='📋 Copiar chave PIX',2000); })
+    .then(() => { btn.textContent='Copiado!'; setTimeout(()=>btn.textContent='Copiar chave PIX',2000); })
     .catch(() => alert('Chave PIX: '+texto));
 }
 </script>
@@ -599,7 +576,7 @@ function selecionarPgto(tipo) {
 function habilitarAprovar(ok) {
     const btn = document.getElementById('btn-aprovar');
     btn.disabled    = !ok;
-    btn.textContent = ok ? '✅ Aprovar Orçamento' : '✅ Selecione a forma de pagamento';
+    btn.textContent = ok ? 'Aprovar Orçamento' : 'Selecione a forma de pagamento';
 }
 function confirmarAprovacao() {
     if (!pagamentoPayload.forma) return;
@@ -627,17 +604,17 @@ function enviar(status, extras) {
     .then(d => {
         if (d.sucesso) {
             document.getElementById('card-pagamento').innerHTML =
-                '<div style="text-align:center;padding:20px 0">' +
+                '<div style="text-align:center;padding:24px 0">' +
                 (status==='Aprovada'
-                    ? '✅ <strong>Orçamento aprovado!</strong><br><span style="font-size:13px;color:#555">Entraremos em contato em breve com as instruções de pagamento.</span>'
-                    : '❌ <strong>Orçamento não aprovado.</strong><br><span style="font-size:13px;color:#555">Registro enviado. Obrigado pelo retorno!</span>'
+                    ? '<strong>Orçamento aprovado!</strong><br><span style="font-size:13px;color:#555">Entraremos em contato em breve com as instruções de pagamento.</span>'
+                    : '<strong>Orçamento não aprovado.</strong><br><span style="font-size:13px;color:#555">Registro enviado. Obrigado pelo retorno!</span>'
                 ) + '</div>';
             setTimeout(() => location.reload(), 2500);
         } else {
-            alert('❌ Erro: ' + (d.erro || 'Tente novamente.'));
+            alert('Erro: ' + (d.erro || 'Tente novamente.'));
         }
     })
-    .catch(() => alert('❌ Erro de conexão. Tente novamente.'));
+    .catch(() => alert('Erro de conexão. Tente novamente.'));
 }
 document.getElementById('modal-reprovacao').addEventListener('click', function(e){ if(e.target===this) fecharModal(); });
 </script>
