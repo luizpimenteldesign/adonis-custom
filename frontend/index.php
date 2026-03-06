@@ -7,11 +7,11 @@
     <title>Solicitar Orçamento - Adonis Luthieria</title>
 
     <!-- FAVICON CORRIGIDO -->
-    <link rel="icon" type="image/x-icon" href="public/assets/img/favicon.ico">
-    <link rel="shortcut icon" type="image/x-icon" href="public/assets/img/favicon.ico">
+    <link rel="icon" type="image/x-icon" href="/frontend/public/assets/img/favicon.ico">
+    <link rel="shortcut icon" type="image/x-icon" href="/frontend/public/assets/img/favicon.ico">
 
     <!-- CSS -->
-    <link rel="stylesheet" href="public/assets/css/style.css">
+    <link rel="stylesheet" href="/frontend/public/assets/css/style.css">
 
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -24,7 +24,7 @@
     <header class="header">
         <div class="header-container">
             <div class="header-logo">
-                <img src="https://adns.luizpimentel.com/adonis-custom/frontend/public/assets/img/Logo-Adonis3.png" alt="Adonis Custom">
+                <img src="/frontend/public/assets/img/Logo-Adonis3.png" alt="Adonis Custom">
             </div>
             <div class="header-title">
                 Solicitar Orçamento
@@ -278,6 +278,6 @@
     </footer>
 
     <!-- JAVASCRIPT COM VERSÃO DINÂMICA -->
-    <script src="public/assets/js/form-luthieria.js?v=<?php echo time(); ?>"></script>
+    <script src="/frontend/public/assets/js/form-luthieria.js?v=<?php echo time(); ?>"></script>
 </body>
 </html>
