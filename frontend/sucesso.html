@@ -5,6 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pedido Enviado com Sucesso - Adonis Luthieria</title>
     
+    <!-- FAVICON -->
+    <link rel="icon" type="image/png" href="public/assets/img/favicon.png">
+    <link rel="shortcut icon" type="image/png" href="public/assets/img/favicon.png">
+    
     <!-- CSS -->
     <link rel="stylesheet" href="public/assets/css/style.css">
     
@@ -19,7 +23,7 @@
     <header class="header">
         <div class="header-container">
             <div class="header-logo">
-                <img src="https://adns.luizpimentel.com/adonis-custom/frontend/public/assets/img/Logo-Adonis3.png" alt="Adonis Custom">
+                <img src="public/assets/img/Logo-Adonis3.png" alt="Adonis Custom">
             </div>
             <div class="header-title">
                 Pedido Enviado com Sucesso
@@ -29,70 +33,76 @@
 
     <!-- CONTEÚDO PRINCIPAL -->
     <main>
-        <div class="main-container" style="max-width: 800px; margin: 0 auto; padding: 40px 20px; text-align: center;">
+        <div class="main-container" style="max-width: 700px; text-align: center;">
             
             <!-- Ícone de Sucesso -->
             <div style="margin-bottom: 32px;">
-                <svg width="100" height="100" viewBox="0 0 24 24" fill="none" style="color: #4caf50;">
+                <svg width="80" height="80" viewBox="0 0 24 24" fill="none" style="color: #4caf50;">
                     <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" fill="none"/>
                     <path d="M9 12l2 2 4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                 </svg>
             </div>
             
-            <h1 style="font-size: 32px; color: #333; margin-bottom: 16px;">
-                Pedido Enviado com Sucesso!
+            <h1 class="page-title">
+                Pedido Enviado com Sucesso
             </h1>
             
-            <p style="font-size: 18px; color: #666; margin-bottom: 40px;">
+            <p class="page-subtitle" style="margin-bottom: 40px;">
                 Seu pedido de orçamento foi recebido e está sendo processado.
             </p>
             
             <!-- Card com informações -->
-            <div style="background: #fff; border: 2px solid #4caf50; border-radius: 12px; padding: 32px; margin-bottom: 32px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+            <div style="background: #e8f5e9; border-left: 4px solid #4caf50; border-radius: 8px; padding: 32px; margin-bottom: 32px; text-align: left;">
                 
-                <h2 style="font-size: 20px; color: #333; margin-bottom: 24px;">
+                <h2 style="font-size: 18px; color: #2e7d32; margin-bottom: 24px; font-weight: 500;">
                     Seu Código de Acompanhamento
                 </h2>
                 
-                <div style="background: #f5f5f5; border-radius: 8px; padding: 20px; margin-bottom: 24px;">
-                    <p style="font-family: 'Courier New', monospace; font-size: 18px; font-weight: bold; color: #ff6b35; word-break: break-all;" id="codigo-token">
+                <div style="background: #fff; border: 2px solid #4caf50; border-radius: 6px; padding: 20px; margin-bottom: 20px;">
+                    <p style="font-family: 'Courier New', monospace; font-size: 16px; font-weight: 600; color: #1a1a1a; word-break: break-all; text-align: center;" id="codigo-token">
                         Carregando...
                     </p>
                 </div>
                 
-                <button onclick="copiarCodigo()" style="background: #ff6b35; color: white; border: none; padding: 12px 24px; border-radius: 8px; font-size: 16px; font-weight: 500; cursor: pointer; transition: all 0.3s ease;">
-                    📋 Copiar Código
+                <button onclick="copiarCodigo()" class="btn-primary" style="width: auto; display: inline-flex; margin: 0 auto;">
+                    <svg class="btn-icon" viewBox="0 0 24 24">
+                        <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
+                    </svg>
+                    Copiar Código
                 </button>
                 
-                <hr style="margin: 32px 0; border: none; border-top: 1px solid #ddd;">
+                <hr style="margin: 32px 0; border: none; border-top: 1px solid #c8e6c9;">
                 
-                <div style="text-align: left;">
-                    <h3 style="font-size: 18px; color: #333; margin-bottom: 16px;">
+                <div>
+                    <h3 style="font-size: 16px; color: #1a1a1a; margin-bottom: 16px; font-weight: 500;">
                         Detalhes do Pedido
                     </h3>
                     
-                    <p style="margin-bottom: 8px;">
+                    <p style="margin-bottom: 8px; font-size: 14px;">
                         <strong>Pedido:</strong> <span id="numero-pedido">-</span>
                     </p>
                     
-                    <p style="margin-bottom: 8px;">
+                    <p style="margin-bottom: 8px; font-size: 14px;">
                         <strong>Instrumento:</strong> <span id="tipo-instrumento">-</span>
                     </p>
                     
-                    <p style="margin-bottom: 8px; color: #666; font-size: 14px;">
+                    <p style="margin-bottom: 0; color: #666; font-size: 13px;">
                         Guarde este código para acompanhar o andamento do seu pedido.
                     </p>
                 </div>
             </div>
             
             <!-- Próximos Passos -->
-            <div style="background: #f9f9f9; border-radius: 12px; padding: 32px; margin-bottom: 32px; text-align: left;">
-                <h3 style="font-size: 20px; color: #333; margin-bottom: 16px;">
-                    📋 Próximos Passos
+            <div class="form-section" style="border: none; padding: 32px; background: #f5f5f5; border-radius: 8px; text-align: left;">
+                <h3 class="section-title" style="margin-bottom: 16px;">
+                    <svg class="section-icon" viewBox="0 0 24 24">
+                        <path d="M19 3h-4.18C14.4 1.84 13.3 1 12 1c-1.3 0-2.4.84-2.82 2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 0c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zm2 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/>
+                    </svg>
+                    Próximos Passos
                 </h3>
                 
-                <ol style="padding-left: 20px; line-height: 1.8;">
-                    <li>Em breve você receberá uma confirmação por <strong>WhatsApp</strong> e <strong>e-mail</strong></li>
+                <ol style="padding-left: 20px; line-height: 1.8; margin: 0; font-size: 14px;">
+                    <li>Em breve você receberá uma confirmação por WhatsApp e e-mail</li>
                     <li>Nossa equipe irá avaliar seu pedido e enviar o orçamento detalhado</li>
                     <li>Use o código de acompanhamento para consultar o status do seu pedido</li>
                     <li>Após aprovação, agendaremos a data para recebimento do instrumento</li>
@@ -100,13 +110,19 @@
             </div>
             
             <!-- Botões de Ação -->
-            <div style="display: flex; gap: 16px; justify-content: center; flex-wrap: wrap;">
-                <a href="index.php" style="display: inline-block; padding: 12px 24px; background: #ff6b35; color: white; text-decoration: none; border-radius: 8px; font-weight: 500; transition: all 0.3s ease;">
-                    ← Fazer Novo Pedido
+            <div style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-top: 32px;">
+                <a href="index.php" class="btn-primary" style="width: auto; text-decoration: none;">
+                    <svg class="btn-icon" viewBox="0 0 24 24">
+                        <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/>
+                    </svg>
+                    Fazer Novo Pedido
                 </a>
                 
-                <a href="https://wa.me/5527999999999" target="_blank" style="display: inline-block; padding: 12px 24px; background: #25d366; color: white; text-decoration: none; border-radius: 8px; font-weight: 500; transition: all 0.3s ease;">
-                    💬 Falar no WhatsApp
+                <a href="public/acompanhar.php" style="display: inline-flex; align-items: center; gap: 10px; padding: 16px 24px; background: #2e7d32; color: white; text-decoration: none; border-radius: 6px; font-size: 16px; font-weight: 500; transition: all 0.3s;">
+                    <svg style="width: 20px; height: 20px; fill: currentColor;" viewBox="0 0 24 24">
+                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                    </svg>
+                    Acompanhar Pedido
                 </a>
             </div>
         </div>
@@ -115,12 +131,7 @@
     <!-- FOOTER -->
     <footer class="footer">
         <div class="footer-container">
-            <p class="footer-text">© 2026 Adonis Custom Luthieria. Todos os direitos reservados.</p>
-            <div class="footer-links">
-                <a href="#" class="footer-link">Política de Privacidade</a>
-                <a href="#" class="footer-link">Termos de Uso</a>
-                <a href="#" class="footer-link">Contato</a>
-            </div>
+            <p class="footer-text">© 2026 Adonis Custom Luthieria. Todos os direitos reservados. | Desenvolvido por <a href="https://luizpimentel.com" target="_blank" style="color: inherit; text-decoration: none;">LP Design</a></p>
         </div>
     </footer>
 
@@ -138,7 +149,7 @@
         
         // Validar parâmetros
         if (!token || token === 'undefined' || token === 'null') {
-            document.getElementById('codigo-token').innerHTML = '<span style="color: #f44336;">❌ Erro: Token não encontrado</span>';
+            document.getElementById('codigo-token').innerHTML = '<span style="color: #f44336;">Erro: Token não encontrado</span>';
             console.error('Token inválido ou não encontrado na URL');
         } else {
             document.getElementById('codigo-token').textContent = token;
@@ -162,7 +173,7 @@
             
             if (codigo && codigo !== 'Carregando...' && !codigo.includes('Erro')) {
                 navigator.clipboard.writeText(codigo).then(() => {
-                    alert('✅ Código copiado para a área de transferência!');
+                    alert('Código copiado para a área de transferência!');
                 }).catch(err => {
                     console.error('Erro ao copiar:', err);
                     // Fallback para navegadores antigos
@@ -172,10 +183,10 @@
                     textarea.select();
                     document.execCommand('copy');
                     document.body.removeChild(textarea);
-                    alert('✅ Código copiado!');
+                    alert('Código copiado!');
                 });
             } else {
-                alert('❌ Não há código válido para copiar');
+                alert('Não há código válido para copiar');
             }
         }
     </script>
