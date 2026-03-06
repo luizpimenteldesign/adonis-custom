@@ -13,7 +13,7 @@ try {
             FROM insumos i
             LEFT JOIN insumos_servicos ins ON ins.insumoid = i.id
             LEFT JOIN servicos s ON s.id = ins.servicoid";
-    if ($busca) $sql .= " WHERE i.nome LIKE :q OR i.unidade LIKE :q";
+    if ($busca) $sql .= " WHERE i.nome LIKE :q OR i.marca LIKE :q OR i.modelo LIKE :q OR i.unidade LIKE :q";
     $sql .= " GROUP BY i.id ORDER BY i.nome";
     $stmt = $conn->prepare($sql);
     if ($busca) $stmt->execute([':q' => '%'.$busca.'%']);
@@ -21,7 +21,6 @@ try {
     $insumos = $stmt->fetchAll(PDO::FETCH_ASSOC);
 } catch (Exception $e) { $insumos = []; }
 
-// Carrega todos os servicos agrupados por categoria para o modal
 try {
     $todos_servicos = $conn->query(
         "SELECT id, nome, categoria FROM servicos WHERE ativo = 1 AND categoria IS NOT NULL AND categoria != '' ORDER BY categoria, nome"
@@ -101,7 +100,7 @@ include '_sidebar_data.php';
         <form method="GET" action="insumos.php" style="margin-bottom:16px">
             <div class="search-bar">
                 <span class="search-icon material-symbols-outlined">search</span>
-                <input type="text" name="q" placeholder="Buscar por nome ou unidade..." value="<?php echo htmlspecialchars($busca); ?>" autocomplete="off">
+                <input type="text" name="q" placeholder="Buscar por nome, marca, modelo ou unidade..." value="<?php echo htmlspecialchars($busca); ?>" autocomplete="off">
                 <?php if ($busca): ?>
                 <button type="button" onclick="location.href='insumos.php'" style="background:none;border:none;cursor:pointer;color:var(--g-text-3);padding:0 4px;display:flex;align-items:center" title="Limpar">
                     <span class="material-symbols-outlined" style="font-size:18px">close</span>
@@ -122,6 +121,7 @@ include '_sidebar_data.php';
                 <thead>
                     <tr>
                         <th>Nome</th>
+                        <th>Marca / Modelo</th>
                         <th class="text-center">Unidade</th>
                         <th class="text-right">Valor Unit.</th>
                         <th class="text-center">Estoque</th>
@@ -134,6 +134,12 @@ include '_sidebar_data.php';
                 <?php foreach ($insumos as $ins): ?>
                 <tr class="<?php echo !$ins['ativo'] ? 'row-inactive' : ''; ?>">
                     <td><strong><?php echo htmlspecialchars($ins['nome']); ?></strong></td>
+                    <td style="font-size:13px;color:var(--g-text-2)">
+                        <?php
+                            $mb = trim(($ins['marca'] ?? '') . ' ' . ($ins['modelo'] ?? ''));
+                            echo $mb ? htmlspecialchars($mb) : '<span class="text-muted">—</span>';
+                        ?>
+                    </td>
                     <td class="text-center">
                         <span class="badge badge-dark"><?php echo htmlspecialchars($ins['unidade']); ?></span>
                     </td>
@@ -197,7 +203,7 @@ include '_sidebar_data.php';
     </a>
 </nav>
 
-<!-- MODAL CRIAR / EDITAR -->
+<!-- MODAL -->
 <div class="modal-overlay" id="modal-insumo">
     <div class="modal-box">
         <div class="modal-drag"></div>
@@ -209,6 +215,17 @@ include '_sidebar_data.php';
             <input class="form-input" type="text" id="f-nome" placeholder="Ex: Encordamento para Guitarra 09-42">
 
             <div style="display:flex;gap:12px">
+                <div style="flex:1">
+                    <label class="form-label">MARCA</label>
+                    <input class="form-input" type="text" id="f-marca" placeholder="Ex: D'Addario, Elixir">
+                </div>
+                <div style="flex:1">
+                    <label class="form-label">MODELO</label>
+                    <input class="form-input" type="text" id="f-modelo" placeholder="Ex: EXL110, Nanoweb">
+                </div>
+            </div>
+
+            <div style="display:flex;gap:12px;margin-top:4px">
                 <div style="flex:1">
                     <label class="form-label">UNIDADE *</label>
                     <input class="form-input" type="text" id="f-unidade" placeholder="Ex: conjunto, metro, ml">
@@ -251,7 +268,6 @@ include '_sidebar_data.php';
     </div>
 </div>
 
-<!-- dados dos servicos embutidos para uso no JS sem chamadas AJAX adicionais -->
 <script>
 const SERVICOS_POR_CAT = <?php echo json_encode($servicos_por_categoria, JSON_UNESCAPED_UNICODE); ?>;
 </script>
@@ -278,48 +294,32 @@ function toggleCategoria(chip) {
 function renderGrupos() {
     const bloco  = document.getElementById('bloco-servicos');
     const grupos = document.getElementById('grupos-servicos');
-
-    if (!categoriasAtivas.length) {
-        bloco.style.display = 'none';
-        grupos.innerHTML = '';
-        return;
-    }
-
+    if (!categoriasAtivas.length) { bloco.style.display = 'none'; grupos.innerHTML = ''; return; }
     grupos.innerHTML = '';
     categoriasAtivas.forEach(cat => {
         const servicos = SERVICOS_POR_CAT[cat] || [];
         if (!servicos.length) return;
-
         const grupo = document.createElement('div');
         grupo.className = 'grupo-cat';
-
         let html = `<div class="grupo-cat-titulo">${esc(cat)}</div><div class="grupo-cat-itens">`;
         servicos.forEach(s => {
             const checked = servicosSelecionados.includes(s.id) ? 'checked' : '';
-            html += `<label class="servico-check-item">
-                <input type="checkbox" value="${s.id}" ${checked} onchange="toggleServico(${s.id}, this.checked)">
-                ${esc(s.nome)}
-            </label>`;
+            html += `<label class="servico-check-item"><input type="checkbox" value="${s.id}" ${checked} onchange="toggleServico(${s.id}, this.checked)"> ${esc(s.nome)}</label>`;
         });
         html += '</div>';
         grupo.innerHTML = html;
         grupos.appendChild(grupo);
     });
-
     bloco.style.display = 'block';
 }
 
 function toggleServico(id, checked) {
-    if (checked) {
-        if (!servicosSelecionados.includes(id)) servicosSelecionados.push(id);
-    } else {
-        servicosSelecionados = servicosSelecionados.filter(s => s !== id);
-    }
+    if (checked) { if (!servicosSelecionados.includes(id)) servicosSelecionados.push(id); }
+    else servicosSelecionados = servicosSelecionados.filter(s => s !== id);
 }
 
 function resetModal() {
-    servicosSelecionados = [];
-    categoriasAtivas = [];
+    servicosSelecionados = []; categoriasAtivas = [];
     document.querySelectorAll('.cat-chip').forEach(chip => {
         chip.classList.remove('ativa');
         chip.querySelector('.material-symbols-outlined').textContent = 'add';
@@ -330,11 +330,7 @@ function resetModal() {
 
 function abrirModal() {
     document.getElementById('modal-titulo').textContent = 'Novo Insumo';
-    document.getElementById('f-id').value      = '';
-    document.getElementById('f-nome').value    = '';
-    document.getElementById('f-unidade').value = '';
-    document.getElementById('f-valor').value   = '';
-    document.getElementById('f-estoque').value = '';
+    ['f-id','f-nome','f-marca','f-modelo','f-unidade','f-valor','f-estoque'].forEach(id => document.getElementById(id).value = '');
     document.getElementById('f-ativo').checked = true;
     resetModal();
     document.getElementById('modal-insumo').classList.add('aberto');
@@ -350,28 +346,21 @@ function editarInsumo(id) {
             document.getElementById('modal-titulo').textContent = 'Editar Insumo';
             document.getElementById('f-id').value      = ins.id;
             document.getElementById('f-nome').value    = ins.nome;
+            document.getElementById('f-marca').value   = ins.marca  || '';
+            document.getElementById('f-modelo').value  = ins.modelo || '';
             document.getElementById('f-unidade').value = ins.unidade;
             document.getElementById('f-valor').value   = parseFloat(ins.valor_unitario).toFixed(2);
             document.getElementById('f-estoque').value = parseFloat(ins.quantidade_estoque);
             document.getElementById('f-ativo').checked = ins.ativo == 1;
-
-            // pre-seleciona servicos e ativa as categorias correspondentes
             resetModal();
             servicosSelecionados = (ins.servicos || []).map(Number);
-
-            // descobre quais categorias tem servicos selecionados
             Object.entries(SERVICOS_POR_CAT).forEach(([cat, servicos]) => {
-                const temSelecionado = servicos.some(s => servicosSelecionados.includes(s.id));
-                if (temSelecionado) {
+                if (servicos.some(s => servicosSelecionados.includes(s.id))) {
                     categoriasAtivas.push(cat);
                     const chip = document.querySelector(`.cat-chip[data-cat="${cat}"]`);
-                    if (chip) {
-                        chip.classList.add('ativa');
-                        chip.querySelector('.material-symbols-outlined').textContent = 'check';
-                    }
+                    if (chip) { chip.classList.add('ativa'); chip.querySelector('.material-symbols-outlined').textContent = 'check'; }
                 }
             });
-
             renderGrupos();
             document.getElementById('modal-insumo').classList.add('aberto');
         });
@@ -380,17 +369,16 @@ function editarInsumo(id) {
 function salvarInsumo() {
     const id      = document.getElementById('f-id').value;
     const nome    = document.getElementById('f-nome').value.trim();
+    const marca   = document.getElementById('f-marca').value.trim();
+    const modelo  = document.getElementById('f-modelo').value.trim();
     const unidade = document.getElementById('f-unidade').value.trim();
     const valor   = document.getElementById('f-valor').value;
     const estoque = document.getElementById('f-estoque').value;
     const ativo   = document.getElementById('f-ativo').checked ? 1 : 0;
-
     if (!nome || !unidade) { alert('Nome e unidade sao obrigatorios.'); return; }
-
-    const payload = { nome, unidade, valor_unitario: valor, quantidade_estoque: estoque, ativo, servicos: servicosSelecionados };
+    const payload = { nome, marca, modelo, unidade, valor_unitario: valor, quantidade_estoque: estoque, ativo, servicos: servicosSelecionados };
     const method  = id ? 'PUT' : 'POST';
     const url     = id ? 'insumos-api.php?id=' + id : 'insumos-api.php';
-
     fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
         .then(r => r.json())
         .then(data => {
@@ -400,18 +388,13 @@ function salvarInsumo() {
 }
 
 function toggleAtivo(id, ativo) {
-    const acao = ativo ? 'Desativar' : 'Reativar';
-    if (!confirm(acao + ' este insumo?')) return;
+    if (!confirm((ativo ? 'Desativar' : 'Reativar') + ' este insumo?')) return;
     if (ativo) {
         fetch('insumos-api.php?id=' + id, { method: 'DELETE' })
-            .then(r => r.json())
-            .then(data => { if (data.ok) location.reload(); else alert('Erro: ' + data.erro); });
+            .then(r => r.json()).then(d => { if (d.ok) location.reload(); else alert('Erro: ' + d.erro); });
     } else {
-        fetch('insumos-api.php?id=' + id, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ativo: 1, nome: '_reativar_', unidade: '_reativar_' })
-        }).then(r => r.json()).then(data => { if (data.ok) location.reload(); else alert('Erro: ' + data.erro); });
+        fetch('insumos-api.php?id=' + id, { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ativo:1,nome:'_reativar_',unidade:'_reativar_'}) })
+            .then(r => r.json()).then(d => { if (d.ok) location.reload(); else alert('Erro: ' + d.erro); });
     }
 }
 
@@ -425,18 +408,9 @@ function excluirInsumo(id, nome) {
         });
 }
 
-function fecharModal() {
-    document.getElementById('modal-insumo').classList.remove('aberto');
-}
-
-document.getElementById('modal-insumo').addEventListener('click', function(e) {
-    if (e.target === this) fecharModal();
-});
-
-function esc(s) {
-    if (!s) return '';
-    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
+function fecharModal() { document.getElementById('modal-insumo').classList.remove('aberto'); }
+document.getElementById('modal-insumo').addEventListener('click', function(e) { if (e.target === this) fecharModal(); });
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 </script>
 </body>
 </html>
