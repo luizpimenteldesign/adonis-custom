@@ -1,7 +1,7 @@
 <?php
 /**
  * LOGIN ADMINISTRATIVO - SISTEMA ADONIS
- * Versão: 1.4
+ * Versão: 1.5
  */
 
 session_start();
@@ -84,7 +84,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <title>Login — Adonis Admin</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="stylesheet" href="assets/css/admin.css">
+    <link rel="stylesheet" href="/backend/admin/assets/css/admin.css">
 </head>
 <body>
 
