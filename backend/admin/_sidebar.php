@@ -7,7 +7,7 @@
 ?>
 <aside class="sidebar" id="sidebar">
     <div class="sidebar-logo">
-        <img src="https://adns.luizpimentel.com/adonis-custom/frontend/public/assets/img/Logo-Adonis2.png" alt="Adonis">
+        <img src="/frontend/public/assets/img/Logo-Adonis2.png" alt="Adonis">
         <span class="sidebar-logo-title">Adonis</span>
     </div>
 
