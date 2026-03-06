@@ -1,0 +1,52 @@
+# ADONIS LUTHIERIA — CONFIGURAÇÃO APACHE
+
+# Habilita FollowSymLinks (necessário para mod_rewrite)
+Options +FollowSymLinks -Indexes
+
+# Ativa mod_rewrite
+RewriteEngine On
+
+# Força HTTPS (se disponível)
+RewriteCond %{HTTPS} off
+RewriteRule ^(.*)$ https://%{HTTP_HOST}/$1 [R=301,L]
+
+# Bloqueia acesso direto a arquivos sensíveis
+<FilesMatch "\.(env|git|gitignore|htaccess|log|sql|zip|config)$">
+    Require all denied
+</FilesMatch>
+
+# Bloqueia acesso à pasta database
+RewriteRule ^database/ - [F,L]
+
+# Bloqueia acesso direto ao backend sem autenticação
+# (as páginas backend/admin fazem auth.php internamente)
+
+# ROTEAMENTO PRINCIPAL
+
+# Se acessar raiz → redireciona para /frontend/
+RewriteRule ^$ /frontend/ [R=301,L]
+
+# Se acessar /admin → redireciona para /backend/admin/
+RewriteRule ^admin(/.*)?$ /backend/admin/$1 [R=301,L]
+
+# Se arquivo ou diretório existe, serve diretamente
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+
+# Caso contrário, tenta servir o arquivo
+RewriteRule . - [L]
+
+# Configurações de segurança adicionais
+<IfModule mod_headers.c>
+    Header set X-Content-Type-Options "nosniff"
+    Header set X-Frame-Options "SAMEORIGIN"
+    Header set X-XSS-Protection "1; mode=block"
+</IfModule>
+
+# Define charset padrão
+AddDefaultCharset UTF-8
+
+# Habilita compressão GZIP
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html text/plain text/xml text/css text/javascript application/javascript application/json
+</IfModule>
