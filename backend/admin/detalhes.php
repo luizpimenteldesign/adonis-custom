@@ -2,7 +2,7 @@
 /**
  * DETALHES DO PEDIDO — SISTEMA ADONIS
  * Visual: Google / Material Design 3
- * Versão: 6.0 — Sidebar + Layout 2 colunas + Ações condicionais
+ * Versão: 7.0 — Menu via include, sem emojis
  */
 require_once 'auth.php';
 require_once '../config/Database.php';
@@ -61,21 +61,21 @@ try {
 }
 
 $status_map = [
-    'Pre-OS'                        => ['label'=>'Pré-OS',                   'badge'=>'badge-new',     'icone'=>'🗒️'],
-    'Em analise'                    => ['label'=>'Em Análise',              'badge'=>'badge-info',    'icone'=>'🔍'],
-    'Orcada'                        => ['label'=>'Orçada',                  'badge'=>'badge-warning', 'icone'=>'💰'],
-    'Aguardando aprovacao'          => ['label'=>'Aguard. Aprovação',     'badge'=>'badge-warning', 'icone'=>'⏳'],
-    'Aprovada'                      => ['label'=>'Aguard. Pagamento',       'badge'=>'badge-success', 'icone'=>'💳'],
-    'Pagamento recebido'            => ['label'=>'Pagamento Recebido',      'badge'=>'badge-success', 'icone'=>'✅'],
-    'Instrumento recebido'          => ['label'=>'Instrumento Recebido',    'badge'=>'badge-success', 'icone'=>'📦'],
-    'Servico iniciado'              => ['label'=>'Serviço Iniciado',        'badge'=>'badge-purple',  'icone'=>'🔧'],
-    'Em desenvolvimento'            => ['label'=>'Em Desenvolvimento',      'badge'=>'badge-purple',  'icone'=>'⚙️'],
-    'Servico finalizado'            => ['label'=>'Serviço Finalizado',      'badge'=>'badge-success', 'icone'=>'🎸'],
-    'Pronto para retirada'          => ['label'=>'Pronto p/ Retirada',      'badge'=>'badge-warning', 'icone'=>'🎉'],
-    'Aguardando pagamento retirada' => ['label'=>'Pag. Pendente Retirada',  'badge'=>'badge-warning', 'icone'=>'💵'],
-    'Entregue'                      => ['label'=>'Entregue',                'badge'=>'badge-dark',    'icone'=>'🏁'],
-    'Reprovada'                     => ['label'=>'Reprovada',               'badge'=>'badge-danger',  'icone'=>'❌'],
-    'Cancelada'                     => ['label'=>'Cancelada',               'badge'=>'badge-dark',    'icone'=>'🚫'],
+    'Pre-OS'                        => ['label'=>'Pré-OS',                   'badge'=>'badge-new',     'icone'=>'■'],
+    'Em analise'                    => ['label'=>'Em Análise',              'badge'=>'badge-info',    'icone'=>'■'],
+    'Orcada'                        => ['label'=>'Orçada',                  'badge'=>'badge-warning', 'icone'=>'■'],
+    'Aguardando aprovacao'          => ['label'=>'Aguard. Aprovação',     'badge'=>'badge-warning', 'icone'=>'■'],
+    'Aprovada'                      => ['label'=>'Aguard. Pagamento',       'badge'=>'badge-success', 'icone'=>'■'],
+    'Pagamento recebido'            => ['label'=>'Pagamento Recebido',      'badge'=>'badge-success', 'icone'=>'■'],
+    'Instrumento recebido'          => ['label'=>'Instrumento Recebido',    'badge'=>'badge-success', 'icone'=>'■'],
+    'Servico iniciado'              => ['label'=>'Serviço Iniciado',        'badge'=>'badge-purple',  'icone'=>'■'],
+    'Em desenvolvimento'            => ['label'=>'Em Desenvolvimento',      'badge'=>'badge-purple',  'icone'=>'■'],
+    'Servico finalizado'            => ['label'=>'Serviço Finalizado',      'badge'=>'badge-success', 'icone'=>'■'],
+    'Pronto para retirada'          => ['label'=>'Pronto p/ Retirada',      'badge'=>'badge-warning', 'icone'=>'■'],
+    'Aguardando pagamento retirada' => ['label'=>'Pag. Pendente Retirada',  'badge'=>'badge-warning', 'icone'=>'■'],
+    'Entregue'                      => ['label'=>'Entregue',                'badge'=>'badge-dark',    'icone'=>'■'],
+    'Reprovada'                     => ['label'=>'Reprovada',               'badge'=>'badge-danger',  'icone'=>'■'],
+    'Cancelada'                     => ['label'=>'Cancelada',               'badge'=>'badge-dark',    'icone'=>'■'],
 ];
 
 // Ações condicionais por status (igual ao dashboard)
@@ -112,7 +112,7 @@ $v = time();
     <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="assets/css/admin.css?v=<?php echo $v; ?>">
     <style>
-    /* ── LAYOUT SIDEBAR (igual ao dashboard) ──────────────── */
+    /* ── LAYOUT SIDEBAR (igual ao dashboard) ────────────── */
     .app-layout { display:flex; min-height:100vh; }
 
     .sidebar {
@@ -306,59 +306,21 @@ $v = time();
 <div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebar()"></div>
 
 <div class="app-layout">
-<!-- SIDEBAR -->
-<aside class="sidebar" id="sidebar">
-    <div class="sidebar-logo">
-        <img src="https://adns.luizpimentel.com/adonis-custom/frontend/public/assets/img/Logo-Adonis2.png" alt="Adonis">
-        <span class="sidebar-logo-title">Adonis</span>
-    </div>
-    <div class="sidebar-section">
-        <div class="sidebar-section-label">Principal</div>
-        <a href="dashboard.php" class="sidebar-link"><span class="nav-icon">📋</span> Todos os Pedidos</a>
-        <a href="dashboard.php?status=Pre-OS" class="sidebar-link"><span class="nav-icon">🗒️</span> Pré-OS</a>
-        <a href="dashboard.php?status=Em analise" class="sidebar-link"><span class="nav-icon">🔍</span> Em Análise</a>
-        <a href="dashboard.php?status=Orcada" class="sidebar-link"><span class="nav-icon">💰</span> Orçadas</a>
-        <a href="dashboard.php?status=Aguardando aprovacao" class="sidebar-link"><span class="nav-icon">⏳</span> Aguard. Aprovação</a>
-    </div>
-    <hr class="sidebar-divider">
-    <div class="sidebar-section">
-        <div class="sidebar-section-label">Execução</div>
-        <a href="dashboard.php?status=Aprovada" class="sidebar-link"><span class="nav-icon">💳</span> Aguard. Pagamento</a>
-        <a href="dashboard.php?status=Instrumento recebido" class="sidebar-link"><span class="nav-icon">📦</span> Instr. Recebido</a>
-        <a href="dashboard.php?status=Em desenvolvimento" class="sidebar-link"><span class="nav-icon">⚙️</span> Em Execução</a>
-        <a href="dashboard.php?status=Servico finalizado" class="sidebar-link"><span class="nav-icon">🎸</span> Serviço Finalizado</a>
-        <a href="dashboard.php?status=Pronto para retirada" class="sidebar-link"><span class="nav-icon">🎉</span> Pronto p/ Retirada</a>
-    </div>
-    <hr class="sidebar-divider">
-    <div class="sidebar-section">
-        <div class="sidebar-section-label">Encerrados</div>
-        <a href="dashboard.php?status=Entregue" class="sidebar-link"><span class="nav-icon">🏁</span> Entregues</a>
-        <a href="dashboard.php?status=Reprovada" class="sidebar-link"><span class="nav-icon">❌</span> Reprovados</a>
-        <a href="dashboard.php?status=Cancelada" class="sidebar-link"><span class="nav-icon">🚫</span> Cancelados</a>
-    </div>
-    <div class="sidebar-user">
-        <div class="sidebar-user-avatar"><?php echo strtoupper(substr($_SESSION['admin_nome']??'A',0,1)); ?></div>
-        <div class="sidebar-user-info">
-            <div class="sidebar-user-name"><?php echo htmlspecialchars($_SESSION['admin_nome']??'Admin'); ?></div>
-            <div class="sidebar-user-role">Administrador</div>
-        </div>
-        <a href="logout.php" class="sidebar-logout" title="Sair">🚪</a>
-    </div>
-</aside>
+<?php include 'includes/menu.php'; ?>
 
 <!-- CONTEÚDO PRINCIPAL -->
 <main class="main-content">
     <div class="topbar">
         <button class="btn-menu" onclick="toggleSidebar()">☰</button>
         <span class="topbar-title">Pedido #<?php echo $pedido['id']; ?></span>
-        <a href="logout.php" style="font-size:20px;color:var(--g-text-2);text-decoration:none">🚪</a>
+        <a href="/backend/admin/logout.php" style="font-size:20px;color:var(--g-text-2);text-decoration:none">→</a>
     </div>
 
     <div class="page-content">
 
         <!-- CABEÇALHO -->
         <div class="page-header">
-            <a href="dashboard.php" class="page-header-back">&#8592;</a>
+            <a href="/backend/admin/dashboard.php" class="page-header-back">&#8592;</a>
             <div class="page-header-info">
                 <div class="page-header-title"><?php echo htmlspecialchars($pedido['cliente_nome'] ?? 'Sem nome'); ?> <span style="font-weight:400;color:var(--g-text-2)">#<?php echo $pedido['id']; ?></span></div>
                 <div class="page-header-sub"><?php echo htmlspecialchars(trim(($pedido['instrumento_tipo']??'').' '.($pedido['instrumento_marca']??'').' '.($pedido['instrumento_modelo']??'')) ?: 'Instrumento não informado'); ?></div>
@@ -597,10 +559,10 @@ $v = time();
 
 <!-- BOTTOM NAV mobile -->
 <nav class="bottom-nav">
-    <a href="dashboard.php"><span class="nav-icon">📋</span>Pedidos</a>
-    <a href="#" class="active"><span class="nav-icon">📌</span>Este pedido</a>
-    <a href="dashboard.php?status=Pre-OS"><span class="nav-icon">⏳</span>Pendentes</a>
-    <a href="logout.php"><span class="nav-icon">🚪</span>Sair</a>
+    <a href="/backend/admin/dashboard.php"><span class="nav-icon">■</span>Pedidos</a>
+    <a href="#" class="active"><span class="nav-icon">■</span>Este pedido</a>
+    <a href="/backend/admin/dashboard.php?status=Pre-OS"><span class="nav-icon">■</span>Pendentes</a>
+    <a href="/backend/admin/logout.php"><span class="nav-icon">■</span>Sair</a>
 </nav>
 
 <!-- MODAL ORÇAMENTO -->
