@@ -1,13 +1,13 @@
 <?php
 /**
  * LOGIN ADMINISTRATIVO - SISTEMA ADONIS
- * Versão: 1.6
+ * Versão: 1.7 - Redirect absoluto
  */
 
 session_start();
 
 if (isset($_SESSION['admin_logado']) && $_SESSION['admin_logado'] === true) {
-    header('Location: dashboard.php');
+    header('Location: /backend/admin/dashboard.php');
     exit;
 }
 
@@ -54,7 +54,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     ':user_agent' => $_SERVER['HTTP_USER_AGENT'] ?? 'unknown',
                 ]);
 
-                header('Location: dashboard.php');
+                header('Location: /backend/admin/dashboard.php');
                 exit;
             } else {
                 $erro = 'E-mail ou senha inválidos.';
@@ -122,7 +122,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </form>
 
         <div style="margin-top:24px;font-size:13px;color:var(--g-text-3)">
-            <a href="../../frontend/index.php" style="color:var(--g-text-3)">← Voltar para o site</a>
+            <a href="/frontend/index.php" style="color:var(--g-text-3)">← Voltar para o site</a>
         </div>
 
     </div>
