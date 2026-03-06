@@ -67,12 +67,16 @@
     <?php endforeach; ?>
     </nav>
 
-    <div class="sidebar-user">
+    <a href="perfil.php" class="sidebar-user" title="Editar perfil">
         <div class="sidebar-user-avatar"><?php echo strtoupper(substr($_SESSION['admin_nome']??'A',0,1)); ?></div>
         <div class="sidebar-user-info">
             <div class="sidebar-user-name"><?php echo htmlspecialchars($_SESSION['admin_nome']??'Admin'); ?></div>
-            <div class="sidebar-user-role">Administrador</div>
+            <div class="sidebar-user-role"><?php echo ucfirst($_SESSION['admin_tipo']??'Admin'); ?></div>
         </div>
-        <a href="logout.php" class="sidebar-logout material-symbols-outlined" title="Sair">logout</a>
-    </div>
+    </a>
+    
+    <a href="logout.php" class="sidebar-logout-btn" title="Sair">
+        <span class="material-symbols-outlined">logout</span>
+        Sair
+    </a>
 </aside>
