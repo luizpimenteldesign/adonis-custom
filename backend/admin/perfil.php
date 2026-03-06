@@ -10,7 +10,7 @@ $msg = isset($_GET['msg']) ? $_GET['msg'] : '';
 // Carrega dados do usuário logado
 $admin_id = $_SESSION['admin_id'] ?? 0;
 try {
-    $stmt = $conn->prepare('SELECT id, nome, email, tipo, criado_em FROM usuarios WHERE id = ? LIMIT 1');
+    $stmt = $conn->prepare('SELECT id, nome, email, tipo, avatar_url, criado_em FROM usuarios WHERE id = ? LIMIT 1');
     $stmt->execute([$admin_id]);
     $usuario = $stmt->fetch(PDO::FETCH_ASSOC);
     if (!$usuario) {
@@ -38,16 +38,18 @@ include '_sidebar_data.php';
     <link rel="stylesheet" href="assets/css/sidebar.css?v=<?php echo $v; ?>">
     <link rel="stylesheet" href="assets/css/pages.css?v=<?php echo $v; ?>">
     <style>
-    .profile-header{background:var(--g-surface);border:1px solid var(--g-border);border-radius:12px;padding:24px;margin-bottom:24px;display:flex;align-items:center;gap:20px}
-    .profile-avatar{width:80px;height:80px;border-radius:50%;background:linear-gradient(135deg,var(--g-primary),#0a7ea4);color:white;display:flex;align-items:center;justify-content:center;font-size:32px;font-weight:600;flex-shrink:0}
-    .profile-info{flex:1}
-    .profile-name{font-size:20px;font-weight:600;color:var(--g-text);margin-bottom:4px}
-    .profile-email{font-size:14px;color:var(--g-text-2);margin-bottom:8px}
-    .profile-meta{display:flex;gap:16px;flex-wrap:wrap}
-    .profile-meta-item{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--g-text-3)}
-    .form-section{background:var(--g-surface);border:1px solid var(--g-border);border-radius:12px;padding:20px 24px;margin-bottom:16px}
-    .form-section-title{font-size:15px;font-weight:600;color:var(--g-text);margin-bottom:16px;display:flex;align-items:center;gap:8px}
-    @media (max-width:640px){.profile-header{flex-direction:column;text-align:center}}
+    .avatar-upload-wrap{position:relative;display:inline-block}
+    .avatar-upload-btn{
+        position:absolute;bottom:0;right:0;width:36px;height:36px;
+        background:var(--g-blue);border-radius:50%;
+        display:flex;align-items:center;justify-content:center;
+        cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.15);
+        transition:transform .15s;
+    }
+    .avatar-upload-btn:hover{transform:scale(1.08)}
+    .avatar-upload-btn .material-symbols-outlined{font-size:18px;color:#fff}
+    .avatar-upload-input{display:none}
+    .profile-avatar-img{width:80px;height:80px;border-radius:50%;object-fit:cover;border:3px solid var(--g-border)}
     </style>
 </head>
 <body>
@@ -81,10 +83,20 @@ include '_sidebar_data.php';
 
         <!-- CARD DE APRESENTAÇÃO -->
         <div class="profile-header">
-            <div class="profile-avatar"><?php
-                $parts = array_filter(explode(' ', trim($usuario['nome'])));
-                echo count($parts)>=2 ? strtoupper(substr($parts[0],0,1).substr(end($parts),0,1)) : strtoupper(substr($parts[0]??'A',0,2));
-            ?></div>
+            <form method="POST" action="upload_avatar.php" enctype="multipart/form-data" id="form-avatar" class="avatar-upload-wrap">
+                <?php if ($usuario['avatar_url'] && file_exists(__DIR__ . '/' . $usuario['avatar_url'])): ?>
+                    <img src="<?php echo htmlspecialchars($usuario['avatar_url']); ?>?v=<?php echo time(); ?>" class="profile-avatar-img" alt="Avatar">
+                <?php else: ?>
+                    <div class="profile-avatar"><?php
+                        $parts = array_filter(explode(' ', trim($usuario['nome'])));
+                        echo count($parts)>=2 ? strtoupper(substr($parts[0],0,1).substr(end($parts),0,1)) : strtoupper(substr($parts[0]??'A',0,2));
+                    ?></div>
+                <?php endif; ?>
+                <label class="avatar-upload-btn" for="avatar-input" title="Alterar avatar">
+                    <span class="material-symbols-outlined">photo_camera</span>
+                </label>
+                <input type="file" name="avatar" id="avatar-input" class="avatar-upload-input" accept="image/jpeg,image/png,image/gif,image/webp" onchange="document.getElementById('form-avatar').submit()">
+            </form>
             <div class="profile-info">
                 <div class="profile-name"><?php echo htmlspecialchars($usuario['nome']); ?></div>
                 <div class="profile-email"><?php echo htmlspecialchars($usuario['email']); ?></div>
@@ -108,7 +120,7 @@ include '_sidebar_data.php';
                     <span class="material-symbols-outlined" style="color:var(--g-primary)">person</span>
                     Dados Pessoais
                 </div>
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+                <div class="form-grid">
                     <div>
                         <label class="form-label">NOME COMPLETO *</label>
                         <input class="form-input" type="text" name="nome" value="<?php echo htmlspecialchars($usuario['nome']); ?>" required placeholder="Seu nome completo">
@@ -124,7 +136,7 @@ include '_sidebar_data.php';
                 </div>
                 <div style="display:flex;justify-content:flex-end;gap:12px;margin-top:16px">
                     <button type="submit" class="btn btn-primary">
-                        <span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle;margin-right:4px">save</span>
+                        <span class="material-symbols-outlined" style="font-size:18px">save</span>
                         Salvar Alterações
                     </button>
                 </div>
@@ -159,7 +171,7 @@ include '_sidebar_data.php';
                 <div style="display:flex;justify-content:flex-end;gap:12px;margin-top:16px">
                     <button type="button" class="btn btn-secondary" onclick="document.getElementById('form-senha').reset()">Limpar</button>
                     <button type="submit" class="btn btn-primary">
-                        <span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle;margin-right:4px">key</span>
+                        <span class="material-symbols-outlined" style="font-size:18px">key</span>
                         Alterar Senha
                     </button>
                 </div>
