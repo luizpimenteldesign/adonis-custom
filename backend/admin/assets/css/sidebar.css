@@ -122,7 +122,7 @@
 
 /* Botão logout */
 .sidebar-logout-btn{
-    padding:10px 16px;margin:0 8px 8px;
+    padding:10px 16px;margin:0 0 12px;
     display:flex;align-items:center;justify-content:center;gap:8px;
     border-radius:10px;background:var(--g-hover);
     color:var(--g-text-2);text-decoration:none;
