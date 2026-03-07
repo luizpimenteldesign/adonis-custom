@@ -34,6 +34,37 @@ if (isset($_POST['action']) && $_POST['action'] === 'criar_categoria') {
     exit;
 }
 
+// API JSON: buscar insumos
+if (isset($_GET['action']) && $_GET['action'] === 'buscar_insumos') {
+    header('Content-Type: application/json');
+    $busca = trim($_GET['q'] ?? '');
+    $sql = "SELECT id, nome, unidade, valor_unitario, categoria_id FROM insumos WHERE ativo=1";
+    if ($busca) $sql .= " AND nome LIKE :q";
+    $sql .= " ORDER BY nome LIMIT 50";
+    $stmt = $conn->prepare($sql);
+    if ($busca) $stmt->execute([':q' => '%'.$busca.'%']);
+    else $stmt->execute();
+    echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
+    exit;
+}
+
+// API JSON: obter insumos vinculados a um serviço
+if (isset($_GET['action']) && $_GET['action'] === 'insumos_servico') {
+    header('Content-Type: application/json');
+    $servicoId = (int)($_GET['servico_id'] ?? 0);
+    if (!$servicoId) { echo json_encode([]); exit; }
+    $stmt = $conn->prepare("
+        SELECT si.insumo_id, si.quantidade_padrao, i.nome, i.unidade, i.valor_unitario
+        FROM servicos_insumos si
+        JOIN insumos i ON si.insumo_id = i.id
+        WHERE si.servico_id = ?
+        ORDER BY i.nome
+    ");
+    $stmt->execute([$servicoId]);
+    echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
+    exit;
+}
+
 $busca = trim($_GET['q'] ?? '');
 $msg   = $_GET['msg'] ?? '';
 
@@ -47,6 +78,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $prazo     = ($_POST['prazo_padrao_dias'] ?? '') !== '' ? (int)$_POST['prazo_padrao_dias'] : null;
         $ativo     = isset($_POST['ativo']) ? 1 : 0;
         $cats      = array_map('intval', $_POST['categorias'] ?? []);
+        $insumos   = json_decode($_POST['insumos_json'] ?? '[]', true) ?: [];
 
         if (!$nome) { header('Location: servicos.php?msg=erro:Nome obrigatório'); exit; }
 
@@ -60,9 +92,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                  ->execute([$nome, $descricao, $valor, $prazo, $ativo, $sid]);
         }
 
+        // Atualiza categorias
         $conn->prepare('DELETE FROM servico_categorias WHERE servico_id=?')->execute([$sid]);
         foreach ($cats as $cid) {
             if ($cid > 0) $conn->prepare('INSERT IGNORE INTO servico_categorias (servico_id, categoria_id) VALUES (?,?)')->execute([$sid, $cid]);
+        }
+
+        // Atualiza insumos vinculados
+        $conn->prepare('DELETE FROM servicos_insumos WHERE servico_id=?')->execute([$sid]);
+        foreach ($insumos as $ins) {
+            $iid = (int)($ins['id'] ?? 0);
+            $qtd = (float)($ins['quantidade'] ?? 1);
+            if ($iid > 0 && $qtd > 0) {
+                $conn->prepare('INSERT INTO servicos_insumos (servico_id, insumo_id, quantidade_padrao) VALUES (?,?,?)')
+                     ->execute([$sid, $iid, $qtd]);
+            }
         }
 
         $label = $acao === 'criar' ? 'criado' : 'atualizado';
@@ -106,6 +150,13 @@ try {
     }
 } catch (Exception $e) {}
 
+// Carrega contagem de insumos por serviço
+$insumos_por_servico = [];
+try {
+    $rows = $conn->query("SELECT servico_id, COUNT(*) as total FROM servicos_insumos GROUP BY servico_id")->fetchAll(PDO::FETCH_ASSOC);
+    foreach ($rows as $r) $insumos_por_servico[$r['servico_id']] = (int)$r['total'];
+} catch (Exception $e) {}
+
 $current_page = 'servicos.php';
 $v = time();
 include '_sidebar_data.php';
@@ -138,7 +189,6 @@ include '_sidebar_data.php';
     }
     .chip .material-symbols-outlined { font-size:15px; }
     
-    /* ┌── BOTÃO + PARA NOVA CATEGORIA ────────────────────── */
     .cat-label-row {
         display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;
     }
@@ -173,6 +223,73 @@ include '_sidebar_data.php';
     .nova-cat-inline .btn-cancelar-cat {
         background:var(--g-surface); color:var(--g-text-2);
         border:1px solid var(--g-border);
+    }
+
+    /* ┌── INSUMOS BADGE NA TABELA ────────────────────────── */
+    .badge-insumos {
+        display:inline-flex; align-items:center; gap:3px;
+        padding:3px 8px; border-radius:12px;
+        background:var(--g-blue-light); color:var(--g-blue);
+        font-size:11px; font-weight:600;
+    }
+    .badge-insumos .material-symbols-outlined { font-size:13px; }
+
+    /* ┌── MODAL DE INSUMOS ────────────────────────── */
+    .insumos-search {
+        position:relative; margin-bottom:12px;
+    }
+    .insumos-search input {
+        width:100%; padding:10px 12px 10px 38px;
+        border:1px solid var(--g-border); border-radius:8px;
+        font-size:14px;
+    }
+    .insumos-search .material-symbols-outlined {
+        position:absolute; left:12px; top:50%;
+        transform:translateY(-50%); font-size:18px;
+        color:var(--g-text-3);
+    }
+    .insumos-results {
+        max-height:200px; overflow-y:auto;
+        border:1px solid var(--g-border); border-radius:8px;
+        margin-bottom:12px; background:var(--g-bg);
+    }
+    .insumo-item {
+        padding:10px 12px; border-bottom:1px solid var(--g-border);
+        cursor:pointer; transition:background .15s;
+        display:flex; justify-content:space-between; align-items:center;
+    }
+    .insumo-item:last-child { border-bottom:none; }
+    .insumo-item:hover { background:var(--g-hover); }
+    .insumo-item-nome { font-size:13px; font-weight:500; }
+    .insumo-item-meta { font-size:11px; color:var(--g-text-3); margin-top:2px; }
+    .insumo-item-valor { font-size:12px; color:var(--g-text-2); }
+    .insumos-selecionados-titulo {
+        font-size:11px; font-weight:600; color:var(--g-text-2);
+        text-transform:uppercase; letter-spacing:.4px; margin-bottom:8px;
+    }
+    .insumo-selecionado {
+        display:flex; gap:10px; align-items:center;
+        padding:10px; background:var(--g-surface);
+        border:1px solid var(--g-border); border-radius:8px;
+        margin-bottom:6px;
+    }
+    .insumo-sel-info { flex:1; min-width:0; }
+    .insumo-sel-nome { font-size:13px; font-weight:500; }
+    .insumo-sel-meta { font-size:11px; color:var(--g-text-3); }
+    .insumo-sel-qtd {
+        width:70px; padding:6px; border:1px solid var(--g-border);
+        border-radius:6px; text-align:center; font-size:13px;
+    }
+    .btn-remover-insumo {
+        padding:4px; border:none; background:transparent;
+        color:var(--g-red); cursor:pointer; display:flex;
+        align-items:center; justify-content:center;
+        border-radius:4px; transition:background .15s;
+    }
+    .btn-remover-insumo:hover { background:var(--g-red-light); }
+    .insumos-vazio {
+        text-align:center; padding:20px; color:var(--g-text-3);
+        font-size:13px;
     }
     </style>
 </head>
@@ -233,6 +350,7 @@ include '_sidebar_data.php';
                     <tr>
                         <th>Nome</th>
                         <th>Categorias</th>
+                        <th>Insumos</th>
                         <th class="text-right">Valor Base</th>
                         <th class="text-center">Prazo (d.u.)</th>
                         <th class="text-center">Uso</th>
@@ -246,6 +364,7 @@ include '_sidebar_data.php';
                     $sc      = $cats_por_servico[$s['id']]    ?? [];
                     $sc_ids  = $cat_ids_por_servico[$s['id']] ?? [];
                     $prazo_v = $s['prazo_padrao_dias'] !== null ? (int)$s['prazo_padrao_dias'] : 'null';
+                    $total_insumos = $insumos_por_servico[$s['id']] ?? 0;
                 ?>
                 <tr class="<?php echo !$s['ativo'] ? 'row-inactive' : ''; ?>">
                     <td><strong><?php echo htmlspecialchars($s['nome']); ?></strong>
@@ -255,6 +374,13 @@ include '_sidebar_data.php';
                         <?php if ($sc): foreach ($sc as $cn): ?>
                         <span class="badge badge-info" style="margin:1px 2px"><?php echo htmlspecialchars($cn); ?></span>
                         <?php endforeach; else: ?><span class="text-muted">—</span><?php endif; ?>
+                    </td>
+                    <td>
+                        <?php if ($total_insumos > 0): ?>
+                        <span class="badge-insumos">
+                            <span class="material-symbols-outlined">inventory_2</span><?php echo $total_insumos; ?>
+                        </span>
+                        <?php else: ?><span class="text-muted">—</span><?php endif; ?>
                     </td>
                     <td class="text-right"><strong>R$&nbsp;<?php echo number_format((float)$s['valor_base'], 2, ',', '.'); ?></strong></td>
                     <td class="text-center">
@@ -277,7 +403,7 @@ include '_sidebar_data.php';
                     <td class="text-center">
                         <div class="table-actions">
                             <button class="btn-icon" title="Editar"
-                                onclick="editarServico(<?php echo $s['id']; ?>,<?php echo htmlspecialchars(json_encode($s['nome']),ENT_QUOTES); ?>,<?php echo htmlspecialchars(json_encode($s['descricao']),ENT_QUOTES); ?>,<?php echo $s['valor_base']; ?>,<?php echo $s['ativo']; ?>,<?php echo $prazo_v; ?>,<?php echo htmlspecialchars(json_encode($sc_ids),ENT_QUOTES); ?>)">
+                                onclick="editarServico(<?php echo $s['id']; ?>)">
                                 <span class="material-symbols-outlined">edit</span>
                             </button>
                             <?php if ($s['total_uso'] == 0): ?>
@@ -314,12 +440,13 @@ include '_sidebar_data.php';
 
 <!-- MODAL CRIAR / EDITAR -->
 <div class="modal-overlay" id="modal-servico">
-    <div class="modal-box">
+    <div class="modal-box" style="max-width:600px;max-height:90vh;overflow-y:auto">
         <div class="modal-drag"></div>
         <div class="modal-title" id="modal-titulo">Novo Serviço</div>
-        <form method="POST" id="form-servico">
+        <form method="POST" id="form-servico" onsubmit="return prepararEnvio()">
             <input type="hidden" name="acao" id="f-acao" value="criar">
             <input type="hidden" name="id"   id="f-id"   value="">
+            <input type="hidden" name="insumos_json" id="f-insumos-json" value="[]">
 
             <label class="form-label">NOME DO SERVIÇO *</label>
             <input class="form-input" type="text" name="nome" id="f-nome" required placeholder="Ex: Setup Completo">
@@ -334,7 +461,6 @@ include '_sidebar_data.php';
                 </button>
             </div>
 
-            <!-- FORMULÁRIO INLINE PARA CRIAR CATEGORIA -->
             <div class="nova-cat-inline" id="nova-cat-form">
                 <input type="text" id="nova-cat-nome" placeholder="Nome da nova categoria..." maxlength="50">
                 <button type="button" class="btn-salvar-cat" onclick="salvarNovaCategoria()">
@@ -359,6 +485,31 @@ include '_sidebar_data.php';
                 </div>
             </div>
 
+            <hr style="margin:16px 0;border:none;border-top:1px solid var(--g-border)">
+
+            <!-- ┌── SEÇÃO DE INSUMOS ────────────────────────── -->
+            <div class="form-label" style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
+                <span class="material-symbols-outlined" style="font-size:18px">inventory_2</span>
+                INSUMOS VINCULADOS AO SERVIÇO
+            </div>
+            <div style="font-size:12px;color:var(--g-text-3);margin-bottom:12px">
+                Vincule os insumos que este serviço utiliza. Eles serão sugeridos automaticamente nos pedidos.
+            </div>
+
+            <div class="insumos-search">
+                <span class="material-symbols-outlined">search</span>
+                <input type="text" id="busca-insumo" placeholder="Buscar insumo por nome..." autocomplete="off" oninput="buscarInsumos()">
+            </div>
+
+            <div class="insumos-results" id="resultados-insumos" style="display:none"></div>
+
+            <div class="insumos-selecionados-titulo">INSUMOS SELECIONADOS (<span id="count-insumos">0</span>)</div>
+            <div id="lista-insumos-selecionados">
+                <div class="insumos-vazio">Nenhum insumo vinculado</div>
+            </div>
+
+            <hr style="margin:16px 0;border:none;border-top:1px solid var(--g-border)">
+
             <label class="form-check" style="margin-top:8px">
                 <input type="checkbox" name="ativo" id="f-ativo" value="1">
                 SERVIÇO ATIVO (VISÍVEL NO FORMULÁRIO)
@@ -376,6 +527,12 @@ include '_sidebar_data.php';
 <script>
 let todasCategorias = [];
 let catsSelecionadas = new Set();
+let insumosSelecionados = []; // [{id, nome, unidade, valor_unitario, quantidade}]
+let timeoutBusca = null;
+
+// ═══════════════════════════════════════════════════════════
+//  CATEGORIAS
+// ═══════════════════════════════════════════════════════════
 
 async function carregarCategorias() {
     const r = await fetch('servicos.php?action=categorias');
@@ -405,51 +562,6 @@ function renderChips() {
     });
 }
 
-async function abrirModal() {
-    await carregarCategorias();
-    catsSelecionadas = new Set();
-    document.getElementById('modal-titulo').textContent = 'Novo Serviço';
-    document.getElementById('f-acao').value     = 'criar';
-    document.getElementById('f-id').value       = '';
-    document.getElementById('f-nome').value     = '';
-    document.getElementById('f-descricao').value= '';
-    document.getElementById('f-valor').value    = '';
-    document.getElementById('f-prazo').value    = '';
-    document.getElementById('f-ativo').checked  = true;
-    document.getElementById('nova-cat-form').classList.remove('show');
-    renderChips();
-    document.getElementById('modal-servico').classList.add('aberto');
-    setTimeout(() => document.getElementById('f-nome').focus(), 150);
-}
-
-async function editarServico(id, nome, desc, valor, ativo, prazo, catIds) {
-    await carregarCategorias();
-    catsSelecionadas = new Set(catIds);
-    document.getElementById('modal-titulo').textContent = 'Editar Serviço';
-    document.getElementById('f-acao').value      = 'editar';
-    document.getElementById('f-id').value        = id;
-    document.getElementById('f-nome').value      = nome;
-    document.getElementById('f-descricao').value = desc || '';
-    document.getElementById('f-valor').value     = Number(valor).toFixed(2);
-    document.getElementById('f-prazo').value     = prazo !== null && prazo !== undefined ? prazo : '';
-    document.getElementById('f-ativo').checked   = !!ativo;
-    document.getElementById('nova-cat-form').classList.remove('show');
-    renderChips();
-    document.getElementById('modal-servico').classList.add('aberto');
-    setTimeout(() => document.getElementById('f-nome').focus(), 150);
-}
-
-function fecharModalServico() {
-    document.getElementById('modal-servico').classList.remove('aberto');
-}
-
-document.getElementById('modal-servico').addEventListener('click', function(e) {
-    if (e.target === this) fecharModalServico();
-});
-
-// ┌─────────────────────────────────────────────────────────
-//   CRIAR NOVA CATEGORIA INLINE
-// └─────────────────────────────────────────────────────────
 function toggleNovaCatForm() {
     const form = document.getElementById('nova-cat-form');
     form.classList.toggle('show');
@@ -466,10 +578,7 @@ function cancelarNovaCategoria() {
 
 async function salvarNovaCategoria() {
     const nome = document.getElementById('nova-cat-nome').value.trim();
-    if (!nome) {
-        alert('✋ Digite o nome da categoria!');
-        return;
-    }
+    if (!nome) { alert('✋ Digite o nome da categoria!'); return; }
 
     const formData = new FormData();
     formData.append('action', 'criar_categoria');
@@ -478,29 +587,239 @@ async function salvarNovaCategoria() {
     try {
         const r = await fetch('servicos.php', { method: 'POST', body: formData });
         const data = await r.json();
-
         if (data.sucesso) {
-            // Adiciona a nova categoria à lista
             todasCategorias.push({ id: data.id, nome: data.nome });
             todasCategorias.sort((a, b) => a.nome.localeCompare(b.nome));
-
-            // Marca como selecionada automaticamente
             catsSelecionadas.add(data.id);
-
-            // Re-renderiza os chips
             renderChips();
-
-            // Fecha o formulário inline
             cancelarNovaCategoria();
-
-            // Toast de sucesso
             _toast('✅ Categoria criada com sucesso!');
-        } else {
-            alert('❌ ' + (data.erro || 'Erro ao salvar categoria'));
-        }
-    } catch (err) {
-        alert('❌ Erro de conexão: ' + err.message);
+        } else { alert('❌ ' + (data.erro || 'Erro ao salvar categoria')); }
+    } catch (err) { alert('❌ Erro de conexão: ' + err.message); }
+}
+
+// ═══════════════════════════════════════════════════════════
+//  INSUMOS
+// ═══════════════════════════════════════════════════════════
+
+function buscarInsumos() {
+    clearTimeout(timeoutBusca);
+    const query = document.getElementById('busca-insumo').value.trim();
+    
+    if (!query) {
+        document.getElementById('resultados-insumos').style.display = 'none';
+        return;
     }
+
+    timeoutBusca = setTimeout(async () => {
+        try {
+            const r = await fetch('servicos.php?action=buscar_insumos&q=' + encodeURIComponent(query));
+            const insumos = await r.json();
+            renderResultadosInsumos(insumos);
+        } catch (e) {
+            console.error('Erro ao buscar insumos:', e);
+        }
+    }, 300);
+}
+
+function renderResultadosInsumos(insumos) {
+    const div = document.getElementById('resultados-insumos');
+    
+    if (!insumos || insumos.length === 0) {
+        div.innerHTML = '<div class="insumos-vazio">Nenhum insumo encontrado</div>';
+        div.style.display = 'block';
+        return;
+    }
+
+    div.innerHTML = '';
+    insumos.forEach(ins => {
+        // Verifica se já está selecionado
+        if (insumosSelecionados.find(i => i.id === ins.id)) return;
+
+        const item = document.createElement('div');
+        item.className = 'insumo-item';
+        item.onclick = () => adicionarInsumo(ins);
+
+        item.innerHTML = `
+            <div>
+                <div class="insumo-item-nome">${_esc(ins.nome)}</div>
+                <div class="insumo-item-meta">${_esc(ins.unidade)}</div>
+            </div>
+            <div class="insumo-item-valor">R$ ${_fmt(parseFloat(ins.valor_unitario))}</div>
+        `;
+
+        div.appendChild(item);
+    });
+
+    div.style.display = 'block';
+}
+
+function adicionarInsumo(ins) {
+    // Adiciona à lista de selecionados
+    insumosSelecionados.push({
+        id: ins.id,
+        nome: ins.nome,
+        unidade: ins.unidade,
+        valor_unitario: parseFloat(ins.valor_unitario),
+        quantidade: 1
+    });
+
+    // Limpa busca
+    document.getElementById('busca-insumo').value = '';
+    document.getElementById('resultados-insumos').style.display = 'none';
+
+    renderInsumosSelecionados();
+    _toast('✅ Insumo adicionado');
+}
+
+function removerInsumo(id) {
+    insumosSelecionados = insumosSelecionados.filter(i => i.id !== id);
+    renderInsumosSelecionados();
+}
+
+function atualizarQuantidade(id, qtd) {
+    const ins = insumosSelecionados.find(i => i.id === id);
+    if (ins) ins.quantidade = Math.max(0.001, parseFloat(qtd) || 1);
+}
+
+function renderInsumosSelecionados() {
+    const div = document.getElementById('lista-insumos-selecionados');
+    document.getElementById('count-insumos').textContent = insumosSelecionados.length;
+
+    if (insumosSelecionados.length === 0) {
+        div.innerHTML = '<div class="insumos-vazio">Nenhum insumo vinculado</div>';
+        return;
+    }
+
+    div.innerHTML = '';
+    insumosSelecionados.forEach(ins => {
+        const item = document.createElement('div');
+        item.className = 'insumo-selecionado';
+
+        const valorTotal = ins.valor_unitario * ins.quantidade;
+
+        item.innerHTML = `
+            <div class="insumo-sel-info">
+                <div class="insumo-sel-nome">${_esc(ins.nome)}</div>
+                <div class="insumo-sel-meta">${_esc(ins.unidade)} • R$ ${_fmt(ins.valor_unitario)} cada • Total: R$ ${_fmt(valorTotal)}</div>
+            </div>
+            <input type="number" class="insumo-sel-qtd" value="${ins.quantidade}"
+                min="0.001" step="0.001"
+                onchange="atualizarQuantidade(${ins.id}, this.value); renderInsumosSelecionados();"
+                title="Quantidade padrão">
+            <button type="button" class="btn-remover-insumo" onclick="removerInsumo(${ins.id})" title="Remover">
+                <span class="material-symbols-outlined" style="font-size:18px">close</span>
+            </button>
+        `;
+
+        div.appendChild(item);
+    });
+}
+
+function prepararEnvio() {
+    // Serializa insumos para JSON
+    const json = JSON.stringify(insumosSelecionados.map(i => ({
+        id: i.id,
+        quantidade: i.quantidade
+    })));
+    document.getElementById('f-insumos-json').value = json;
+    return true;
+}
+
+// ═══════════════════════════════════════════════════════════
+//  MODAL PRINCIPAL
+// ═══════════════════════════════════════════════════════════
+
+async function abrirModal() {
+    await carregarCategorias();
+    catsSelecionadas = new Set();
+    insumosSelecionados = [];
+    document.getElementById('modal-titulo').textContent = 'Novo Serviço';
+    document.getElementById('f-acao').value     = 'criar';
+    document.getElementById('f-id').value       = '';
+    document.getElementById('f-nome').value     = '';
+    document.getElementById('f-descricao').value= '';
+    document.getElementById('f-valor').value    = '';
+    document.getElementById('f-prazo').value    = '';
+    document.getElementById('f-ativo').checked  = true;
+    document.getElementById('busca-insumo').value = '';
+    document.getElementById('resultados-insumos').style.display = 'none';
+    document.getElementById('nova-cat-form').classList.remove('show');
+    renderChips();
+    renderInsumosSelecionados();
+    document.getElementById('modal-servico').classList.add('aberto');
+    setTimeout(() => document.getElementById('f-nome').focus(), 150);
+}
+
+async function editarServico(id) {
+    // Busca dados do serviço
+    const r = await fetch(`servicos.php?action=insumos_servico&servico_id=${id}`);
+    const insumosVinculados = await r.json();
+
+    // Busca dados básicos do serviço (precisamos fazer uma requisição extra ou passar via data-attribute)
+    // Por simplicidade, vamos buscar da própria tabela HTML
+    const row = event.target.closest('tr');
+    const nome = row.querySelector('td:first-child strong').textContent;
+    const desc = row.querySelector('td:first-child span')?.textContent || '';
+    const valorText = row.querySelector('td:nth-child(4)').textContent.replace(/[^0-9,]/g, '').replace(',', '.');
+    const prazoEl = row.querySelector('td:nth-child(5) .badge');
+    const prazo = prazoEl ? parseInt(prazoEl.textContent) : null;
+    const ativo = row.querySelector('.badge-success') !== null;
+
+    // Carrega categorias e insumos
+    await carregarCategorias();
+    
+    // Popula campos
+    document.getElementById('modal-titulo').textContent = 'Editar Serviço';
+    document.getElementById('f-acao').value      = 'editar';
+    document.getElementById('f-id').value        = id;
+    document.getElementById('f-nome').value      = nome;
+    document.getElementById('f-descricao').value = desc;
+    document.getElementById('f-valor').value     = parseFloat(valorText).toFixed(2);
+    document.getElementById('f-prazo').value     = prazo || '';
+    document.getElementById('f-ativo').checked   = ativo;
+    document.getElementById('busca-insumo').value = '';
+    document.getElementById('resultados-insumos').style.display = 'none';
+
+    // Popula insumos selecionados
+    insumosSelecionados = insumosVinculados.map(i => ({
+        id: parseInt(i.insumo_id),
+        nome: i.nome,
+        unidade: i.unidade,
+        valor_unitario: parseFloat(i.valor_unitario),
+        quantidade: parseFloat(i.quantidade_padrao)
+    }));
+
+    // TODO: carregar categorias selecionadas (precisa de endpoint adicional)
+    catsSelecionadas = new Set();
+
+    document.getElementById('nova-cat-form').classList.remove('show');
+    renderChips();
+    renderInsumosSelecionados();
+    document.getElementById('modal-servico').classList.add('aberto');
+    setTimeout(() => document.getElementById('f-nome').focus(), 150);
+}
+
+function fecharModalServico() {
+    document.getElementById('modal-servico').classList.remove('aberto');
+}
+
+document.getElementById('modal-servico').addEventListener('click', function(e) {
+    if (e.target === this) fecharModalServico();
+});
+
+// ═══════════════════════════════════════════════════════════
+//  UTILITÁRIOS
+// ═══════════════════════════════════════════════════════════
+
+function _esc(str) {
+    const div = document.createElement('div');
+    div.textContent = str || '';
+    return div.innerHTML;
+}
+
+function _fmt(v) {
+    return v.toFixed(2).replace('.', ',');
 }
 
 function _toast(msg) {
