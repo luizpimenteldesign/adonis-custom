@@ -3,6 +3,7 @@
  * DASHBOARD — SISTEMA ADONIS
  * Visual: Google / Material Design 3
  * Ícones: Material Symbols Outlined
+ * Versão: 9.0 — Modal análise de insumos no dashboard
  */
 require_once 'auth.php';
 require_once '../config/Database.php';
@@ -77,8 +78,8 @@ $status_map = [
 ];
 
 $acoes_por_status = [
-    'Pre-OS'               => [['Em analise','Iniciar Análise','btn-info'],['Orcada','Orçar','btn-warning','modal-orc'],['Reprovada','Reprovar','btn-danger','modal-rep'],['Cancelada','Cancelar','btn-dark']],
-    'Em analise'           => [['Orcada','Orçar','btn-warning','modal-orc'],['Reprovada','Reprovar','btn-danger','modal-rep'],['Cancelada','Cancelar','btn-dark']],
+    'Pre-OS'               => [['Em analise','Iniciar Análise','btn-info','modal-analise'],['Reprovada','Reprovar','btn-danger','modal-rep'],['Cancelada','Cancelar','btn-dark']],
+    'Em analise'           => [['Em analise','Rever Insumos','btn-info','modal-analise'],['Reprovada','Reprovar','btn-danger','modal-rep'],['Cancelada','Cancelar','btn-dark']],
     'Orcada'               => [['Aguardando aprovacao','Aguardar Aprovação','btn-warning'],['Reprovada','Reprovar','btn-danger','modal-rep'],['Cancelada','Cancelar','btn-dark']],
     'Aguardando aprovacao' => [['Aprovada','Marcar Aprovada','btn-success'],['Reprovada','Reprovar','btn-danger','modal-rep'],['Cancelada','Cancelar','btn-dark']],
     'Aprovada'             => [['Pagamento recebido','Pagamento Recebido','btn-success'],['Cancelada','Cancelar','btn-dark']],
@@ -90,7 +91,7 @@ $acoes_por_status = [
     'Pronto para retirada' => [['Entregue','Entregue','btn-dark']],
     'Aguardando pagamento retirada' => [['Entregue','Entregue','btn-dark']],
     'Entregue'             => [],
-    'Reprovada'            => [['Em analise','Reabrir Análise','btn-info']],
+    'Reprovada'            => [['Em analise','Reabrir — Rever Insumos','btn-info','modal-analise']],
     'Cancelada'            => [['Pre-OS','Reabrir','btn-info']],
 ];
 
@@ -193,6 +194,31 @@ $v = time();
     .search-loading{display:none;width:16px;height:16px;border:2px solid var(--g-border);border-top-color:var(--g-blue);border-radius:50%;animation:spin .6s linear infinite;flex-shrink:0}
     .search-loading.active{display:block}
     @keyframes spin{to{transform:rotate(360deg)}}
+
+    /* ── MODAL ANÁLISE ───────────────────────────────────── */
+    .analise-resumo{padding:12px 20px 0}
+    .analise-resumo-title{font-size:12px;font-weight:600;color:var(--g-text-3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px}
+    .analise-resumo-tags{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}
+    .analise-tag{background:var(--g-bg);border:1px solid var(--g-border);border-radius:20px;padding:4px 12px;font-size:12px;color:var(--g-text-2)}
+    .analise-sep{border:none;border-top:1px solid var(--g-border);margin:0 0 14px}
+    .analise-insumos-title{font-size:12px;font-weight:600;color:var(--g-text-3);text-transform:uppercase;letter-spacing:.4px;padding:0 20px 8px}
+    .analise-insumo-row{display:flex;align-items:center;gap:10px;padding:10px 20px;border-top:1px solid var(--g-border)}
+    .analise-insumo-row:first-child{border-top:none}
+    .analise-insumo-info{flex:1;min-width:0}
+    .analise-insumo-nome{font-size:13px;font-weight:500;color:var(--g-text)}
+    .analise-insumo-meta{font-size:11px;color:var(--g-text-3);margin-top:2px}
+    .analise-insumo-meta .sem-estoque{color:#c5221f;font-weight:600}
+    .analise-insumo-valor{font-size:13px;font-weight:600;color:var(--g-text);white-space:nowrap;min-width:70px;text-align:right}
+    .analise-insumo-valor.riscado{text-decoration:line-through;color:var(--g-text-3);font-weight:400}
+    .analise-cf-toggle{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--g-text-2);white-space:nowrap;cursor:pointer}
+    .analise-cf-toggle input{cursor:pointer;accent-color:var(--g-blue);width:15px;height:15px}
+    .analise-qtd{width:52px;border:1px solid var(--g-border);border-radius:6px;padding:4px 6px;font-size:13px;text-align:center}
+    .analise-qtd:focus{outline:2px solid var(--g-blue);border-color:transparent}
+    .analise-vazio{padding:20px;text-align:center;color:var(--g-text-3);font-size:13px}
+    .analise-footer{padding:14px 20px 0;border-top:2px solid var(--g-border);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}
+    .analise-total-bloco{font-size:13px;color:var(--g-text-2)}
+    .analise-total-bloco strong{font-size:16px;color:var(--g-text);display:block}
+    .analise-loading{padding:30px 20px;text-align:center;color:var(--g-text-3);font-size:13px}
     </style>
 </head>
 <body>
@@ -350,13 +376,31 @@ $v = time();
     </div>
 </div>
 
+<!-- ═══════════════════════════════════════════════════════════════
+     MODAL ANÁLISE DE INSUMOS
+═══════════════════════════════════════════════════════════════ -->
+<div class="modal-overlay" id="modal-analise">
+    <div class="modal-box" style="max-width:560px">
+        <div class="modal-drag"></div>
+        <div class="modal-title">Análise de Insumos</div>
+        <div id="analise-corpo">
+            <div class="analise-loading">Carregando insumos...</div>
+        </div>
+        <div class="modal-actions" id="analise-acoes" style="display:none">
+            <button class="btn btn-secondary" onclick="fecharModal('modal-analise')">Cancelar</button>
+            <button class="btn btn-info" id="btn-confirmar-analise" onclick="confirmarAnalise()">Confirmar e Orçar →</button>
+        </div>
+    </div>
+</div>
+
 <!-- MODAL ORÇAMENTO -->
 <div class="modal-overlay" id="modal-orcamento">
     <div class="modal-box">
         <div class="modal-drag"></div>
         <div class="modal-title">Definir Orçamento</div>
-        <label>Valor dos serviços (R$)</label>
+        <label>Valor total (serviços + insumos) — R$</label>
         <input type="number" id="modal-input-valor" min="0" step="0.01" placeholder="Ex: 350.00" oninput="simularModal()">
+        <div id="orc-breakdown" style="font-size:12px;color:var(--g-text-3);margin:-8px 0 8px;padding:0 2px"></div>
         <label>Prazo (dias úteis)</label>
         <input type="number" id="modal-input-prazo" min="1" step="1" placeholder="Ex: 7">
         <div class="modal-hint">Sem sábados, domingos e feriados</div>
@@ -555,12 +599,144 @@ function renderAcoes(acoes, totalBase, status){
     let html=`<div class="acao-section"><div class="acao-section-label">Ações disponíveis</div><div class="acao-btns">`;
     for(const a of acoes){
         const[s,label,cls,modal]=a;
-        if(modal==='modal-orc')      html+=`<button class="btn ${cls}" onclick="_abrirOrcamento(${totalBase})">${label}</button>`;
+        if(modal==='modal-analise') html+=`<button class="btn ${cls}" onclick="_abrirAnalise()">${label}</button>`;
         else if(modal==='modal-rep') html+=`<button class="btn ${cls}" onclick="_abrirReprovacao()">${label}</button>`;
-        else                         html+=`<button class="btn ${cls}" onclick="_enviar('${s.replace(/'/g,"\\'")}')">${label}</button>`;
+        else                         html+=`<button class="btn ${cls}" onclick="_enviar('${s.replace(/'/g,"\\'")}')}">${label}</button>`;
     }
     html+=`</div></div>`;
     return html;
+}
+
+// ── MODAL ANÁLISE ────────────────────────────────────────────
+let _insumos = [];
+
+function _abrirAnalise() {
+    if (!_idAtual) return;
+    document.getElementById('analise-corpo').innerHTML = '<div class="analise-loading">Carregando insumos...</div>';
+    document.getElementById('analise-acoes').style.display = 'none';
+    document.getElementById('modal-analise').classList.add('aberto');
+
+    fetch('analise_insumos.php?pre_os_id=' + _idAtual)
+        .then(r => r.json())
+        .then(data => {
+            if (!data.sucesso) { _toast(data.erro || 'Erro ao carregar'); fecharModal('modal-analise'); return; }
+            _renderizarAnalise(data);
+        })
+        .catch(() => { _toast('Erro de conexão'); fecharModal('modal-analise'); });
+}
+
+function _renderizarAnalise(data) {
+    _insumos = (data.insumos || []).map(i => ({ ...i }));
+
+    let html = '';
+
+    // Resumo do pedido
+    html += '<div class="analise-resumo">';
+    html += '<div class="analise-resumo-title">Serviços do pedido</div>';
+    html += '<div class="analise-resumo-tags">';
+    if (data.servicos && data.servicos.length) {
+        data.servicos.forEach(s => { html += '<span class="analise-tag">' + escHtml(s.nome) + '</span>'; });
+    } else {
+        html += '<span style="font-size:13px;color:var(--g-text-3)">Nenhum serviço</span>';
+    }
+    html += '</div></div>';
+    html += '<hr class="analise-sep">';
+
+    // Lista de insumos
+    html += '<div class="analise-insumos-title">Insumos necessários</div>';
+
+    if (!_insumos.length) {
+        html += '<div class="analise-vazio">Nenhum insumo vinculado a estes serviços. Você pode prosseguir para o orçamento.</div>';
+    } else {
+        _insumos.forEach((ins, idx) => {
+            const semEstoque = parseFloat(ins.quantidade_estoque) <= 0;
+            const cf = ins.cliente_fornece == 1;
+            const valorTotal = parseFloat(ins.valor_unitario) * parseFloat(ins.quantidade || 1);
+
+            html += `<div class="analise-insumo-row" id="row-ins-${idx}">`;
+
+            // Checkbox cliente fornece
+            html += `<label class="analise-cf-toggle">`;
+            html += `<input type="checkbox" onchange="_toggleCF(${idx}, this.checked)" ${cf ? 'checked' : ''}>`;
+            html += `<span>Cliente<br>fornece</span></label>`;
+
+            // Info
+            html += `<div class="analise-insumo-info">`;
+            html += `<div class="analise-insumo-nome">${escHtml(ins.nome)}</div>`;
+            html += `<div class="analise-insumo-meta">`;
+            if (ins.servicos_origem) html += `Vinculado: ${escHtml(ins.servicos_origem)} &bull; `;
+            html += `${escHtml(ins.unidade)}`;
+            if (semEstoque) html += ` &bull; <span class="sem-estoque">Sem estoque</span>`;
+            html += `</div></div>`;
+
+            // Qtd
+            html += `<input type="number" class="analise-qtd" value="${parseFloat(ins.quantidade||1)}" min="0.001" step="0.001"
+                onchange="_mudarQtd(${idx}, this.value)" title="Quantidade">`;
+
+            // Valor
+            html += `<div class="analise-insumo-valor ${cf ? 'riscado' : ''}" id="val-ins-${idx}">${fmt(cf ? 0 : valorTotal)}</div>`;
+
+            html += `</div>`; // row
+        });
+    }
+
+    // Footer com total
+    html += '<div class="analise-footer">';
+    html += '<div class="analise-total-bloco">Insumos a cobrar:<strong id="analise-total-ins">—</strong></div>';
+    html += '</div>';
+
+    document.getElementById('analise-corpo').innerHTML = html;
+    document.getElementById('analise-acoes').style.display = 'flex';
+    _recalcularTotalAnalise();
+}
+
+function _toggleCF(idx, checked) {
+    _insumos[idx].cliente_fornece = checked ? 1 : 0;
+    const valEl = document.getElementById('val-ins-' + idx);
+    if (valEl) {
+        const total = parseFloat(_insumos[idx].valor_unitario) * parseFloat(_insumos[idx].quantidade || 1);
+        valEl.textContent = checked ? fmt(0) : fmt(total);
+        valEl.classList.toggle('riscado', checked);
+    }
+    _recalcularTotalAnalise();
+}
+
+function _mudarQtd(idx, val) {
+    const qtd = Math.max(0.001, parseFloat(val) || 1);
+    _insumos[idx].quantidade = qtd;
+    const cf = _insumos[idx].cliente_fornece == 1;
+    const total = parseFloat(_insumos[idx].valor_unitario) * qtd;
+    const valEl = document.getElementById('val-ins-' + idx);
+    if (valEl) { valEl.textContent = cf ? fmt(0) : fmt(total); }
+    _recalcularTotalAnalise();
+}
+
+function _recalcularTotalAnalise() {
+    let total = 0;
+    _insumos.forEach(ins => {
+        if (!ins.cliente_fornece) total += parseFloat(ins.valor_unitario) * parseFloat(ins.quantidade || 1);
+    });
+    const el = document.getElementById('analise-total-ins');
+    if (el) el.textContent = fmt(total);
+}
+
+function confirmarAnalise() {
+    const btn = document.getElementById('btn-confirmar-analise');
+    btn.disabled = true; btn.textContent = 'Salvando...';
+
+    fetch('analise_insumos.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pre_os_id: _idAtual, insumos: _insumos })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (!data.sucesso) { _toast(data.erro || 'Erro ao salvar'); btn.disabled = false; btn.textContent = 'Confirmar e Orçar →'; return; }
+        fecharModal('modal-analise');
+        // Abre modal orçamento já com valor pré-calculado
+        _abrirOrcamentoComValor(data.total_orcamento, data.total_servicos, data.total_insumos);
+    })
+    .catch(() => { _toast('Erro de conexão'); btn.disabled = false; btn.textContent = 'Confirmar e Orçar →'; });
 }
 
 // ─ Orçamento
@@ -568,14 +744,21 @@ function taxaMaq(v){ return v>2000?15.38:21.58; }
 function fmt(v){ return 'R$\u00a0'+Number(v).toFixed(2).replace('.',',').replace(/\B(?=(\d{3})+(?!\d))/g,'.'); }
 let _orcTipoEscolhido=null;
 
-function _abrirOrcamento(totalBase){
+function _abrirOrcamentoComValor(totalOrc, totalSrv, totalIns) {
     _orcTipoEscolhido=null;
-    document.getElementById('modal-input-valor').value=totalBase>0?Number(totalBase).toFixed(2):'';
+    document.getElementById('modal-input-valor').value=totalOrc>0?Number(totalOrc).toFixed(2):'';
     document.getElementById('modal-input-prazo').value='';
     document.getElementById('modal-valor-final').value='';
     document.getElementById('modal-btn-orc').disabled=true;
     document.getElementById('modal-sim-aviso').style.display='none';
     ['modal-card-base','modal-card-maquina'].forEach(id=>document.getElementById(id)?.classList.remove('ativo'));
+
+    // Mostra breakdown
+    let bd = document.getElementById('orc-breakdown');
+    if (totalSrv >= 0 && totalIns >= 0) {
+        bd.innerHTML = 'Serviços: ' + fmt(totalSrv) + ' + Insumos: ' + fmt(totalIns);
+    } else { bd.textContent = ''; }
+
     simularModal();
     document.getElementById('modal-orcamento').classList.add('aberto');
     setTimeout(()=>document.getElementById('modal-input-valor').focus(),150);
@@ -595,7 +778,7 @@ function simularModal(){
 
 function escolherModalValor(tipo){
     const v=parseFloat(document.getElementById('modal-input-valor').value);
-    if(isNaN(v)||v<=0){_toast('Informe o valor primeiro',false);return;}
+    if(isNaN(v)||v<=0){_toast('Informe o valor primeiro');return;}
     _orcTipoEscolhido=tipo;
     document.getElementById('modal-card-base').classList.toggle('ativo',tipo==='base');
     document.getElementById('modal-card-maquina').classList.toggle('ativo',tipo==='maquina');
@@ -616,8 +799,8 @@ function _atualizarAvisoModal(v){
 function confirmarModalOrcamento(){
     const vf=parseFloat(document.getElementById('modal-valor-final').value);
     const pr=parseInt(document.getElementById('modal-input-prazo').value);
-    if(isNaN(vf)||vf<=0){_toast('Escolha o valor a enviar',false);return;}
-    if(isNaN(pr)||pr<=0){_toast('Informe o prazo',false);return;}
+    if(isNaN(vf)||vf<=0){_toast('Escolha o valor a enviar');return;}
+    if(isNaN(pr)||pr<=0){_toast('Informe o prazo');return;}
     fecharModal('modal-orcamento');
     _enviar('Orcada',{valor_orcamento:vf,prazo_orcamento:pr});
 }
@@ -630,7 +813,7 @@ function _abrirReprovacao(){
 
 function confirmarModalReprovacao(){
     const m=document.getElementById('modal-motivo').value.trim();
-    if(!m){_toast('Informe o motivo',false);return;}
+    if(!m){_toast('Informe o motivo');return;}
     fecharModal('modal-reprovacao');
     _enviar('Reprovada',{motivo:m});
 }
@@ -649,7 +832,7 @@ function _abrirWa(link,label){
 }
 
 // ─ Toast
-function _toast(msg,ok){
+function _toast(msg){
     const el=document.createElement('div'); el.className='g-toast'; el.textContent=msg;
     document.body.appendChild(el); setTimeout(()=>el.remove(),3000);
 }
@@ -666,10 +849,10 @@ function _enviar(status,extras={}){
     .then(data=>{
         if(data.sucesso){
             if(data.wa_link)_abrirWa(data.wa_link,label);
-            else{_toast('Status atualizado!',true);setTimeout(()=>location.reload(),1200);}
-        } else _toast((data.erro||'Erro desconhecido'),false);
+            else{_toast('Status atualizado!');setTimeout(()=>location.reload(),1200);}
+        } else _toast((data.erro||'Erro desconhecido'));
     })
-    .catch(()=>_toast('Erro de conexão',false));
+    .catch(()=>_toast('Erro de conexão'));
 }
 
 function escHtml(s){
