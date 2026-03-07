@@ -21,14 +21,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['categoria'])) {
     
     $sql = "SELECT id, nome, unidade, valor_unitario, quantidade_estoque FROM insumos WHERE ativo=1";
     
-    // Verifica se tabela categorias_insumo existe
-    $tem_categoria = false;
-    try {
-        $conn->query("SELECT 1 FROM categorias_insumo LIMIT 1");
-        $tem_categoria = true;
-    } catch (Exception $e) {}
-    
-    if ($tem_categoria && $categoria !== 'Todos') {
+    if ($categoria !== 'Todos') {
         $sql .= " AND categoria = :cat";
     }
     
@@ -40,7 +33,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['categoria'])) {
     
     $stmt = $conn->prepare($sql);
     
-    if ($tem_categoria && $categoria !== 'Todos') {
+    if ($categoria !== 'Todos') {
         $stmt->bindValue(':cat', $categoria);
     }
     if ($busca) {
@@ -85,21 +78,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     $stmt_s->execute([':id' => $pre_os_id]);
     $servicos = $stmt_s->fetchAll(PDO::FETCH_ASSOC);
 
-    // Verifica se tabela categorias_insumo existe
-    $categorias = [];
+    // Busca categorias DISTINTAS da tabela insumos (campo categoria)
+    $categorias = ['Todos']; // Sempre inclui "Todos" primeiro
     try {
-        $stmt_cat = $conn->query("SELECT nome, icone FROM categorias_insumo WHERE ativo = 1 ORDER BY nome");
-        $rows = $stmt_cat->fetchAll(PDO::FETCH_ASSOC);
-        foreach ($rows as $r) {
-            $categorias[] = ['nome' => $r['nome'], 'icone' => $r['icone'] ?: 'category'];
-        }
+        $stmt_cat = $conn->query("
+            SELECT DISTINCT categoria 
+            FROM insumos 
+            WHERE ativo = 1 AND categoria IS NOT NULL AND categoria != ''
+            ORDER BY categoria
+        ");
+        $rows = $stmt_cat->fetchAll(PDO::FETCH_COLUMN);
+        $categorias = array_merge($categorias, $rows); // Adiciona as categorias encontradas
     } catch (Exception $e) {
-        // Tabela não existe - usa categoria padrão
-        $categorias = [['nome' => 'Todos', 'icone' => 'inventory_2']];
+        // Se der erro, mantém apenas "Todos"
     }
-
-    // Adiciona opção "Todos"
-    array_unshift($categorias, ['nome' => 'Todos', 'icone' => 'grid_view']);
 
     // Insumos já selecionados (se houver)
     $stmt_ins = $conn->prepare("
