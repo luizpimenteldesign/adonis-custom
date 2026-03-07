@@ -15,6 +15,25 @@ if (isset($_GET['action']) && $_GET['action'] === 'categorias') {
     exit;
 }
 
+// API JSON: criar categoria
+if (isset($_POST['action']) && $_POST['action'] === 'criar_categoria') {
+    header('Content-Type: application/json');
+    $nome = trim($_POST['nome'] ?? '');
+    if (!$nome) {
+        echo json_encode(['sucesso' => false, 'erro' => 'Nome é obrigatório']);
+        exit;
+    }
+    try {
+        $stmt = $conn->prepare('INSERT INTO categorias_servico (nome, ativo) VALUES (?, 1)');
+        $stmt->execute([$nome]);
+        $newId = (int)$conn->lastInsertId();
+        echo json_encode(['sucesso' => true, 'id' => $newId, 'nome' => $nome]);
+    } catch (Exception $e) {
+        echo json_encode(['sucesso' => false, 'erro' => 'Erro ao salvar: ' . $e->getMessage()]);
+    }
+    exit;
+}
+
 $busca = trim($_GET['q'] ?? '');
 $msg   = $_GET['msg'] ?? '';
 
@@ -118,6 +137,43 @@ include '_sidebar_data.php';
         color:#fff;
     }
     .chip .material-symbols-outlined { font-size:15px; }
+    
+    /* ┌── BOTÃO + PARA NOVA CATEGORIA ────────────────────── */
+    .cat-label-row {
+        display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;
+    }
+    .btn-nova-cat {
+        display:inline-flex; align-items:center; gap:4px;
+        padding:4px 10px; border-radius:6px;
+        background:var(--color-primary,#7c3aed);
+        color:#fff; font-size:12px; font-weight:600;
+        border:none; cursor:pointer; transition:opacity .15s;
+    }
+    .btn-nova-cat:hover { opacity:.85; }
+    .btn-nova-cat .material-symbols-outlined { font-size:16px; }
+    
+    .nova-cat-inline {
+        display:none; padding:12px; background:var(--g-bg);
+        border:1px solid var(--g-border); border-radius:8px;
+        margin-bottom:10px; gap:8px; align-items:flex-start;
+    }
+    .nova-cat-inline.show { display:flex; }
+    .nova-cat-inline input {
+        flex:1; padding:8px 12px; border:1px solid var(--g-border);
+        border-radius:6px; font-size:13px;
+    }
+    .nova-cat-inline button {
+        padding:8px 14px; border-radius:6px; border:none;
+        font-size:13px; font-weight:600; cursor:pointer;
+        display:flex; align-items:center; gap:4px;
+    }
+    .nova-cat-inline .btn-salvar-cat {
+        background:var(--color-primary,#7c3aed); color:#fff;
+    }
+    .nova-cat-inline .btn-cancelar-cat {
+        background:var(--g-surface); color:var(--g-text-2);
+        border:1px solid var(--g-border);
+    }
     </style>
 </head>
 <body>
@@ -271,7 +327,24 @@ include '_sidebar_data.php';
             <label class="form-label">DESCRIÇÃO</label>
             <textarea class="form-input" name="descricao" id="f-descricao" rows="3" placeholder="Descreva brevemente o serviço..."></textarea>
 
-            <label class="form-label">CATEGORIAS</label>
+            <div class="cat-label-row">
+                <label class="form-label" style="margin:0">CATEGORIAS</label>
+                <button type="button" class="btn-nova-cat" onclick="toggleNovaCatForm()">
+                    <span class="material-symbols-outlined">add</span> Nova Categoria
+                </button>
+            </div>
+
+            <!-- FORMULÁRIO INLINE PARA CRIAR CATEGORIA -->
+            <div class="nova-cat-inline" id="nova-cat-form">
+                <input type="text" id="nova-cat-nome" placeholder="Nome da nova categoria..." maxlength="50">
+                <button type="button" class="btn-salvar-cat" onclick="salvarNovaCategoria()">
+                    <span class="material-symbols-outlined" style="font-size:16px">check</span> Salvar
+                </button>
+                <button type="button" class="btn-cancelar-cat" onclick="cancelarNovaCategoria()">
+                    <span class="material-symbols-outlined" style="font-size:16px">close</span>
+                </button>
+            </div>
+
             <div class="chips-wrap" id="chips-categorias"></div>
             <div id="hidden-cats"></div>
 
@@ -305,7 +378,6 @@ let todasCategorias = [];
 let catsSelecionadas = new Set();
 
 async function carregarCategorias() {
-    if (todasCategorias.length) return;
     const r = await fetch('servicos.php?action=categorias');
     todasCategorias = await r.json();
 }
@@ -344,6 +416,7 @@ async function abrirModal() {
     document.getElementById('f-valor').value    = '';
     document.getElementById('f-prazo').value    = '';
     document.getElementById('f-ativo').checked  = true;
+    document.getElementById('nova-cat-form').classList.remove('show');
     renderChips();
     document.getElementById('modal-servico').classList.add('aberto');
     setTimeout(() => document.getElementById('f-nome').focus(), 150);
@@ -360,6 +433,7 @@ async function editarServico(id, nome, desc, valor, ativo, prazo, catIds) {
     document.getElementById('f-valor').value     = Number(valor).toFixed(2);
     document.getElementById('f-prazo').value     = prazo !== null && prazo !== undefined ? prazo : '';
     document.getElementById('f-ativo').checked   = !!ativo;
+    document.getElementById('nova-cat-form').classList.remove('show');
     renderChips();
     document.getElementById('modal-servico').classList.add('aberto');
     setTimeout(() => document.getElementById('f-nome').focus(), 150);
@@ -371,6 +445,80 @@ function fecharModalServico() {
 
 document.getElementById('modal-servico').addEventListener('click', function(e) {
     if (e.target === this) fecharModalServico();
+});
+
+// ┌─────────────────────────────────────────────────────────
+//   CRIAR NOVA CATEGORIA INLINE
+// └─────────────────────────────────────────────────────────
+function toggleNovaCatForm() {
+    const form = document.getElementById('nova-cat-form');
+    form.classList.toggle('show');
+    if (form.classList.contains('show')) {
+        document.getElementById('nova-cat-nome').value = '';
+        setTimeout(() => document.getElementById('nova-cat-nome').focus(), 100);
+    }
+}
+
+function cancelarNovaCategoria() {
+    document.getElementById('nova-cat-form').classList.remove('show');
+    document.getElementById('nova-cat-nome').value = '';
+}
+
+async function salvarNovaCategoria() {
+    const nome = document.getElementById('nova-cat-nome').value.trim();
+    if (!nome) {
+        alert('✋ Digite o nome da categoria!');
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append('action', 'criar_categoria');
+    formData.append('nome', nome);
+
+    try {
+        const r = await fetch('servicos.php', { method: 'POST', body: formData });
+        const data = await r.json();
+
+        if (data.sucesso) {
+            // Adiciona a nova categoria à lista
+            todasCategorias.push({ id: data.id, nome: data.nome });
+            todasCategorias.sort((a, b) => a.nome.localeCompare(b.nome));
+
+            // Marca como selecionada automaticamente
+            catsSelecionadas.add(data.id);
+
+            // Re-renderiza os chips
+            renderChips();
+
+            // Fecha o formulário inline
+            cancelarNovaCategoria();
+
+            // Toast de sucesso
+            _toast('✅ Categoria criada com sucesso!');
+        } else {
+            alert('❌ ' + (data.erro || 'Erro ao salvar categoria'));
+        }
+    } catch (err) {
+        alert('❌ Erro de conexão: ' + err.message);
+    }
+}
+
+function _toast(msg) {
+    const el = document.createElement('div');
+    el.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#323232;color:#fff;padding:14px 24px;border-radius:8px;font-size:14px;z-index:10000;box-shadow:0 4px 12px rgba(0,0,0,.3)';
+    el.textContent = msg;
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 3000);
+}
+
+// Enter no input da nova categoria
+document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('nova-cat-nome').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            salvarNovaCategoria();
+        }
+    });
 });
 </script>
 </body>
