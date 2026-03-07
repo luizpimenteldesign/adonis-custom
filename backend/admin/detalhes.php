@@ -2,7 +2,7 @@
 /**
  * DETALHES DO PEDIDO — SISTEMA ADONIS
  * Visual: Google / Material Design 3
- * Versão: 8.0 — Modal Iniciar Análise com insumos
+ * Versão: 8.1 — Corrige sidebar + lista de insumos
  */
 require_once 'auth.php';
 require_once '../config/Database.php';
@@ -35,6 +35,25 @@ try {
     $total_valor = 0; $total_prazo = 0;
     foreach ($servicos as $s) { $total_valor += (float)$s['valor_base']; $total_prazo += (int)$s['prazo_base']; }
 
+    // ┌─ BUSCAR INSUMOS VINCULADOS AOS SERVIÇOS DESTE PEDIDO
+    $insumos_pedido = [];
+    if (!empty($servicos)) {
+        $servico_ids = array_column($servicos, 'id');
+        $placeholders = implode(',', array_fill(0, count($servico_ids), '?'));
+        $stmt_ins = $conn->prepare("
+            SELECT DISTINCT i.id, i.nome, i.unidade, i.valor_unitario, i.quantidade_estoque,
+                   GROUP_CONCAT(DISTINCT s.nome SEPARATOR ', ') as servicos_origem
+            FROM servico_insumos si
+            JOIN insumos i ON si.insumo_id = i.id
+            JOIN servicos s ON si.servico_id = s.id
+            WHERE si.servico_id IN ($placeholders)
+            GROUP BY i.id
+            ORDER BY i.nome
+        ");
+        $stmt_ins->execute($servico_ids);
+        $insumos_pedido = $stmt_ins->fetchAll(PDO::FETCH_ASSOC);
+    }
+
     $fotos = [];
     if (!empty($pedido['instrumento_id'])) {
         $stmt_f = $conn->prepare("SELECT caminho, ordem FROM instrumento_fotos WHERE instrumento_id = :id ORDER BY ordem ASC");
@@ -61,21 +80,21 @@ try {
 }
 
 $status_map = [
-    'Pre-OS'                        => ['label'=>'Pré-OS',                   'badge'=>'badge-new',     'icone'=>'■'],
-    'Em analise'                    => ['label'=>'Em Análise',              'badge'=>'badge-info',    'icone'=>'■'],
-    'Orcada'                        => ['label'=>'Orçada',                  'badge'=>'badge-warning', 'icone'=>'■'],
-    'Aguardando aprovacao'          => ['label'=>'Aguard. Aprovação',     'badge'=>'badge-warning', 'icone'=>'■'],
-    'Aprovada'                      => ['label'=>'Aguard. Pagamento',       'badge'=>'badge-success', 'icone'=>'■'],
-    'Pagamento recebido'            => ['label'=>'Pagamento Recebido',      'badge'=>'badge-success', 'icone'=>'■'],
-    'Instrumento recebido'          => ['label'=>'Instrumento Recebido',    'badge'=>'badge-success', 'icone'=>'■'],
-    'Servico iniciado'              => ['label'=>'Serviço Iniciado',        'badge'=>'badge-purple',  'icone'=>'■'],
-    'Em desenvolvimento'            => ['label'=>'Em Desenvolvimento',      'badge'=>'badge-purple',  'icone'=>'■'],
-    'Servico finalizado'            => ['label'=>'Serviço Finalizado',      'badge'=>'badge-success', 'icone'=>'■'],
-    'Pronto para retirada'          => ['label'=>'Pronto p/ Retirada',      'badge'=>'badge-warning', 'icone'=>'■'],
-    'Aguardando pagamento retirada' => ['label'=>'Pag. Pendente Retirada',  'badge'=>'badge-warning', 'icone'=>'■'],
-    'Entregue'                      => ['label'=>'Entregue',                'badge'=>'badge-dark',    'icone'=>'■'],
-    'Reprovada'                     => ['label'=>'Reprovada',               'badge'=>'badge-danger',  'icone'=>'■'],
-    'Cancelada'                     => ['label'=>'Cancelada',               'badge'=>'badge-dark',    'icone'=>'■'],
+    'Pre-OS'                        => ['label'=>'Pré-OS',                   'badge'=>'badge-new',     'icone'=>'note_add'],
+    'Em analise'                    => ['label'=>'Em Análise',              'badge'=>'badge-info',    'icone'=>'search'],
+    'Orcada'                        => ['label'=>'Orçada',                  'badge'=>'badge-warning', 'icone'=>'request_quote'],
+    'Aguardando aprovacao'          => ['label'=>'Aguard. Aprovação',     'badge'=>'badge-warning', 'icone'=>'hourglass_empty'],
+    'Aprovada'                      => ['label'=>'Aguard. Pagamento',       'badge'=>'badge-success', 'icone'=>'credit_card'],
+    'Pagamento recebido'            => ['label'=>'Pagamento Recebido',      'badge'=>'badge-success', 'icone'=>'check_circle'],
+    'Instrumento recebido'          => ['label'=>'Instrumento Recebido',    'badge'=>'badge-success', 'icone'=>'inventory_2'],
+    'Servico iniciado'              => ['label'=>'Serviço Iniciado',        'badge'=>'badge-purple',  'icone'=>'build'],
+    'Em desenvolvimento'            => ['label'=>'Em Desenvolvimento',      'badge'=>'badge-purple',  'icone'=>'settings'],
+    'Servico finalizado'            => ['label'=>'Serviço Finalizado',      'badge'=>'badge-success', 'icone'=>'done_all'],
+    'Pronto para retirada'          => ['label'=>'Pronto p/ Retirada',      'badge'=>'badge-warning', 'icone'=>'store'],
+    'Aguardando pagamento retirada' => ['label'=>'Pag. Pendente Retirada',  'badge'=>'badge-warning', 'icone'=>'payments'],
+    'Entregue'                      => ['label'=>'Entregue',                'badge'=>'badge-dark',    'icone'=>'verified'],
+    'Reprovada'                     => ['label'=>'Reprovada',               'badge'=>'badge-danger',  'icone'=>'cancel'],
+    'Cancelada'                     => ['label'=>'Cancelada',               'badge'=>'badge-dark',    'icone'=>'block'],
 ];
 
 $acoes_por_status = [
@@ -96,9 +115,14 @@ $acoes_por_status = [
     'Cancelada'            => [['Pre-OS','Reabrir','btn-info']],
 ];
 
-$status_info  = $status_map[$pedido['status']] ?? ['label'=>$pedido['status'],'badge'=>'badge-secondary','icone'=>'•'];
+$status_info  = $status_map[$pedido['status']] ?? ['label'=>$pedido['status'],'badge'=>'badge-secondary','icone'=>'circle'];
 $acoes_atuais = $acoes_por_status[$pedido['status']] ?? [];
+
+$current_page = 'detalhes.php'; // Para highlighting da sidebar
+require_once '_sidebar_data.php';
 $v = time();
+
+function iconHtml($name,$size=16){return '<span class="material-symbols-outlined" style="font-size:'.$size.'px;vertical-align:middle">'.$name.'</span>';}
 ?>
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -108,41 +132,12 @@ $v = time();
     <title>Pedido #<?php echo $pedido['id']; ?> — Adonis Admin</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="assets/css/admin.css?v=<?php echo $v; ?>">
+    <link rel="stylesheet" href="assets/css/sidebar.css?v=<?php echo $v; ?>">
+    <link rel="stylesheet" href="assets/css/dashboard.css?v=<?php echo $v; ?>">
     <style>
-    /* ── LAYOUT SIDEBAR ─────────────────────────────────── */
-    .app-layout { display:flex; min-height:100vh; }
-    .sidebar { width:240px; flex-shrink:0; background:var(--g-surface); border-right:1px solid var(--g-border); display:flex; flex-direction:column; position:fixed; top:0; left:0; bottom:0; z-index:200; overflow-y:auto; transform:translateX(-100%); transition:transform .25s ease; }
-    .sidebar.open { transform:translateX(0); }
-    @media (min-width:960px) { .sidebar { transform:translateX(0); position:sticky; top:0; height:100vh; } }
-    .sidebar-logo { padding:20px 20px 10px; display:flex; align-items:center; gap:10px; }
-    .sidebar-logo img { height:36px; }
-    .sidebar-logo-title { font-family:'Google Sans',sans-serif; font-size:16px; font-weight:700; color:var(--g-text); }
-    .sidebar-section { padding:8px 0; }
-    .sidebar-section-label { font-size:11px; font-weight:600; color:var(--g-text-3); text-transform:uppercase; letter-spacing:.6px; padding:8px 20px 4px; }
-    .sidebar-link { display:flex; align-items:center; gap:12px; padding:10px 20px; font-size:14px; font-weight:500; color:var(--g-text-2); text-decoration:none; border-radius:0 24px 24px 0; margin-right:12px; transition:background .15s,color .15s; -webkit-tap-highlight-color:transparent; }
-    .sidebar-link:hover { background:var(--g-hover); color:var(--g-text); text-decoration:none; }
-    .sidebar-link.active { background:var(--g-blue-light); color:var(--g-blue); }
-    .sidebar-link .nav-icon { font-size:18px; flex-shrink:0; width:22px; text-align:center; }
-    .sidebar-divider { border:none; border-top:1px solid var(--g-border); margin:8px 0; }
-    .sidebar-user { margin-top:auto; padding:16px 20px; border-top:1px solid var(--g-border); display:flex; align-items:center; gap:10px; }
-    .sidebar-user-avatar { width:36px; height:36px; border-radius:50%; background:var(--g-blue-light); color:var(--g-blue); display:flex; align-items:center; justify-content:center; font-family:'Google Sans',sans-serif; font-size:14px; font-weight:700; flex-shrink:0; }
-    .sidebar-user-info { flex:1; min-width:0; }
-    .sidebar-user-name { font-size:13px; font-weight:500; color:var(--g-text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-    .sidebar-user-role { font-size:11px; color:var(--g-text-3); }
-    .sidebar-logout { color:var(--g-text-3); text-decoration:none; font-size:18px; padding:4px; flex-shrink:0; }
-    .sidebar-logout:hover { color:var(--g-red); text-decoration:none; }
-    .sidebar-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.35); z-index:199; }
-    .sidebar-overlay.open { display:block; }
-    .main-content { flex:1; min-width:0; display:flex; flex-direction:column; }
-    .topbar { position:sticky; top:0; z-index:100; height:56px; background:var(--g-surface); border-bottom:1px solid var(--g-border); display:flex; align-items:center; padding:0 16px; gap:12px; }
-    @media (min-width:960px) { .topbar { display:none; } }
-    .topbar-title { font-family:'Google Sans',sans-serif; font-size:17px; font-weight:500; color:var(--g-text); flex:1; }
-    .btn-menu { width:40px; height:40px; display:flex; align-items:center; justify-content:center; border:none; background:none; font-size:20px; cursor:pointer; border-radius:50%; color:var(--g-text-2); -webkit-tap-highlight-color:transparent; }
-    .btn-menu:hover { background:var(--g-hover); }
+    /* ── LAYOUT PRINCIPAL ────────────────────────────────── */
     .page-content { flex:1; padding:20px; }
-    @media (min-width:960px) { body { padding-bottom:0; } .bottom-nav { display:none; } }
     .page-header { display:flex; align-items:center; gap:12px; margin-bottom:20px; padding-bottom:16px; border-bottom:1px solid var(--g-border); }
     .page-header-back { display:flex; align-items:center; justify-content:center; width:36px; height:36px; border-radius:50%; color:var(--g-text-2); text-decoration:none; font-size:18px; transition:background .15s; flex-shrink:0; }
     .page-header-back:hover { background:var(--g-hover); text-decoration:none; }
@@ -207,30 +202,14 @@ $v = time();
     .token-row { display:flex; align-items:center; gap:10px; padding:14px 20px; }
     .token-val { font-family:'Roboto Mono',monospace; font-size:11px; color:var(--g-text-2); background:var(--g-bg); border:1px solid var(--g-border); border-radius:6px; padding:7px 10px; flex:1; word-break:break-all; }
 
-    /* ── MODAL ANÁLISE ───────────────────────────────────── */
-    .analise-resumo { padding:12px 20px 0; }
-    .analise-resumo-title { font-size:12px; font-weight:600; color:var(--g-text-3); text-transform:uppercase; letter-spacing:.4px; margin-bottom:6px; }
-    .analise-resumo-tags { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:14px; }
-    .analise-tag { background:var(--g-bg); border:1px solid var(--g-border); border-radius:20px; padding:4px 12px; font-size:12px; color:var(--g-text-2); }
-    .analise-sep { border:none; border-top:1px solid var(--g-border); margin:0 0 14px; }
-    .analise-insumos-title { font-size:12px; font-weight:600; color:var(--g-text-3); text-transform:uppercase; letter-spacing:.4px; padding:0 20px 8px; }
-    .analise-insumo-row { display:flex; align-items:center; gap:10px; padding:10px 20px; border-top:1px solid var(--g-border); }
-    .analise-insumo-row:first-child { border-top:none; }
-    .analise-insumo-info { flex:1; min-width:0; }
-    .analise-insumo-nome { font-size:13px; font-weight:500; color:var(--g-text); }
-    .analise-insumo-meta { font-size:11px; color:var(--g-text-3); margin-top:2px; }
-    .analise-insumo-meta .sem-estoque { color:#c5221f; font-weight:600; }
-    .analise-insumo-valor { font-size:13px; font-weight:600; color:var(--g-text); white-space:nowrap; min-width:70px; text-align:right; }
-    .analise-insumo-valor.riscado { text-decoration:line-through; color:var(--g-text-3); font-weight:400; }
-    .analise-cf-toggle { display:flex; align-items:center; gap:6px; font-size:12px; color:var(--g-text-2); white-space:nowrap; cursor:pointer; }
-    .analise-cf-toggle input { cursor:pointer; accent-color:var(--g-blue); width:15px; height:15px; }
-    .analise-qtd { width:52px; border:1px solid var(--g-border); border-radius:6px; padding:4px 6px; font-size:13px; text-align:center; }
-    .analise-qtd:focus { outline:2px solid var(--g-blue); border-color:transparent; }
-    .analise-vazio { padding:20px; text-align:center; color:var(--g-text-3); font-size:13px; }
-    .analise-footer { padding:14px 20px 0; border-top:2px solid var(--g-border); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; }
-    .analise-total-bloco { font-size:13px; color:var(--g-text-2); }
-    .analise-total-bloco strong { font-size:16px; color:var(--g-text); display:block; }
-    .analise-loading { padding:30px 20px; text-align:center; color:var(--g-text-3); font-size:13px; }
+    /* ── TABELA DE INSUMOS ───────────────────── */
+    .ins-table { width:100%; border-collapse:collapse; }
+    .ins-table thead th { text-align:left; padding:8px 20px; font-size:10px; font-weight:600; color:var(--g-text-3); text-transform:uppercase; letter-spacing:.4px; border-bottom:1px solid var(--g-border); background:var(--g-bg); }
+    .ins-table tbody td { padding:10px 20px; font-size:13px; border-bottom:1px solid var(--g-border); color:var(--g-text); vertical-align:middle; }
+    .ins-table tbody tr:last-child td { border-bottom:none; }
+    .ins-table .ins-origem { font-size:11px; color:var(--g-text-3); margin-top:2px; }
+    .ins-table .estoque-baixo { color:var(--g-orange); font-weight:600; }
+    .ins-table .estoque-zero { color:var(--g-red); font-weight:600; }
     </style>
 </head>
 <body>
@@ -238,24 +217,32 @@ $v = time();
 <div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebar()"></div>
 
 <div class="app-layout">
-<?php include 'includes/menu.php'; ?>
+
+<?php require_once '_sidebar.php'; ?>
 
 <main class="main-content">
     <div class="topbar">
-        <button class="btn-menu" onclick="toggleSidebar()">☰</button>
+        <button class="btn-menu" onclick="toggleSidebar()">
+            <span class="material-symbols-outlined">menu</span>
+        </button>
+        <div style="display:flex;align-items:center;gap:8px">
+            <img src="https://adns.luizpimentel.com/adonis-custom/frontend/public/assets/img/Logo-Adonis2.png" style="height:26px" alt="Adonis">
+        </div>
         <span class="topbar-title">Pedido #<?php echo $pedido['id']; ?></span>
-        <a href="/backend/admin/logout.php" style="font-size:20px;color:var(--g-text-2);text-decoration:none">→</a>
+        <a href="logout.php" class="material-symbols-outlined sidebar-logout" title="Sair">logout</a>
     </div>
 
     <div class="page-content">
 
         <div class="page-header">
-            <a href="/backend/admin/dashboard.php" class="page-header-back">&#8592;</a>
+            <a href="dashboard.php" class="page-header-back">
+                <span class="material-symbols-outlined">arrow_back</span>
+            </a>
             <div class="page-header-info">
                 <div class="page-header-title"><?php echo htmlspecialchars($pedido['cliente_nome'] ?? 'Sem nome'); ?> <span style="font-weight:400;color:var(--g-text-2)">#<?php echo $pedido['id']; ?></span></div>
                 <div class="page-header-sub"><?php echo htmlspecialchars(trim(($pedido['instrumento_tipo']??'').' '.($pedido['instrumento_marca']??'').' '.($pedido['instrumento_modelo']??'')) ?: 'Instrumento não informado'); ?></div>
             </div>
-            <span class="badge <?php echo $status_info['badge']; ?>" id="status-badge"><?php echo $status_info['icone'].' '.$status_info['label']; ?></span>
+            <span class="badge <?php echo $status_info['badge']; ?>" id="status-badge"><?php echo iconHtml($status_info['icone'],11).' '.$status_info['label']; ?></span>
         </div>
 
         <div class="detalhes-grid">
@@ -378,6 +365,48 @@ $v = time();
                     <?php endif; ?>
                 </div>
 
+                <!-- ┌──────────────────────────────────────────────
+                     INSUMOS VINCULADOS AOS SERVIÇOS
+                └────────────────────────────────────────────── -->
+                <?php if (!empty($insumos_pedido)): ?>
+                <div class="sect">
+                    <div class="sect-title"><?php echo iconHtml('inventory_2',13); ?> Insumos vinculados aos serviços</div>
+                    <div style="overflow-x:auto">
+                        <table class="ins-table">
+                            <thead>
+                                <tr>
+                                    <th>Insumo</th>
+                                    <th>Unid.</th>
+                                    <th>Valor unitário</th>
+                                    <th>Estoque</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($insumos_pedido as $ins):
+                                    $estoque = (float)$ins['quantidade_estoque'];
+                                    $cls_estoque = $estoque <= 0 ? 'estoque-zero' : ($estoque < 5 ? 'estoque-baixo' : '');
+                                ?>
+                                <tr>
+                                    <td>
+                                        <strong><?php echo htmlspecialchars($ins['nome']); ?></strong>
+                                        <?php if (!empty($ins['servicos_origem'])): ?>
+                                        <div class="ins-origem"><?php echo iconHtml('link',10); ?> <?php echo htmlspecialchars($ins['servicos_origem']); ?></div>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td><?php echo htmlspecialchars($ins['unidade']); ?></td>
+                                    <td>R$ <?php echo number_format($ins['valor_unitario'],2,',','.'); ?></td>
+                                    <td class="<?php echo $cls_estoque; ?>">
+                                        <?php echo number_format($estoque,3,',','.'); ?>
+                                        <?php if ($estoque <= 0): echo ' '.iconHtml('warning',14); endif; ?>
+                                    </td>
+                                </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <?php endif; ?>
+
                 <?php if (!empty($pedido['observacoes'])): ?>
                 <div class="sect">
                     <div class="sect-title">Observações</div>
@@ -441,10 +470,10 @@ $v = time();
                     <?php else: ?>
                     <ul class="tl">
                         <?php foreach (array_reverse($historico) as $h):
-                            $hi = $status_map[$h['status']] ?? ['icone'=>'•','label'=>$h['status']];
+                            $hi = $status_map[$h['status']] ?? ['icone'=>'circle','label'=>$h['status']];
                         ?>
                         <li class="tl-item">
-                            <div class="tl-dot"><?php echo $hi['icone']; ?></div>
+                            <div class="tl-dot"><?php echo iconHtml($hi['icone'],16); ?></div>
                             <div class="tl-body">
                                 <div class="tl-status"><?php echo htmlspecialchars($hi['label']); ?></div>
                                 <div class="tl-meta"><?php echo date('d/m/Y H:i',strtotime($h['criado_em'])); ?><?php if (!empty($h['admin_nome'])): ?> &mdash; <?php echo htmlspecialchars($h['admin_nome']); ?><?php endif; ?></div>
@@ -471,11 +500,12 @@ $v = time();
 </main>
 </div>
 
+<!-- BOTTOM NAV mobile -->
 <nav class="bottom-nav">
-    <a href="/backend/admin/dashboard.php"><span class="nav-icon">■</span>Pedidos</a>
-    <a href="#" class="active"><span class="nav-icon">■</span>Este pedido</a>
-    <a href="/backend/admin/dashboard.php?status=Pre-OS"><span class="nav-icon">■</span>Pendentes</a>
-    <a href="/backend/admin/logout.php"><span class="nav-icon">■</span>Sair</a>
+    <a href="dashboard.php"><span class="material-symbols-outlined nav-icon">dashboard</span>Painel</a>
+    <a href="#" class="active"><span class="material-symbols-outlined nav-icon">description</span>Pedido</a>
+    <a href="dashboard.php?status=Pre-OS"><span class="material-symbols-outlined nav-icon">note_add</span>Pré-OS</a>
+    <a href="logout.php"><span class="material-symbols-outlined nav-icon">logout</span>Sair</a>
 </nav>
 
 <!-- ═══════════════════════════════════════════════════════════════
@@ -549,7 +579,9 @@ $v = time();
         <div class="modal-drag"></div>
         <div class="modal-title">Avisar o cliente?</div>
         <div style="font-size:14px;color:var(--g-text-2);margin-bottom:20px" id="wa-status-texto">Status atualizado!</div>
-        <a id="btn-wa-enviar" href="#" target="_blank" class="btn-wa" onclick="_fecharWaEReload()">Enviar no WhatsApp</a>
+        <a id="btn-wa-enviar" href="#" target="_blank" class="btn-wa" onclick="_fecharWaEReload()">
+            <span class="material-symbols-outlined">chat</span> WhatsApp
+        </a>
         <button class="btn-wa-skip" onclick="_fecharWaEReload()">Pular — recarregar</button>
     </div>
 </div>
@@ -557,19 +589,44 @@ $v = time();
 <script>
 const _pedidoId  = <?php echo $preos_id; ?>;
 const _totalBase = <?php echo (float)$total_valor; ?>;
-const _statusMap = <?php echo json_encode(array_map(fn($v)=>$v['icone'].' '.$v['label'], $status_map)); ?>;
+const _statusMap = <?php echo json_encode(array_map(fn($v)=>iconHtml($v['icone'],11).' '.$v['label'], $status_map), JSON_UNESCAPED_UNICODE); ?>;
 
-// ── Sidebar ──────────────────────────────────────────────────────
-function toggleSidebar() {
+// ─ Sidebar mobile
+function toggleSidebar(){
     document.getElementById('sidebar').classList.toggle('open');
     document.getElementById('sidebar-overlay').classList.toggle('open');
 }
-function closeSidebar() {
+function closeSidebar(){
     document.getElementById('sidebar').classList.remove('open');
     document.getElementById('sidebar-overlay').classList.remove('open');
 }
 
-// ── Utilitários ───────────────────────────────────────────────────
+// ─ Grupos colasáveis
+function toggleGroup(id){
+    const toggle = document.getElementById('toggle-' + id);
+    const sub    = document.getElementById('sub-'    + id);
+    toggle.classList.toggle('open');
+    sub.classList.toggle('open');
+    const estado = JSON.parse(localStorage.getItem('nav_grupos') || '{}');
+    estado[id] = toggle.classList.contains('open');
+    localStorage.setItem('nav_grupos', JSON.stringify(estado));
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    // Restaurar estado dos grupos
+    const estado = JSON.parse(localStorage.getItem('nav_grupos') || '{}');
+    for (const [id, aberto] of Object.entries(estado)) {
+        const toggle = document.getElementById('toggle-' + id);
+        const sub    = document.getElementById('sub-'    + id);
+        if (!toggle || !sub) continue;
+        if (aberto && !toggle.classList.contains('open')) {
+            toggle.classList.add('open');
+            sub.classList.add('open');
+        }
+    }
+});
+
+// ─ Utilitários
 function fmt(v) { return 'R\u00a0' + v.toFixed(2).replace('.',',').replace(/\B(?=(\d{3})+(?!\d))/g,'.'); }
 function taxaMaquina(v) { return v > 2000 ? 15.38 : 21.58; }
 function _toast(msg) {
@@ -578,15 +635,15 @@ function _toast(msg) {
     document.body.appendChild(el); setTimeout(() => el.remove(), 3000);
 }
 
-// ── Modais ────────────────────────────────────────────────────────
+// ─ Modais
 function abrirModal(id)  { document.getElementById(id).classList.add('aberto'); }
 function fecharModal(id) { document.getElementById(id).classList.remove('aberto'); }
 document.querySelectorAll('.modal-overlay').forEach(o => {
     o.addEventListener('click', e => { if (e.target === o) o.classList.remove('aberto'); });
 });
 
-// ── MODAL ANÁLISE ────────────────────────────────────────────────
-let _insumos = []; // lista em memória para submeter
+// ── MODAL ANÁLISE ────────────────────────────────────────────
+let _insumos = [];
 
 function abrirModalAnalise() {
     document.getElementById('analise-corpo').innerHTML = '<div class="analise-loading">Carregando insumos...</div>';
@@ -632,12 +689,8 @@ function _renderizarAnalise(data) {
 
             html += `<div class="analise-insumo-row" id="row-ins-${idx}">`;
 
-            // Checkbox cliente fornece
-            html += `<label class="analise-cf-toggle">`;
-            html += `<input type="checkbox" onchange="_toggleCF(${idx}, this.checked)" ${cf ? 'checked' : ''}>`;
-            html += `<span>Cliente<br>fornece</span></label>`;
-
-            // Info
+            // Top: info + qtd + valor
+            html += `<div class="analise-insumo-top">`;
             html += `<div class="analise-insumo-info">`;
             html += `<div class="analise-insumo-nome">${_esc(ins.nome)}</div>`;
             html += `<div class="analise-insumo-meta">`;
@@ -646,12 +699,18 @@ function _renderizarAnalise(data) {
             if (semEstoque) html += ` &bull; <span class="sem-estoque">Sem estoque</span>`;
             html += `</div></div>`;
 
-            // Qtd
             html += `<input type="number" class="analise-qtd" value="${parseFloat(ins.quantidade||1)}" min="0.001" step="0.001"
                 onchange="_mudarQtd(${idx}, this.value)" title="Quantidade">`;
 
-            // Valor
             html += `<div class="analise-insumo-valor ${cf ? 'riscado' : ''}" id="val-ins-${idx}">${fmt(cf ? 0 : valorTotal)}</div>`;
+            html += `</div>`; // top
+
+            // Bottom: checkbox cliente fornece
+            html += `<div class="analise-insumo-bottom">`;
+            html += `<label class="analise-cf-toggle">`;
+            html += `<input type="checkbox" onchange="_toggleCF(${idx}, this.checked)" ${cf ? 'checked' : ''}>`;
+            html += `<span>Cliente fornece</span></label>`;
+            html += `</div>`; // bottom
 
             html += `</div>`; // row
         });
@@ -722,7 +781,7 @@ function confirmarAnalise() {
     .catch(() => { _toast('Erro de conexão'); btn.disabled = false; btn.textContent = 'Confirmar e Orçar →'; });
 }
 
-// ── MODAL ORÇAMENTO ───────────────────────────────────────────────
+// ─ Orçamento
 let valorEscolhido = null;
 
 function _abrirOrcamentoComValor(totalOrc, totalSrv, totalIns) {
@@ -790,7 +849,7 @@ function confirmarOrcamento() {
     _enviar('Orcada',{valor_orcamento:vf,prazo_orcamento:pr});
 }
 
-// ── MODAL REPROVAÇÃO ─────────────────────────────────────────────
+// ─ Reprovação
 function abrirModalReprovacao() { abrirModal('modal-reprovacao'); setTimeout(()=>document.getElementById('input-motivo').focus(),150); }
 
 function confirmarReprovacao() {
@@ -800,12 +859,12 @@ function confirmarReprovacao() {
 }
 
 function atualizarStatus(s) {
-    const label=(_statusMap[s]||s).replace(/^\S+\s/,'');
+    const label=(_statusMap[s]||s).replace(/<[^>]+>/g,'');
     if (!confirm('Alterar status para "'+label+'"?')) return;
     _enviar(s,{});
 }
 
-// ── WhatsApp ─────────────────────────────────────────────────────
+// ─ WhatsApp
 function _fecharWaEReload() { fecharModal('modal-wa'); setTimeout(()=>location.reload(),300); }
 function _abrirModalWa(waLink,statusLabel) {
     document.getElementById('wa-status-texto').innerHTML='Status atualizado para <strong>'+statusLabel+'</strong>. Deseja avisar o cliente?';
@@ -813,13 +872,13 @@ function _abrirModalWa(waLink,statusLabel) {
     abrirModal('modal-wa');
 }
 
-// ── Fetch central ────────────────────────────────────────────────
+// ─ Fetch central
 function _enviar(status,extras) {
     fetch('atualizar_status.php',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:_pedidoId,status,...extras})})
     .then(r=>r.json())
     .then(data=>{
         if (data.sucesso) {
-            const label=(_statusMap[status]||status).replace(/^\S+\s/,'');
+            const label=(_statusMap[status]||status).replace(/<[^>]+>/g,'');
             document.getElementById('status-label').textContent=label;
             if (data.atualizado_em) document.getElementById('atualizado-em').textContent='Atualizado '+data.atualizado_em;
             if (data.wa_link) _abrirModalWa(data.wa_link,label);
