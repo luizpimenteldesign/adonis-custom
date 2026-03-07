@@ -1,21 +1,36 @@
 <?php
 /**
  * HELPER DE WHATSAPP — Adonis Custom
- * Versão: 1.1
+ * Versão: 2.0 — phone, token e endereço lidos da tabela configuracoes
  *
  * CallMeBot  → notificações automáticas para o Adonis
  * wa.me      → links para o cliente abrir conversa com o Adonis
  *              links para o Adonis enviar mensagem ao cliente
- *
- * ⚠️  CONFIGURE ANTES DE USAR:
- *   WA_ADONIS_PHONE  → número do Adonis com DDI, sem + nem espaços
- *   WA_ADONIS_APIKEY → chave gerada pelo Adonis no CallMeBot
- *                      (Adonis deve salvar +34 644 95 42 75 nos contatos
- *                       e enviar: "I allow callmebot to send me messages")
  */
 
-define('WA_ADONIS_PHONE',  '5527988137891');   // número do Adonis
-define('WA_ADONIS_APIKEY', 'APIKEY_PENDENTE'); // ← substituir pela chave real
+require_once __DIR__ . '/../config/Database.php';
+
+/**
+ * Lê uma chave da tabela configuracoes.
+ * Retorna $padrao se não encontrar.
+ */
+function _wa_cfg(string $chave, string $padrao = ''): string {
+    static $cache = [];
+    if (isset($cache[$chave])) return $cache[$chave];
+    try {
+        $db   = new Database();
+        $conn = $db->getConnection();
+        $stmt = $conn->prepare('SELECT valor FROM configuracoes WHERE chave = ? LIMIT 1');
+        $stmt->execute([$chave]);
+        $row  = $stmt->fetch(PDO::FETCH_ASSOC);
+        $cache[$chave] = $row ? (string)$row['valor'] : $padrao;
+    } catch (Throwable $e) {
+        error_log('[wa_cfg] ' . $e->getMessage());
+        $cache[$chave] = $padrao;
+    }
+    return $cache[$chave];
+}
+
 define('WA_ACOMPANHA_URL', 'https://adns.luizpimentel.com/adonis-custom/frontend/public/acompanhar.php');
 
 /**
@@ -23,15 +38,20 @@ define('WA_ACOMPANHA_URL', 'https://adns.luizpimentel.com/adonis-custom/frontend
  */
 function wa_notificar_adonis(string $mensagem): bool
 {
-    if (WA_ADONIS_APIKEY === 'APIKEY_PENDENTE') {
-        error_log('[WhatsApp] APIKEY não configurada — mensagem não enviada.');
+    $phone  = _wa_cfg('whatsapp_admin');
+    $apikey = _wa_cfg('callmebot_token');
+
+    if (empty($phone) || empty($apikey)) {
+        error_log('[WhatsApp] whatsapp_admin ou callmebot_token não configurados.');
         return false;
     }
+
     $url = 'https://api.callmebot.com/whatsapp.php?'
-         . 'phone='  . urlencode(WA_ADONIS_PHONE)
-         . '&text='  . urlencode($mensagem)
-         . '&apikey='. urlencode(WA_ADONIS_APIKEY);
-    $ctx = stream_context_create(['http' => ['method'=>'GET','timeout'=>8,'ignore_errors'=>true]]);
+         . 'phone='   . urlencode($phone)
+         . '&text='   . urlencode($mensagem)
+         . '&apikey=' . urlencode($apikey);
+
+    $ctx  = stream_context_create(['http' => ['method' => 'GET', 'timeout' => 8, 'ignore_errors' => true]]);
     $resp = @file_get_contents($url, false, $ctx);
     if ($resp === false) { error_log('[WhatsApp] Falha ao chamar CallMeBot.'); return false; }
     return true;
@@ -42,7 +62,8 @@ function wa_notificar_adonis(string $mensagem): bool
  */
 function wa_link_cliente(string $mensagem = ''): string
 {
-    $base = 'https://wa.me/' . WA_ADONIS_PHONE;
+    $phone = _wa_cfg('whatsapp_admin');
+    $base  = 'https://wa.me/' . preg_replace('/\D/', '', $phone);
     if (!empty($mensagem)) $base .= '?text=' . rawurlencode($mensagem);
     return $base;
 }
@@ -62,18 +83,15 @@ function wa_link_para_cliente(string $telefone_cliente, string $mensagem = ''): 
 // MENSAGENS ADONIS → CLIENTE  (por status)
 // ─────────────────────────────────────────────────────────────────
 
-/**
- * Retorna o texto da mensagem do Adonis para o cliente
- * de acordo com o novo status do pedido.
- */
 function wa_msg_status_para_cliente(array $pedido, string $status, array $extras = []): string
 {
-    $nome   = $pedido['cliente_nome']   ?? 'Cliente';
-    $id     = $pedido['id']             ?? '?';
-    $instr  = trim(($pedido['instrumento_tipo']  ?? '') . ' '
-                 . ($pedido['instrumento_marca'] ?? '') . ' '
-                 . ($pedido['instrumento_modelo']?? ''));
+    $nome   = $pedido['cliente_nome']    ?? 'Cliente';
+    $id     = $pedido['id']              ?? '?';
+    $instr  = trim(($pedido['instrumento_tipo']   ?? '') . ' '
+                 . ($pedido['instrumento_marca']  ?? '') . ' '
+                 . ($pedido['instrumento_modelo'] ?? ''));
     $link   = WA_ACOMPANHA_URL . '?token=' . ($pedido['public_token'] ?? '');
+    $end    = _wa_cfg('endereco_loja', 'Endereço não configurado');
 
     $saudacao = "Olá, *{$nome}*! 👋\n";
     $rodape   = "\n\n🔗 Acompanhe seu pedido:\n{$link}";
@@ -124,14 +142,15 @@ function wa_msg_status_para_cliente(array $pedido, string $status, array $extras
         case 'Pronto para retirada':
             return $saudacao
                  . "🎉 Seu *{$instr}* (Pedido #{$id}) está *pronto para retirada*!\n"
-                 . "📍 Endereço: Rua do Presépio, s/n – Chácara do Conde, Vila Velha – ES\n"
+                 . "📍 Endereço: {$end}\n"
                  . "Qualquer dúvida, é só falar!"
                  . $rodape;
 
         case 'Aguardando pagamento retirada':
+            $perc = _wa_cfg('perc_retirada', '40');
             return $saudacao
-                 . "💵 Seu *{$instr}* (Pedido #{$id}) está pronto! Para retirar, realize o pagamento do saldo restante (50%).\n"
-                 . "📍 Endereço: Rua do Presépio, s/n – Chácara do Conde, Vila Velha – ES"
+                 . "💵 Seu *{$instr}* (Pedido #{$id}) está pronto! Para retirar, realize o pagamento do saldo restante ({$perc}%).\n"
+                 . "📍 Endereço: {$end}"
                  . $rodape;
 
         case 'Entregue':
@@ -157,11 +176,11 @@ function wa_msg_status_para_cliente(array $pedido, string $status, array $extras
 
 function wa_msg_aprovacao(array $pedido, array $pgto): string
 {
-    $nome  = $pedido['cliente_nome']   ?? 'Cliente';
-    $id    = $pedido['id']             ?? '?';
-    $instr = trim(($pedido['instrumento_tipo']  ?? '') . ' '
-                . ($pedido['instrumento_marca'] ?? '') . ' '
-                . ($pedido['instrumento_modelo']?? ''));
+    $nome  = $pedido['cliente_nome']    ?? 'Cliente';
+    $id    = $pedido['id']              ?? '?';
+    $instr = trim(($pedido['instrumento_tipo']   ?? '') . ' '
+                . ($pedido['instrumento_marca']  ?? '') . ' '
+                . ($pedido['instrumento_modelo'] ?? ''));
     $valor = isset($pgto['valor_final'])
                ? 'R$ ' . number_format((float)$pgto['valor_final'], 2, ',', '.')
                : 'não informado';
@@ -179,11 +198,11 @@ function wa_msg_aprovacao(array $pedido, array $pgto): string
 
 function wa_msg_reprovacao(array $pedido, string $motivo): string
 {
-    $nome  = $pedido['cliente_nome']   ?? 'Cliente';
-    $id    = $pedido['id']             ?? '?';
-    $instr = trim(($pedido['instrumento_tipo']  ?? '') . ' '
-                . ($pedido['instrumento_marca'] ?? '') . ' '
-                . ($pedido['instrumento_modelo']?? ''));
+    $nome  = $pedido['cliente_nome']    ?? 'Cliente';
+    $id    = $pedido['id']              ?? '?';
+    $instr = trim(($pedido['instrumento_tipo']   ?? '') . ' '
+                . ($pedido['instrumento_marca']  ?? '') . ' '
+                . ($pedido['instrumento_modelo'] ?? ''));
 
     return "❌ *Orçamento REPROVADO*\n"
          . "Pedido: #{$id}\n"
