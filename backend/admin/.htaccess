@@ -27,7 +27,7 @@ RewriteRule ^$ login.php [L]
     Require all denied
 </FilesMatch>
 
-# Bloqueia acesso direto a arquivos internos
+# Bloqueia acesso direto a arquivos internos (mas permite criar_tabela_servicos_insumos.php)
 <FilesMatch "^(auth|_sidebar|_sidebar_data|criar_tabela_historico|criar_coluna_prazo)\.php$">
     Require all denied
 </FilesMatch>
