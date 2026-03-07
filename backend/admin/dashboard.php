@@ -3,7 +3,7 @@
  * DASHBOARD — SISTEMA ADONIS
  * Visual: Google / Material Design 3
  * Ícones: Material Symbols Outlined
- * Versão: 9.0 — Modal análise de insumos no dashboard
+ * Versão: 9.1 — Layout modal análise ajustado
  */
 require_once 'auth.php';
 require_once '../config/Database.php';
@@ -202,17 +202,19 @@ $v = time();
     .analise-tag{background:var(--g-bg);border:1px solid var(--g-border);border-radius:20px;padding:4px 12px;font-size:12px;color:var(--g-text-2)}
     .analise-sep{border:none;border-top:1px solid var(--g-border);margin:0 0 14px}
     .analise-insumos-title{font-size:12px;font-weight:600;color:var(--g-text-3);text-transform:uppercase;letter-spacing:.4px;padding:0 20px 8px}
-    .analise-insumo-row{display:flex;align-items:center;gap:10px;padding:10px 20px;border-top:1px solid var(--g-border)}
+    .analise-insumo-row{display:flex;flex-direction:column;gap:8px;padding:12px 20px;border-top:1px solid var(--g-border)}
     .analise-insumo-row:first-child{border-top:none}
+    .analise-insumo-linha1{display:flex;align-items:center;gap:10px}
     .analise-insumo-info{flex:1;min-width:0}
     .analise-insumo-nome{font-size:13px;font-weight:500;color:var(--g-text)}
     .analise-insumo-meta{font-size:11px;color:var(--g-text-3);margin-top:2px}
     .analise-insumo-meta .sem-estoque{color:#c5221f;font-weight:600}
-    .analise-insumo-valor{font-size:13px;font-weight:600;color:var(--g-text);white-space:nowrap;min-width:70px;text-align:right}
+    .analise-insumo-valor{font-size:14px;font-weight:600;color:var(--g-text);white-space:nowrap;min-width:80px;text-align:right}
     .analise-insumo-valor.riscado{text-decoration:line-through;color:var(--g-text-3);font-weight:400}
-    .analise-cf-toggle{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--g-text-2);white-space:nowrap;cursor:pointer}
-    .analise-cf-toggle input{cursor:pointer;accent-color:var(--g-blue);width:15px;height:15px}
-    .analise-qtd{width:52px;border:1px solid var(--g-border);border-radius:6px;padding:4px 6px;font-size:13px;text-align:center}
+    .analise-insumo-linha2{display:flex;align-items:center;gap:8px;padding-left:0}
+    .analise-cf-toggle{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--g-text-2);cursor:pointer}
+    .analise-cf-toggle input{cursor:pointer;accent-color:var(--g-blue);width:16px;height:16px}
+    .analise-qtd{width:60px;border:1px solid var(--g-border);border-radius:6px;padding:6px 8px;font-size:13px;text-align:center}
     .analise-qtd:focus{outline:2px solid var(--g-blue);border-color:transparent}
     .analise-vazio{padding:20px;text-align:center;color:var(--g-text-3);font-size:13px}
     .analise-footer{padding:14px 20px 0;border-top:2px solid var(--g-border);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}
@@ -601,7 +603,7 @@ function renderAcoes(acoes, totalBase, status){
         const[s,label,cls,modal]=a;
         if(modal==='modal-analise') html+=`<button class="btn ${cls}" onclick="_abrirAnalise()">${label}</button>`;
         else if(modal==='modal-rep') html+=`<button class="btn ${cls}" onclick="_abrirReprovacao()">${label}</button>`;
-        else                         html+=`<button class="btn ${cls}" onclick="_enviar('${s.replace(/'/g,"\\'")}')}">${label}</button>`;
+        else                         html+=`<button class="btn ${cls}" onclick="_enviar('${s.replace(/'/g,"\\'")}')">${label}</button>`;
     }
     html+=`</div></div>`;
     return html;
@@ -655,12 +657,8 @@ function _renderizarAnalise(data) {
 
             html += `<div class="analise-insumo-row" id="row-ins-${idx}">`;
 
-            // Checkbox cliente fornece
-            html += `<label class="analise-cf-toggle">`;
-            html += `<input type="checkbox" onchange="_toggleCF(${idx}, this.checked)" ${cf ? 'checked' : ''}>`;
-            html += `<span>Cliente<br>fornece</span></label>`;
-
-            // Info
+            // Linha 1: info + qtd + valor
+            html += `<div class="analise-insumo-linha1">`;
             html += `<div class="analise-insumo-info">`;
             html += `<div class="analise-insumo-nome">${escHtml(ins.nome)}</div>`;
             html += `<div class="analise-insumo-meta">`;
@@ -669,12 +667,18 @@ function _renderizarAnalise(data) {
             if (semEstoque) html += ` &bull; <span class="sem-estoque">Sem estoque</span>`;
             html += `</div></div>`;
 
-            // Qtd
             html += `<input type="number" class="analise-qtd" value="${parseFloat(ins.quantidade||1)}" min="0.001" step="0.001"
                 onchange="_mudarQtd(${idx}, this.value)" title="Quantidade">`;
 
-            // Valor
             html += `<div class="analise-insumo-valor ${cf ? 'riscado' : ''}" id="val-ins-${idx}">${fmt(cf ? 0 : valorTotal)}</div>`;
+            html += `</div>`; // linha1
+
+            // Linha 2: checkbox cliente fornece
+            html += `<div class="analise-insumo-linha2">`;
+            html += `<label class="analise-cf-toggle">`;
+            html += `<input type="checkbox" onchange="_toggleCF(${idx}, this.checked)" ${cf ? 'checked' : ''}>`;
+            html += `<span>Cliente fornece</span></label>`;
+            html += `</div>`; // linha2
 
             html += `</div>`; // row
         });
