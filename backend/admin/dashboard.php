@@ -3,7 +3,7 @@
  * DASHBOARD — SISTEMA ADONIS
  * Visual: Google / Material Design 3
  * Ícones: Material Symbols Outlined
- * Versão: 11.0 — Análise de insumos por categoria
+ * Versão: 12.0 — Modal unificado com detalhes.php
  */
 require_once 'auth.php';
 require_once '../config/Database.php';
@@ -138,36 +138,7 @@ $v = time();
     <link rel="stylesheet" href="assets/css/admin.css?v=<?php echo $v; ?>">
     <link rel="stylesheet" href="assets/css/sidebar.css?v=<?php echo $v; ?>">
     <link rel="stylesheet" href="assets/css/dashboard.css?v=<?php echo $v; ?>">
-    <style>
-    /* CHIPS DE CATEGORIA */
-    .analise-chips-row {
-        display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px;
-    }
-    .analise-chip-cat {
-        display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px;
-        border-radius: 16px; background: var(--g-bg-hover); color: var(--g-text-2);
-        border: 1px solid var(--g-border); cursor: pointer; transition: 120ms;
-        font-size: 13px; font-weight: 500; user-select: none;
-    }
-    .analise-chip-cat:hover { background: var(--g-blue); color: white; border-color: var(--g-blue); }
-    .analise-chip-cat.ativo { background: var(--g-blue); color: white; border-color: var(--g-blue); }
-    .analise-chip-cat .material-symbols-outlined { font-size: 16px; }
-    .analise-chip-cat .badge-count { font-size: 11px; background: rgba(255,255,255,0.3); padding: 2px 6px; border-radius: 8px; margin-left: 4px; }
-
-    .analise-categoria-grupo { margin-bottom: 16px; }
-    .analise-categoria-header {
-        display: flex; align-items: center; justify-content: space-between;
-        padding: 8px 0; cursor: pointer; user-select: none;
-    }
-    .analise-categoria-titulo {
-        display: flex; align-items: center; gap: 6px;
-        font-weight: 500; color: var(--g-text);
-    }
-    .analise-categoria-chevron { transition: transform 0.2s; }
-    .analise-categoria-header.fechado .analise-categoria-chevron { transform: rotate(-90deg); }
-    .analise-categoria-content { padding-left: 8px; }
-    .analise-categoria-header.fechado + .analise-categoria-content { display: none; }
-    </style>
+    <link rel="stylesheet" href="assets/css/analise_insumos_v3.css?v=<?php echo $v; ?>">
 </head>
 <body>
 
@@ -483,13 +454,14 @@ function limparBusca(){
     location.href = 'dashboard.php' + (s ? '?status=' + encodeURIComponent(s) : '');
 }
 
-let _idAtual = null, _telefoneAtual = '';
+let _idAtual = null, _telefoneAtual = '', _pedidoId = null;
 let _orcEscolhido = null;
 
 function abrirAcoes(id, nome, instr, status, acoes, totalBase, orcAtual, telefone){
     document.querySelectorAll('.pedido-item.selected').forEach(el=>el.classList.remove('selected'));
     document.getElementById('pedido-'+id)?.classList.add('selected');
     _idAtual = id;
+    _pedidoId = id;
     _telefoneAtual = telefone;
 
     const bmap = _badgeMap[status] ?? {badge:'badge-secondary',icone:'circle',label:status};
@@ -531,11 +503,13 @@ function fecharPainel(){
     document.getElementById('acao-panel').classList.remove('visible');
     document.querySelectorAll('.pedido-item.selected').forEach(el=>el.classList.remove('selected'));
     _idAtual = null;
+    _pedidoId = null;
 }
 function fecharSheet(){
     document.getElementById('acao-sheet').classList.remove('open');
     document.querySelectorAll('.pedido-item.selected').forEach(el=>el.classList.remove('selected'));
     _idAtual = null;
+    _pedidoId = null;
 }
 
 function renderAcoes(acoes, totalBase, status){
@@ -544,211 +518,12 @@ function renderAcoes(acoes, totalBase, status){
     let html=`<div class="acao-section"><div class="acao-section-label">Ações disponíveis</div><div class="acao-btns">`;
     for(const a of acoes){
         const[s,label,cls,modal]=a;
-        if(modal==='modal-analise') html+=`<button class="btn ${cls}" onclick="_abrirAnalise()">${label}</button>`;
+        if(modal==='modal-analise') html+=`<button class="btn ${cls}" onclick="abrirModalAnalise()">${label}</button>`;
         else if(modal==='modal-rep') html+=`<button class="btn ${cls}" onclick="_abrirReprovacao()">${label}</button>`;
         else                         html+=`<button class="btn ${cls}" onclick="_enviar('${s.replace(/'/g,"\\\\'")}')">${label}</button>`;
     }
     html+=`</div></div>`;
     return html;
-}
-
-// ── MODAL ANÁLISE V3 - POR CATEGORIAS ──
-let _insumosPorCategoria = {};
-let _categoriasAbertasState = {};
-let _categoriasAtivas = new Set();
-
-function _abrirAnalise() {
-    if (!_idAtual) return;
-    document.getElementById('analise-corpo').innerHTML = '<div class="analise-loading">Carregando insumos...</div>';
-    document.getElementById('analise-acoes').style.display = 'none';
-    document.getElementById('modal-analise').classList.add('aberto');
-
-    fetch('analise_insumos.php?pre_os_id=' + _idAtual)
-        .then(r => r.json())
-        .then(data => {
-            if (!data.sucesso) { _toast(data.erro || 'Erro ao carregar'); fecharModal('modal-analise'); return; }
-            _renderizarAnalisePorCategoria(data);
-        })
-        .catch(() => { _toast('Erro de conexão'); fecharModal('modal-analise'); });
-}
-
-function _renderizarAnalisePorCategoria(data) {
-    // Estruturar insumos por categoria (vêm do backend)
-    _insumosPorCategoria = data.insumos_por_categoria || {};
-    const categorias = data.categorias || [];
-    const icones = data.categorias_icones || {};
-
-    // Todas as categorias começam abertas
-    _categoriasAbertasState = {};
-    categorias.forEach(c => { _categoriasAbertasState[c] = true; });
-    _categoriasAtivas = new Set(categorias);
-
-    let html = '';
-
-    // Resumo do pedido
-    html += '<div class="analise-resumo">';
-    html += '<div class="analise-resumo-title">Serviços do pedido</div>';
-    html += '<div class="analise-resumo-tags">';
-    if (data.servicos && data.servicos.length) {
-        data.servicos.forEach(s => { html += '<span class="analise-tag">' + escHtml(s.nome) + '</span>'; });
-    } else {
-        html += '<span style="font-size:13px;color:var(--g-text-3)">Nenhum serviço</span>';
-    }
-    html += '</div></div>';
-    html += '<hr class="analise-sep">';
-
-    // Título
-    html += '<div class="analise-insumos-title">Insumos necessários</div>';
-
-    // Chips de categoria
-    if (categorias.length) {
-        html += '<div class="analise-chips-row">';
-        categorias.forEach(cat => {
-            const qtdCat = _insumosPorCategoria[cat] ? _insumosPorCategoria[cat].length : 0;
-            const icone = icones[cat] || 'category';
-            html += `<div class="analise-chip-cat ativo" onclick="_toggleCategoria('${cat}')" id="chip-cat-${cat}">`;
-            html += iconHtml(icone, 16);
-            html += ` ${escHtml(cat)}<span class="badge-count">${qtdCat}</span></div>`;
-        });
-        html += '</div>';
-    }
-
-    // Renderiza insumos agrupados por categoria
-    categorias.forEach(cat => {
-        const insumos = _insumosPorCategoria[cat] || [];
-        if (!insumos.length) return;
-
-        html += `<div class="analise-categoria-grupo" id="grupo-cat-${cat}">`;
-        html += `<div class="analise-categoria-header" onclick="_toggleGrupoCategoria('${cat}')">`;
-        html += `<div class="analise-categoria-titulo">`;
-        html += iconHtml(icones[cat] || 'category', 18);
-        html += ` ${escHtml(cat)} (${insumos.length})</div>`;
-        html += `<span class="material-symbols-outlined analise-categoria-chevron" id="chevron-cat-${cat}">expand_more</span>`;
-        html += `</div>`; // header
-
-        html += `<div class="analise-categoria-content" id="content-cat-${cat}">`;
-
-        insumos.forEach((ins, idx) => {
-            const globalIdx = `${cat}-${idx}`;
-            const semEstoque = parseFloat(ins.quantidade_estoque) <= 0;
-            const cf = ins.cliente_fornece == 1;
-            const valorTotal = parseFloat(ins.valor_unitario) * parseFloat(ins.quantidade || 1);
-
-            html += `<div class="analise-insumo-row" id="row-ins-${globalIdx}">`;
-            html += `<div class="analise-insumo-top">`;
-            html += `<div class="analise-insumo-info">`;
-            html += `<div class="analise-insumo-nome">${escHtml(ins.nome)}</div>`;
-            html += `<div class="analise-insumo-meta">`;
-            if (ins.servicos_origem) html += `Vinculado: ${escHtml(ins.servicos_origem)} &bull; `;
-            html += `${escHtml(ins.unidade)}`;
-            if (semEstoque) html += ` &bull; <span class="sem-estoque">Sem estoque</span>`;
-            html += `</div></div>`;
-
-            html += `<input type="number" class="analise-qtd" value="${parseFloat(ins.quantidade||1)}" min="0.001" step="0.001"
-                onchange="_mudarQtdCat('${cat}', ${idx}, this.value)" title="Quantidade">`;
-
-            html += `<div class="analise-insumo-valor ${cf ? 'riscado' : ''}" id="val-ins-${globalIdx}">${fmt(cf ? 0 : valorTotal)}</div>`;
-            html += `</div>`;
-
-            html += `<div class="analise-insumo-bottom">`;
-            html += `<label class="analise-cf-toggle">`;
-            html += `<input type="checkbox" onchange="_toggleCFCat('${cat}', ${idx}, this.checked)" ${cf ? 'checked' : ''}>`;
-            html += `<span>Cliente fornece</span></label>`;
-            html += `</div>`;
-
-            html += `</div>`;
-        });
-
-        html += `</div>`; // content
-        html += `</div>`; // grupo
-    });
-
-    // Footer com total
-    html += '<div class="analise-footer">';
-    html += '<div class="analise-total-bloco">Insumos a cobrar:<strong id="analise-total-ins">—</strong></div>';
-    html += '</div>';
-
-    document.getElementById('analise-corpo').innerHTML = html;
-    document.getElementById('analise-acoes').style.display = 'flex';
-    _recalcularTotalAnaliseCat();
-}
-
-function _toggleCategoria(cat) {
-    const chip = document.getElementById('chip-cat-' + cat);
-    const grupo = document.getElementById('grupo-cat-' + cat);
-    if (!chip || !grupo) return;
-
-    if (_categoriasAtivas.has(cat)) {
-        _categoriasAtivas.delete(cat);
-        chip.classList.remove('ativo');
-        grupo.style.display = 'none';
-    } else {
-        _categoriasAtivas.add(cat);
-        chip.classList.add('ativo');
-        grupo.style.display = 'block';
-    }
-}
-
-function _toggleGrupoCategoria(cat) {
-    const header = document.querySelector(`#grupo-cat-${cat} .analise-categoria-header`);
-    if (!header) return;
-    _categoriasAbertasState[cat] = !_categoriasAbertasState[cat];
-    header.classList.toggle('fechado', !_categoriasAbertasState[cat]);
-}
-
-function _toggleCFCat(cat, idx, checked) {
-    _insumosPorCategoria[cat][idx].cliente_fornece = checked ? 1 : 0;
-    const globalIdx = `${cat}-${idx}`;
-    const ins = _insumosPorCategoria[cat][idx];
-    const valEl = document.getElementById('val-ins-' + globalIdx);
-    if (valEl) {
-        const total = parseFloat(ins.valor_unitario) * parseFloat(ins.quantidade || 1);
-        valEl.textContent = checked ? fmt(0) : fmt(total);
-        valEl.classList.toggle('riscado', checked);
-    }
-    _recalcularTotalAnaliseCat();
-}
-
-function _mudarQtdCat(cat, idx, val) {
-    const qtd = Math.max(0.001, parseFloat(val) || 1);
-    _insumosPorCategoria[cat][idx].quantidade = qtd;
-    const ins = _insumosPorCategoria[cat][idx];
-    const cf = ins.cliente_fornece == 1;
-    const total = parseFloat(ins.valor_unitario) * qtd;
-    const globalIdx = `${cat}-${idx}`;
-    const valEl = document.getElementById('val-ins-' + globalIdx);
-    if (valEl) { valEl.textContent = cf ? fmt(0) : fmt(total); }
-    _recalcularTotalAnaliseCat();
-}
-
-function _recalcularTotalAnaliseCat() {
-    let total = 0;
-    Object.values(_insumosPorCategoria).flat().forEach(ins => {
-        if (!ins.cliente_fornece) total += parseFloat(ins.valor_unitario) * parseFloat(ins.quantidade || 1);
-    });
-    const el = document.getElementById('analise-total-ins');
-    if (el) el.textContent = fmt(total);
-}
-
-function confirmarAnalise() {
-    const btn = document.getElementById('btn-confirmar-analise');
-    btn.disabled = true; btn.textContent = 'Salvando...';
-
-    // Montar array de insumos flat
-    const insumos = Object.values(_insumosPorCategoria).flat();
-
-    fetch('analise_insumos.php', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pre_os_id: _idAtual, insumos })
-    })
-    .then(r => r.json())
-    .then(data => {
-        if (!data.sucesso) { _toast(data.erro || 'Erro ao salvar'); btn.disabled = false; btn.textContent = 'Confirmar e Orçar →'; return; }
-        fecharModal('modal-analise');
-        _abrirOrcamentoComValor(data.total_orcamento, data.total_servicos, data.total_insumos);
-    })
-    .catch(() => { _toast('Erro de conexão'); btn.disabled = false; btn.textContent = 'Confirmar e Orçar →'; });
 }
 
 // ─ Orçamento
@@ -830,6 +605,7 @@ function confirmarModalReprovacao(){
 }
 
 function fecharModal(id){document.getElementById(id).classList.remove('aberto');}
+function abrirModal(id){document.getElementById(id).classList.add('aberto');}
 document.querySelectorAll('.modal-overlay').forEach(o=>{
     o.addEventListener('click',e=>{if(e.target===o)o.classList.remove('aberto');});
 });
@@ -870,5 +646,6 @@ function escHtml(s){
 }
 </script>
 <script src="assets/js/admin.js?v=<?php echo $v; ?>"></script>
+<script src="assets/js/analise_insumos_v3.js?v=<?php echo $v; ?>"></script>
 </body>
 </html>
