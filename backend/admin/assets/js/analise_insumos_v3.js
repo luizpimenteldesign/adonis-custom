@@ -60,10 +60,19 @@ function _renderizarInterfaceCategorias() {
     html += '<div class="analise-cats-grid" id="cats-grid">';
     if (_dadosAnalise.categorias && _dadosAnalise.categorias.length) {
         _dadosAnalise.categorias.forEach(cat => {
-            html += '<button class="cat-btn" onclick="_selecionarCategoria(\'' + _esc(cat.nome) + '\')">'
-                 + '<span class="material-symbols-outlined">' + (cat.icone || 'category') + '</span>'
-                 + '<span>' + _esc(cat.nome) + '</span></button>';
+            // Suporta tanto objetos {nome, icone} quanto strings simples
+            const nomeCat = typeof cat === 'object' ? cat.nome : cat;
+            const iconeCat = typeof cat === 'object' ? (cat.icone || 'category') : 'category';
+            
+            html += '<button class="cat-btn" onclick="_selecionarCategoria(\'' + _esc(nomeCat) + '\')">'
+                 + '<span class="material-symbols-outlined">' + iconeCat + '</span>'
+                 + '<span>' + _esc(nomeCat) + '</span></button>';
         });
+    } else {
+        // Fallback: sem categorias, mostra botão "Todos"
+        html += '<button class="cat-btn" onclick="_selecionarCategoria(\'Todos\')">' +
+                '<span class="material-symbols-outlined">grid_view</span>' +
+                '<span>Todos os Insumos</span></button>';
     }
     html += '</div>';
 
