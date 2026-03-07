@@ -2,7 +2,7 @@
 /**
  * DETALHES DO PEDIDO — SISTEMA ADONIS
  * Visual: Google / Material Design 3
- * Versão: 8.1 — Corrige sidebar + lista de insumos
+ * Versão: 8.2 — Corrige erro quando tabela servico_insumos não existe
  */
 require_once 'auth.php';
 require_once '../config/Database.php';
@@ -37,21 +37,26 @@ try {
 
     // ┌─ BUSCAR INSUMOS VINCULADOS AOS SERVIÇOS DESTE PEDIDO
     $insumos_pedido = [];
-    if (!empty($servicos)) {
-        $servico_ids = array_column($servicos, 'id');
-        $placeholders = implode(',', array_fill(0, count($servico_ids), '?'));
-        $stmt_ins = $conn->prepare("
-            SELECT DISTINCT i.id, i.nome, i.unidade, i.valor_unitario, i.quantidade_estoque,
-                   GROUP_CONCAT(DISTINCT s.nome SEPARATOR ', ') as servicos_origem
-            FROM servico_insumos si
-            JOIN insumos i ON si.insumo_id = i.id
-            JOIN servicos s ON si.servico_id = s.id
-            WHERE si.servico_id IN ($placeholders)
-            GROUP BY i.id
-            ORDER BY i.nome
-        ");
-        $stmt_ins->execute($servico_ids);
-        $insumos_pedido = $stmt_ins->fetchAll(PDO::FETCH_ASSOC);
+    try {
+        if (!empty($servicos)) {
+            $servico_ids = array_column($servicos, 'id');
+            $placeholders = implode(',', array_fill(0, count($servico_ids), '?'));
+            $stmt_ins = $conn->prepare("
+                SELECT DISTINCT i.id, i.nome, i.unidade, i.valor_unitario, i.quantidade_estoque,
+                       GROUP_CONCAT(DISTINCT s.nome SEPARATOR ', ') as servicos_origem
+                FROM servico_insumos si
+                JOIN insumos i ON si.insumo_id = i.id
+                JOIN servicos s ON si.servico_id = s.id
+                WHERE si.servico_id IN ($placeholders)
+                GROUP BY i.id
+                ORDER BY i.nome
+            ");
+            $stmt_ins->execute($servico_ids);
+            $insumos_pedido = $stmt_ins->fetchAll(PDO::FETCH_ASSOC);
+        }
+    } catch (PDOException $e) {
+        // Tabela servico_insumos pode não existir ainda - não quebra a página
+        $insumos_pedido = [];
     }
 
     $fotos = [];
@@ -76,6 +81,8 @@ try {
     } catch (PDOException $e) {}
 
 } catch (PDOException $e) {
+    // Debug temporário: descomente para ver o erro real
+    // die('Erro SQL: ' . $e->getMessage());
     header('Location: dashboard.php?erro=banco'); exit;
 }
 
@@ -118,7 +125,7 @@ $acoes_por_status = [
 $status_info  = $status_map[$pedido['status']] ?? ['label'=>$pedido['status'],'badge'=>'badge-secondary','icone'=>'circle'];
 $acoes_atuais = $acoes_por_status[$pedido['status']] ?? [];
 
-$current_page = 'detalhes.php'; // Para highlighting da sidebar
+$current_page = 'detalhes.php';
 require_once '_sidebar_data.php';
 $v = time();
 
