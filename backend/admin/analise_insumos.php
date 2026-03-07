@@ -1,10 +1,10 @@
 <?php
 /**
- * API: Análise de insumos de uma Pré-OS (VERSÃO 3.1 - FILTRO POR SERVIÇOS)
+ * API: Análise de insumos de uma Pré-OS (VERSÃO 3.2 - FILTRO COMPLETO)
  *
- * GET  ?pre_os_id=X       → retorna categorias FILTRADAS pelos serviços e insumos já selecionados
- * GET  ?categoria=X       → retorna insumos de uma categoria específica
- * POST                    → salva a lista confirmada em pre_os_insumos
+ * GET  ?pre_os_id=X                    → retorna categorias FILTRADAS pelos serviços e insumos já selecionados
+ * GET  ?pre_os_id=X&categoria=Y&q=Z    → retorna insumos FILTRADOS pelos serviços da pré-OS
+ * POST                                 → salva a lista confirmada em pre_os_insumos
  */
 require_once 'auth.php';
 require_once '../config/Database.php';
@@ -14,36 +14,57 @@ header('Content-Type: application/json; charset=utf-8');
 $db   = new Database();
 $conn = $db->getConnection();
 
-// ── GET: BUSCAR INSUMOS DE UMA CATEGORIA ─────────────────────────────
-if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['categoria'])) {
+// ── GET: BUSCAR INSUMOS DE UMA CATEGORIA (FILTRADOS PELOS SERVIÇOS) ─────────────────────────────
+if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['categoria']) && isset($_GET['pre_os_id'])) {
     $categoria = trim($_GET['categoria']);
-    $busca = trim($_GET['q'] ?? '');
+    $busca     = trim($_GET['q'] ?? '');
+    $pre_os_id = (int)$_GET['pre_os_id'];
     
-    $sql = "SELECT id, nome, unidade, valor_unitario, quantidade_estoque FROM insumos WHERE ativo=1";
+    if (!$pre_os_id) {
+        echo json_encode(['sucesso' => false, 'erro' => 'ID da pré-OS é obrigatório']);
+        exit;
+    }
     
+    // ✅ QUERY CORRIGIDA: Filtra insumos pelos serviços da pré-OS
+    $sql = "
+        SELECT DISTINCT 
+            i.id,
+            i.nome,
+            i.unidade,
+            i.valor_unitario,
+            i.quantidade_estoque
+        FROM insumos i
+        INNER JOIN insumos_servicos isv ON i.id = isv.insumo_id
+        INNER JOIN pre_os_servicos pos ON isv.servico_id = pos.servico_id
+        WHERE pos.pre_os_id = :pre_os_id
+        AND i.ativo = 1
+    ";
+    
+    $params = [':pre_os_id' => $pre_os_id];
+    
+    // Filtro por categoria (se não for "Todos")
     if ($categoria !== 'Todos') {
-        $sql .= " AND categoria = :cat";
+        $sql .= " AND i.categoria = :categoria";
+        $params[':categoria'] = $categoria;
     }
     
+    // Filtro por busca textual
     if ($busca) {
-        $sql .= " AND nome LIKE :busca";
+        $sql .= " AND i.nome LIKE :busca";
+        $params[':busca'] = '%' . $busca . '%';
     }
     
-    $sql .= " ORDER BY nome LIMIT 100";
+    $sql .= " ORDER BY i.nome LIMIT 100";
     
-    $stmt = $conn->prepare($sql);
-    
-    if ($categoria !== 'Todos') {
-        $stmt->bindValue(':cat', $categoria);
+    try {
+        $stmt = $conn->prepare($sql);
+        $stmt->execute($params);
+        $insumos = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        echo json_encode(['sucesso' => true, 'insumos' => $insumos]);
+    } catch (PDOException $e) {
+        echo json_encode(['sucesso' => false, 'erro' => 'Erro ao buscar insumos: ' . $e->getMessage()]);
     }
-    if ($busca) {
-        $stmt->bindValue(':busca', '%' . $busca . '%');
-    }
-    
-    $stmt->execute();
-    $insumos = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    
-    echo json_encode(['sucesso' => true, 'insumos' => $insumos]);
     exit;
 }
 
