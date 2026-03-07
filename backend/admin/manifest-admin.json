@@ -1,0 +1,45 @@
+{
+  "name": "Adonis Admin - Painel",
+  "short_name": "Adonis Admin",
+  "description": "Painel administrativo para gestão de orçamentos e pedidos de luthieria",
+  "start_url": "/backend/admin/dashboard.php",
+  "display": "standalone",
+  "background_color": "#121212",
+  "theme_color": "#1976d2",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "assets/img/favicon-admin.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["business", "productivity", "utilities"],
+  "shortcuts": [
+    {
+      "name": "Dashboard",
+      "short_name": "Painel",
+      "description": "Visualizar todos os pedidos",
+      "url": "/backend/admin/dashboard.php",
+      "icons": [
+        {
+          "src": "assets/img/favicon-admin.png",
+          "sizes": "96x96"
+        }
+      ]
+    },
+    {
+      "name": "Novo Pedido",
+      "short_name": "Criar",
+      "description": "Criar novo pedido manualmente",
+      "url": "/backend/admin/novo-pedido.php",
+      "icons": [
+        {
+          "src": "assets/img/favicon-admin.png",
+          "sizes": "96x96"
+        }
+      ]
+    }
+  ]
+}
