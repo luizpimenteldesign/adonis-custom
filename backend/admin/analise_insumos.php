@@ -7,6 +7,8 @@
  *                        se já houver registros em pre_os_insumos, retorna eles
  * POST               → salva a lista confirmada em pre_os_insumos
  *                        e muda status para 'Em analise'
+ *
+ * RETROCOMPATIBILIDADE: funciona com ou sem tabela categorias_insumo
  */
 require_once 'auth.php';
 require_once '../config/Database.php';
@@ -47,18 +49,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     $stmt_s->execute([':id' => $pre_os_id]);
     $servicos = $stmt_s->fetchAll(PDO::FETCH_ASSOC);
 
-    // Buscar TODAS as categorias de insumos
+    // RETROCOMPATIBILIDADE: Verifica se tabela categorias_insumo existe
+    $tabela_existe = false;
     try {
-        $stmt_cat = $conn->query("SELECT nome, icone FROM categorias_insumo WHERE ativo = 1 ORDER BY nome");
-        $categorias_raw = $stmt_cat->fetchAll(PDO::FETCH_ASSOC);
-        $categorias = array_column($categorias_raw, 'nome');
-        $categorias_icones = [];
-        foreach ($categorias_raw as $c) {
-            $categorias_icones[$c['nome']] = $c['icone'] ?? 'category';
-        }
+        $conn->query("SELECT 1 FROM categorias_insumo LIMIT 1");
+        $tabela_existe = true;
     } catch (Exception $e) {
-        $categorias = [];
-        $categorias_icones = [];
+        // Tabela não existe ainda
+    }
+
+    // Buscar categorias (se existirem)
+    $categorias = [];
+    $categorias_icones = [];
+
+    if ($tabela_existe) {
+        try {
+            $stmt_cat = $conn->query("SELECT nome, icone FROM categorias_insumo WHERE ativo = 1 ORDER BY nome");
+            $categorias_raw = $stmt_cat->fetchAll(PDO::FETCH_ASSOC);
+            $categorias = array_column($categorias_raw, 'nome');
+            foreach ($categorias_raw as $c) {
+                $categorias_icones[$c['nome']] = $c['icone'] ?? 'category';
+            }
+        } catch (Exception $e) {
+            // Falha silenciosa
+        }
+    }
+
+    // Se não houver categorias, criar uma padrão
+    if (empty($categorias)) {
+        $categorias = ['Insumos'];
+        $categorias_icones = ['Insumos' => 'inventory_2'];
     }
 
     // Verifica se já existem insumos confirmados
@@ -70,9 +90,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
 
     if ($ja_confirmado) {
         // Retorna o que já foi salvo, agrupado por categoria
+        $query_cat = $tabela_existe ? "ins.categoria" : "'Insumos' AS categoria";
         $stmt_i = $conn->prepare("
             SELECT poi.id, poi.insumo_id, poi.quantidade, poi.valor_unitario, poi.cliente_fornece,
-                   ins.nome, ins.unidade, ins.quantidade_estoque, ins.categoria,
+                   ins.nome, ins.unidade, ins.quantidade_estoque, $query_cat,
                    (
                        SELECT GROUP_CONCAT(s2.nome SEPARATOR ', ')
                        FROM insumos_servicos is2
@@ -90,7 +111,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         $rows = $stmt_i->fetchAll(PDO::FETCH_ASSOC);
 
         foreach ($rows as $r) {
-            $cat = $r['categoria'] ?: 'Outros';
+            $cat = $tabela_existe ? ($r['categoria'] ?: 'Outros') : 'Insumos';
             if (!isset($insumos_por_categoria[$cat])) $insumos_por_categoria[$cat] = [];
             $insumos_por_categoria[$cat][] = [
                 'insumo_id'          => (int)$r['insumo_id'],
@@ -110,9 +131,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             $insumos_por_categoria = [];
         } else {
             $ids_servicos = implode(',', array_map(fn($s) => (int)$s['id'], $servicos));
+            $query_cat = $tabela_existe ? "ins.categoria" : "'Insumos' AS categoria";
             $stmt_i = $conn->prepare("
                 SELECT ins.id AS insumo_id,
-                       ins.nome, ins.unidade, ins.categoria,
+                       ins.nome, ins.unidade, $query_cat,
                        ins.valor_unitario,
                        ins.quantidade_estoque,
                        GROUP_CONCAT(s.nome SEPARATOR ', ') AS servicos_origem
@@ -128,7 +150,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
 
             foreach ($rows as $r) {
                 $sem_estoque = (float)$r['quantidade_estoque'] <= 0;
-                $cat = $r['categoria'] ?: 'Outros';
+                $cat = $tabela_existe ? ($r['categoria'] ?: 'Outros') : 'Insumos';
                 if (!isset($insumos_por_categoria[$cat])) $insumos_por_categoria[$cat] = [];
                 $insumos_por_categoria[$cat][] = [
                     'insumo_id'          => (int)$r['insumo_id'],
