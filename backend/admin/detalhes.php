@@ -1,8 +1,7 @@
 <?php
 /**
  * DETALHES DO PEDIDO — SISTEMA ADONIS
- * Visual: Google / Material Design 3
- * Versão: 8.4 — Carrega analise_insumos_v3.js, remove JS inline
+ * Versão: 8.5 — Força cache-bust do analise_insumos_v3.js
  */
 require_once 'auth.php';
 require_once '../config/Database.php';
@@ -127,7 +126,7 @@ $acoes_atuais = $acoes_por_status[$pedido['status']] ?? [];
 
 $current_page = 'detalhes.php';
 require_once '_sidebar_data.php';
-$v = time();
+$v = time(); // Versão timestamp para cache-busting forçado
 
 function iconHtml($name,$size=16){return '<span class="material-symbols-outlined" style="font-size:'.$size.'px;vertical-align:middle">'.$name.'</span>';}
 ?>
@@ -143,7 +142,7 @@ function iconHtml($name,$size=16){return '<span class="material-symbols-outlined
     <link rel="stylesheet" href="assets/css/sidebar.css?v=<?php echo $v; ?>">
     <link rel="stylesheet" href="assets/css/dashboard.css?v=<?php echo $v; ?>">
     <style>
-    /* ── LAYOUT PRINCIPAL ────────────────────────────────── */
+    /* ── LAYOUT PRINCIPAL ───────────────────────────────────────────── */
     .page-content { flex:1; padding:20px; }
     .page-header { display:flex; align-items:center; gap:12px; margin-bottom:20px; padding-bottom:16px; border-bottom:1px solid var(--g-border); }
     .page-header-back { display:flex; align-items:center; justify-content:center; width:36px; height:36px; border-radius:50%; color:var(--g-text-2); text-decoration:none; font-size:18px; transition:background .15s; flex-shrink:0; }
@@ -209,7 +208,7 @@ function iconHtml($name,$size=16){return '<span class="material-symbols-outlined
     .token-row { display:flex; align-items:center; gap:10px; padding:14px 20px; }
     .token-val { font-family:'Roboto Mono',monospace; font-size:11px; color:var(--g-text-2); background:var(--g-bg); border:1px solid var(--g-border); border-radius:6px; padding:7px 10px; flex:1; word-break:break-all; }
 
-    /* ── TABELA DE INSUMOS ───────────────────── */
+    /* ── TABELA DE INSUMOS ──────────────────────────────────── */
     .ins-table { width:100%; border-collapse:collapse; }
     .ins-table thead th { text-align:left; padding:8px 20px; font-size:10px; font-weight:600; color:var(--g-text-3); text-transform:uppercase; letter-spacing:.4px; border-bottom:1px solid var(--g-border); background:var(--g-bg); }
     .ins-table tbody td { padding:10px 20px; font-size:13px; border-bottom:1px solid var(--g-border); color:var(--g-text); vertical-align:middle; }
@@ -372,9 +371,9 @@ function iconHtml($name,$size=16){return '<span class="material-symbols-outlined
                     <?php endif; ?>
                 </div>
 
-                <!-- ┌──────────────────────────────────────────────
+                <!-- ┌────────────────────────────────────────────────
                      INSUMOS VINCULADOS AOS SERVIÇOS
-                └────────────────────────────────────────────── -->
+                └──────────────────────────────────────────────── -->
                 <?php if (!empty($insumos_pedido)): ?>
                 <div class="sect">
                     <div class="sect-title"><?php echo iconHtml('inventory_2',13); ?> Insumos vinculados aos serviços</div>
