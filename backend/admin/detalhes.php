@@ -2,7 +2,7 @@
 /**
  * DETALHES DO PEDIDO — SISTEMA ADONIS
  * Visual: Google / Material Design 3
- * Versão: 7.0 — Menu via include, sem emojis
+ * Versão: 8.0 — Modal Iniciar Análise com insumos
  */
 require_once 'auth.php';
 require_once '../config/Database.php';
@@ -78,10 +78,9 @@ $status_map = [
     'Cancelada'                     => ['label'=>'Cancelada',               'badge'=>'badge-dark',    'icone'=>'■'],
 ];
 
-// Ações condicionais por status (igual ao dashboard)
 $acoes_por_status = [
-    'Pre-OS'               => [['Em analise','Iniciar Análise','btn-info'],['Orcada','Orçar','btn-warning','modal-orc'],['Reprovada','Reprovar','btn-danger','modal-rep'],['Cancelada','Cancelar','btn-dark']],
-    'Em analise'           => [['Orcada','Orçar','btn-warning','modal-orc'],['Reprovada','Reprovar','btn-danger','modal-rep'],['Cancelada','Cancelar','btn-dark']],
+    'Pre-OS'               => [['Em analise','Iniciar Análise','btn-info','modal-analise'],['Orcada','Orçar','btn-warning','modal-orc'],['Reprovada','Reprovar','btn-danger','modal-rep'],['Cancelada','Cancelar','btn-dark']],
+    'Em analise'           => [['Em analise','Rever Insumos','btn-info','modal-analise'],['Orcada','Orçar','btn-warning','modal-orc'],['Reprovada','Reprovar','btn-danger','modal-rep'],['Cancelada','Cancelar','btn-dark']],
     'Orcada'               => [['Aguardando aprovacao','Aguardar Aprovação','btn-warning'],['Reprovada','Reprovar','btn-danger','modal-rep'],['Cancelada','Cancelar','btn-dark']],
     'Aguardando aprovacao' => [['Aprovada','Marcar Aprovada','btn-success'],['Reprovada','Reprovar','btn-danger','modal-rep'],['Cancelada','Cancelar','btn-dark']],
     'Aprovada'             => [['Pagamento recebido','Pagamento Recebido','btn-success'],['Cancelada','Cancelar','btn-dark']],
@@ -93,7 +92,7 @@ $acoes_por_status = [
     'Pronto para retirada' => [['Entregue','Entregue','btn-dark']],
     'Aguardando pagamento retirada' => [['Entregue','Entregue','btn-dark']],
     'Entregue'             => [],
-    'Reprovada'            => [['Em analise','Reabrir Análise','btn-info']],
+    'Reprovada'            => [['Em analise','Reabrir — Rever Insumos','btn-info','modal-analise']],
     'Cancelada'            => [['Pre-OS','Reabrir','btn-info']],
 ];
 
@@ -112,20 +111,11 @@ $v = time();
     <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="assets/css/admin.css?v=<?php echo $v; ?>">
     <style>
-    /* ── LAYOUT SIDEBAR (igual ao dashboard) ────────────── */
+    /* ── LAYOUT SIDEBAR ─────────────────────────────────── */
     .app-layout { display:flex; min-height:100vh; }
-
-    .sidebar {
-      width:240px; flex-shrink:0;
-      background:var(--g-surface); border-right:1px solid var(--g-border);
-      display:flex; flex-direction:column;
-      position:fixed; top:0; left:0; bottom:0;
-      z-index:200; overflow-y:auto;
-      transform:translateX(-100%); transition:transform .25s ease;
-    }
+    .sidebar { width:240px; flex-shrink:0; background:var(--g-surface); border-right:1px solid var(--g-border); display:flex; flex-direction:column; position:fixed; top:0; left:0; bottom:0; z-index:200; overflow-y:auto; transform:translateX(-100%); transition:transform .25s ease; }
     .sidebar.open { transform:translateX(0); }
     @media (min-width:960px) { .sidebar { transform:translateX(0); position:sticky; top:0; height:100vh; } }
-
     .sidebar-logo { padding:20px 20px 10px; display:flex; align-items:center; gap:10px; }
     .sidebar-logo img { height:36px; }
     .sidebar-logo-title { font-family:'Google Sans',sans-serif; font-size:16px; font-weight:700; color:var(--g-text); }
@@ -145,106 +135,34 @@ $v = time();
     .sidebar-logout:hover { color:var(--g-red); text-decoration:none; }
     .sidebar-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.35); z-index:199; }
     .sidebar-overlay.open { display:block; }
-
-    /* MAIN */
     .main-content { flex:1; min-width:0; display:flex; flex-direction:column; }
-
-    /* TOP BAR mobile */
     .topbar { position:sticky; top:0; z-index:100; height:56px; background:var(--g-surface); border-bottom:1px solid var(--g-border); display:flex; align-items:center; padding:0 16px; gap:12px; }
     @media (min-width:960px) { .topbar { display:none; } }
     .topbar-title { font-family:'Google Sans',sans-serif; font-size:17px; font-weight:500; color:var(--g-text); flex:1; }
     .btn-menu { width:40px; height:40px; display:flex; align-items:center; justify-content:center; border:none; background:none; font-size:20px; cursor:pointer; border-radius:50%; color:var(--g-text-2); -webkit-tap-highlight-color:transparent; }
     .btn-menu:hover { background:var(--g-hover); }
-
-    /* CONTENT */
     .page-content { flex:1; padding:20px; }
     @media (min-width:960px) { body { padding-bottom:0; } .bottom-nav { display:none; } }
-
-    /* CABECALHO DA PÁGINA */
-    .page-header {
-      display:flex; align-items:center; gap:12px;
-      margin-bottom:20px;
-      padding-bottom:16px;
-      border-bottom:1px solid var(--g-border);
-    }
-    .page-header-back {
-      display:flex; align-items:center; justify-content:center;
-      width:36px; height:36px; border-radius:50%;
-      color:var(--g-text-2); text-decoration:none; font-size:18px;
-      transition:background .15s; flex-shrink:0;
-    }
+    .page-header { display:flex; align-items:center; gap:12px; margin-bottom:20px; padding-bottom:16px; border-bottom:1px solid var(--g-border); }
+    .page-header-back { display:flex; align-items:center; justify-content:center; width:36px; height:36px; border-radius:50%; color:var(--g-text-2); text-decoration:none; font-size:18px; transition:background .15s; flex-shrink:0; }
     .page-header-back:hover { background:var(--g-hover); text-decoration:none; }
     .page-header-info { flex:1; min-width:0; }
     .page-header-title { font-family:'Google Sans',sans-serif; font-size:18px; font-weight:500; color:var(--g-text); }
     .page-header-sub { font-size:13px; color:var(--g-text-2); margin-top:2px; }
-
-    /* LAYOUT 2 COLUNAS */
-    .detalhes-grid {
-      display:grid;
-      grid-template-columns:1fr;
-      gap:16px;
-      align-items:start;
-    }
-    @media (min-width:900px) {
-      .detalhes-grid { grid-template-columns:1fr 320px; }
-    }
-
-    /* COLUNA ESQUERDA — info */
-    .info-col {}
-
-    /* COLUNA DIREITA — ações + histórico */
-    .side-col {}
-
-    /* SECTÕES (substitui os cards excessivos) */
-    .sect {
-      background:var(--g-surface);
-      border:1px solid var(--g-border);
-      border-radius:var(--g-radius-lg);
-      margin-bottom:12px;
-      overflow:hidden;
-    }
-    .sect-title {
-      font-family:'Google Sans',sans-serif;
-      font-size:14px; font-weight:500;
-      color:var(--g-text-2);
-      padding:14px 20px 10px;
-      border-bottom:1px solid var(--g-border);
-      text-transform:uppercase;
-      letter-spacing:.4px;
-      font-size:11px;
-    }
-
-    /* STATUS HERO */
-    .status-block {
-      padding:16px 20px;
-      display:flex; align-items:center; gap:14px;
-    }
-    .status-block-badge { flex-shrink:0; }
+    .detalhes-grid { display:grid; grid-template-columns:1fr; gap:16px; align-items:start; }
+    @media (min-width:900px) { .detalhes-grid { grid-template-columns:1fr 320px; } }
+    .sect { background:var(--g-surface); border:1px solid var(--g-border); border-radius:var(--g-radius-lg); margin-bottom:12px; overflow:hidden; }
+    .sect-title { font-family:'Google Sans',sans-serif; font-size:11px; font-weight:600; color:var(--g-text-2); padding:14px 20px 10px; border-bottom:1px solid var(--g-border); text-transform:uppercase; letter-spacing:.4px; }
+    .status-block { padding:16px 20px; display:flex; align-items:center; gap:14px; }
     .status-block-label { font-family:'Google Sans',sans-serif; font-size:17px; font-weight:500; color:var(--g-text); }
     .status-block-meta { font-size:12px; color:var(--g-text-3); margin-top:3px; }
-
-    .orc-banner {
-      display:flex; gap:16px; flex-wrap:wrap;
-      padding:10px 20px;
-      background:#e6f4ea;
-      border-top:1px solid #c8e6c9;
-      font-size:13px; font-weight:500; color:var(--g-green);
-    }
-    .rep-banner {
-      padding:10px 20px;
-      background:#fce8e6;
-      border-top:1px solid #f5c6c3;
-      font-size:13px; color:var(--g-red);
-    }
-
-    /* AÇÕES */
+    .orc-banner { display:flex; gap:16px; flex-wrap:wrap; padding:10px 20px; background:#e6f4ea; border-top:1px solid #c8e6c9; font-size:13px; font-weight:500; color:var(--g-green); }
+    .rep-banner { padding:10px 20px; background:#fce8e6; border-top:1px solid #f5c6c3; font-size:13px; color:var(--g-red); }
     .acoes-sect { background:var(--g-surface); border:1px solid var(--g-border); border-radius:var(--g-radius-lg); overflow:hidden; margin-bottom:12px; }
     .acoes-title { font-size:11px; font-weight:600; color:var(--g-text-3); text-transform:uppercase; letter-spacing:.5px; padding:14px 20px 8px; }
     .acoes-list { padding:0 16px 16px; display:flex; flex-direction:column; gap:6px; }
     .acoes-list .btn { justify-content:flex-start; border-radius:10px; font-size:13px; }
     .acoes-vazio { padding:12px 20px 16px; font-size:13px; color:var(--g-text-3); }
-
-    /* INFO GRID (dentro das sect) */
     .ig { display:grid; grid-template-columns:1fr 1fr; gap:0; }
     .ig-item { padding:12px 20px; border-bottom:1px solid var(--g-border); }
     .ig-item:last-child, .ig-item:nth-last-child(2):not(.full) { border-bottom:none; }
@@ -252,8 +170,6 @@ $v = time();
     .ig-label { font-size:11px; font-weight:600; color:var(--g-text-3); text-transform:uppercase; letter-spacing:.4px; margin-bottom:3px; }
     .ig-value { font-size:14px; color:var(--g-text); word-break:break-word; }
     @media (max-width:480px) { .ig { grid-template-columns:1fr; } .ig-item { border-bottom:1px solid var(--g-border); } }
-
-    /* PAGAMENTO */
     .pgto-block { background:#e6f4ea; overflow:hidden; }
     .pgto-titulo { padding:14px 20px; font-size:13px; font-weight:600; color:#1e8e3e; border-bottom:1px solid #c8e6c9; }
     .pgto-row { display:flex; justify-content:space-between; align-items:center; padding:10px 20px; border-bottom:1px solid #c8e6c9; font-size:13px; }
@@ -261,7 +177,6 @@ $v = time();
     .pgto-lbl { color:#2e7d32; }
     .pgto-val { font-weight:600; color:#1b5e20; }
     .pgto-val.big { font-size:17px; }
-
     .maq-block { background:#fff8e1; overflow:hidden; }
     .maq-titulo { padding:14px 20px; font-size:13px; font-weight:600; color:#e65100; border-bottom:1px solid #ffe082; }
     .maq-row { display:flex; justify-content:space-between; align-items:center; padding:10px 20px; border-bottom:1px solid #ffe082; font-size:13px; }
@@ -270,21 +185,15 @@ $v = time();
     .maq-val { font-weight:600; color:#e65100; }
     .maq-val.big { font-size:17px; color:#bf360c; }
     .maq-obs { padding:10px 20px 14px; font-size:12px; color:#795548; }
-
-    /* SERVIÇOS TABLE */
     .srv-table { width:100%; border-collapse:collapse; }
     .srv-table thead th { text-align:left; padding:10px 20px; font-size:11px; font-weight:600; color:var(--g-text-2); text-transform:uppercase; letter-spacing:.5px; border-bottom:1px solid var(--g-border); background:var(--g-bg); }
     .srv-table tbody td { padding:12px 20px; font-size:13px; border-bottom:1px solid var(--g-border); color:var(--g-text); vertical-align:top; }
     .srv-table tbody tr:last-child td { border-bottom:none; }
     .srv-table tfoot td { padding:12px 20px; font-weight:600; font-size:13px; border-top:2px solid var(--g-border); background:var(--g-bg); }
     .srv-nome-desc { font-size:11px; color:var(--g-text-2); margin-top:2px; }
-
-    /* FOTOS */
     .fotos-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:4px; padding:4px; }
     .fotos-grid img { width:100%; aspect-ratio:1; object-fit:cover; border-radius:6px; cursor:pointer; transition:opacity .15s; }
     .fotos-grid img:hover { opacity:.85; }
-
-    /* TIMELINE */
     .tl { list-style:none; padding:16px 20px; position:relative; }
     .tl::before { content:''; position:absolute; left:38px; top:16px; bottom:16px; width:2px; background:var(--g-border); }
     .tl-item { display:flex; gap:14px; padding-bottom:20px; }
@@ -295,10 +204,33 @@ $v = time();
     .tl-detalhe { margin-top:5px; padding:5px 10px; border-radius:6px; font-size:12px; display:inline-block; }
     .tl-detalhe.valor { background:#e6f4ea; color:#1e8e3e; }
     .tl-detalhe.motivo { background:#fce8e6; color:#c5221f; }
-
-    /* TOKEN */
     .token-row { display:flex; align-items:center; gap:10px; padding:14px 20px; }
     .token-val { font-family:'Roboto Mono',monospace; font-size:11px; color:var(--g-text-2); background:var(--g-bg); border:1px solid var(--g-border); border-radius:6px; padding:7px 10px; flex:1; word-break:break-all; }
+
+    /* ── MODAL ANÁLISE ───────────────────────────────────── */
+    .analise-resumo { padding:12px 20px 0; }
+    .analise-resumo-title { font-size:12px; font-weight:600; color:var(--g-text-3); text-transform:uppercase; letter-spacing:.4px; margin-bottom:6px; }
+    .analise-resumo-tags { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:14px; }
+    .analise-tag { background:var(--g-bg); border:1px solid var(--g-border); border-radius:20px; padding:4px 12px; font-size:12px; color:var(--g-text-2); }
+    .analise-sep { border:none; border-top:1px solid var(--g-border); margin:0 0 14px; }
+    .analise-insumos-title { font-size:12px; font-weight:600; color:var(--g-text-3); text-transform:uppercase; letter-spacing:.4px; padding:0 20px 8px; }
+    .analise-insumo-row { display:flex; align-items:center; gap:10px; padding:10px 20px; border-top:1px solid var(--g-border); }
+    .analise-insumo-row:first-child { border-top:none; }
+    .analise-insumo-info { flex:1; min-width:0; }
+    .analise-insumo-nome { font-size:13px; font-weight:500; color:var(--g-text); }
+    .analise-insumo-meta { font-size:11px; color:var(--g-text-3); margin-top:2px; }
+    .analise-insumo-meta .sem-estoque { color:#c5221f; font-weight:600; }
+    .analise-insumo-valor { font-size:13px; font-weight:600; color:var(--g-text); white-space:nowrap; min-width:70px; text-align:right; }
+    .analise-insumo-valor.riscado { text-decoration:line-through; color:var(--g-text-3); font-weight:400; }
+    .analise-cf-toggle { display:flex; align-items:center; gap:6px; font-size:12px; color:var(--g-text-2); white-space:nowrap; cursor:pointer; }
+    .analise-cf-toggle input { cursor:pointer; accent-color:var(--g-blue); width:15px; height:15px; }
+    .analise-qtd { width:52px; border:1px solid var(--g-border); border-radius:6px; padding:4px 6px; font-size:13px; text-align:center; }
+    .analise-qtd:focus { outline:2px solid var(--g-blue); border-color:transparent; }
+    .analise-vazio { padding:20px; text-align:center; color:var(--g-text-3); font-size:13px; }
+    .analise-footer { padding:14px 20px 0; border-top:2px solid var(--g-border); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; }
+    .analise-total-bloco { font-size:13px; color:var(--g-text-2); }
+    .analise-total-bloco strong { font-size:16px; color:var(--g-text); display:block; }
+    .analise-loading { padding:30px 20px; text-align:center; color:var(--g-text-3); font-size:13px; }
     </style>
 </head>
 <body>
@@ -308,7 +240,6 @@ $v = time();
 <div class="app-layout">
 <?php include 'includes/menu.php'; ?>
 
-<!-- CONTEÚDO PRINCIPAL -->
 <main class="main-content">
     <div class="topbar">
         <button class="btn-menu" onclick="toggleSidebar()">☰</button>
@@ -318,7 +249,6 @@ $v = time();
 
     <div class="page-content">
 
-        <!-- CABEÇALHO -->
         <div class="page-header">
             <a href="/backend/admin/dashboard.php" class="page-header-back">&#8592;</a>
             <div class="page-header-info">
@@ -328,13 +258,11 @@ $v = time();
             <span class="badge <?php echo $status_info['badge']; ?>" id="status-badge"><?php echo $status_info['icone'].' '.$status_info['label']; ?></span>
         </div>
 
-        <!-- GRID 2 COLUNAS -->
         <div class="detalhes-grid">
 
             <!-- COLUNA ESQUERDA -->
             <div class="info-col">
 
-                <!-- STATUS -->
                 <div class="sect">
                     <div class="sect-title">Status atual</div>
                     <div class="status-block">
@@ -356,7 +284,6 @@ $v = time();
                     <?php endif; ?>
                 </div>
 
-                <!-- PAGAMENTO (se aprovado) -->
                 <?php if (!empty($pagamento_info) && !empty($pagamento_info['forma_pagamento'])):
                     $forma    = $pagamento_info['forma_pagamento'];
                     $vf       = (float)($pagamento_info['valor_final'] ?? 0);
@@ -390,20 +317,13 @@ $v = time();
                 </div>
                 <?php endif; ?>
 
-                <!-- CLIENTE -->
                 <div class="sect">
                     <div class="sect-title">Cliente</div>
                     <div class="ig">
                         <div class="ig-item full"><div class="ig-label">Nome</div><div class="ig-value"><?php echo htmlspecialchars($pedido['cliente_nome']??''); ?></div></div>
-                        <div class="ig-item">
-                            <div class="ig-label">WhatsApp</div>
-                            <div class="ig-value"><a href="https://wa.me/55<?php echo preg_replace('/\D/','',$pedido['cliente_telefone']??''); ?>" target="_blank"><?php echo htmlspecialchars($pedido['cliente_telefone']??''); ?></a></div>
-                        </div>
+                        <div class="ig-item"><div class="ig-label">WhatsApp</div><div class="ig-value"><a href="https://wa.me/55<?php echo preg_replace('/\D/','',$pedido['cliente_telefone']??''); ?>" target="_blank"><?php echo htmlspecialchars($pedido['cliente_telefone']??''); ?></a></div></div>
                         <?php if (!empty($pedido['cliente_email'])): ?>
-                        <div class="ig-item">
-                            <div class="ig-label">E-mail</div>
-                            <div class="ig-value"><a href="mailto:<?php echo htmlspecialchars($pedido['cliente_email']); ?>"><?php echo htmlspecialchars($pedido['cliente_email']); ?></a></div>
-                        </div>
+                        <div class="ig-item"><div class="ig-label">E-mail</div><div class="ig-value"><a href="mailto:<?php echo htmlspecialchars($pedido['cliente_email']); ?>"><?php echo htmlspecialchars($pedido['cliente_email']); ?></a></div></div>
                         <?php endif; ?>
                         <?php if (!empty($pedido['cliente_endereco'])): ?>
                         <div class="ig-item full"><div class="ig-label">Endereço</div><div class="ig-value"><?php echo nl2br(htmlspecialchars($pedido['cliente_endereco'])); ?></div></div>
@@ -411,7 +331,6 @@ $v = time();
                     </div>
                 </div>
 
-                <!-- INSTRUMENTO -->
                 <div class="sect">
                     <div class="sect-title">Instrumento</div>
                     <div class="ig">
@@ -430,7 +349,6 @@ $v = time();
                     </div>
                 </div>
 
-                <!-- SERVIÇOS -->
                 <div class="sect">
                     <div class="sect-title">Serviços solicitados</div>
                     <?php if (empty($servicos)): ?>
@@ -460,7 +378,6 @@ $v = time();
                     <?php endif; ?>
                 </div>
 
-                <!-- OBSERVAÇÕES -->
                 <?php if (!empty($pedido['observacoes'])): ?>
                 <div class="sect">
                     <div class="sect-title">Observações</div>
@@ -468,7 +385,6 @@ $v = time();
                 </div>
                 <?php endif; ?>
 
-                <!-- FOTOS -->
                 <?php if (!empty($fotos)): ?>
                 <div class="sect">
                     <div class="sect-title">Fotos</div>
@@ -486,7 +402,6 @@ $v = time();
             <!-- COLUNA DIREITA -->
             <div class="side-col">
 
-                <!-- AÇÕES -->
                 <div class="acoes-sect">
                     <div class="acoes-title">Ações disponíveis</div>
                     <?php if (empty($acoes_atuais)): ?>
@@ -497,7 +412,9 @@ $v = time();
                             [$s_dest, $label_acao, $cls_btn] = $a;
                             $modal_acao = $a[3] ?? null;
                         ?>
-                        <?php if ($modal_acao === 'modal-orc'): ?>
+                        <?php if ($modal_acao === 'modal-analise'): ?>
+                        <button class="btn <?php echo $cls_btn; ?>" onclick="abrirModalAnalise()"><?php echo htmlspecialchars($label_acao); ?></button>
+                        <?php elseif ($modal_acao === 'modal-orc'): ?>
                         <button class="btn <?php echo $cls_btn; ?>" onclick="abrirModalOrcamento()"><?php echo htmlspecialchars($label_acao); ?></button>
                         <?php elseif ($modal_acao === 'modal-rep'): ?>
                         <button class="btn <?php echo $cls_btn; ?>" onclick="abrirModalReprovacao()"><?php echo htmlspecialchars($label_acao); ?></button>
@@ -509,7 +426,6 @@ $v = time();
                     <?php endif; ?>
                 </div>
 
-                <!-- LINK PÚBLICO -->
                 <div class="sect">
                     <div class="sect-title">Acompanhamento público</div>
                     <div class="token-row">
@@ -518,7 +434,6 @@ $v = time();
                     </div>
                 </div>
 
-                <!-- HISTÓRICO -->
                 <div class="sect">
                     <div class="sect-title">Histórico</div>
                     <?php if (empty($historico)): ?>
@@ -550,14 +465,12 @@ $v = time();
             <!-- /COLUNA DIREITA -->
 
         </div>
-        <!-- /GRID -->
 
         <div style="height:24px"></div>
     </div>
 </main>
 </div>
 
-<!-- BOTTOM NAV mobile -->
 <nav class="bottom-nav">
     <a href="/backend/admin/dashboard.php"><span class="nav-icon">■</span>Pedidos</a>
     <a href="#" class="active"><span class="nav-icon">■</span>Este pedido</a>
@@ -565,13 +478,31 @@ $v = time();
     <a href="/backend/admin/logout.php"><span class="nav-icon">■</span>Sair</a>
 </nav>
 
+<!-- ═══════════════════════════════════════════════════════════════
+     MODAL ANÁLISE DE INSUMOS
+═══════════════════════════════════════════════════════════════ -->
+<div class="modal-overlay" id="modal-analise">
+    <div class="modal-box" style="max-width:560px">
+        <div class="modal-drag"></div>
+        <div class="modal-title">Análise de Insumos</div>
+        <div id="analise-corpo">
+            <div class="analise-loading">Carregando insumos...</div>
+        </div>
+        <div class="modal-actions" id="analise-acoes" style="display:none">
+            <button class="btn btn-secondary" onclick="fecharModal('modal-analise')">Cancelar</button>
+            <button class="btn btn-info" id="btn-confirmar-analise" onclick="confirmarAnalise()">Confirmar e Orçar →</button>
+        </div>
+    </div>
+</div>
+
 <!-- MODAL ORÇAMENTO -->
 <div class="modal-overlay" id="modal-orcamento">
     <div class="modal-box">
         <div class="modal-drag"></div>
         <div class="modal-title">Definir Orçamento</div>
-        <label>Valor total dos serviços (R$)</label>
+        <label>Valor total (serviços + insumos) — R$</label>
         <input type="number" id="input-valor" min="0" step="0.01" placeholder="Ex: 350.00" oninput="simularValores()">
+        <div id="orc-breakdown" style="font-size:12px;color:var(--g-text-3);margin:-8px 0 8px;padding:0 2px"></div>
         <label>Prazo de entrega (dias úteis)</label>
         <input type="number" id="input-prazo" min="1" step="1" placeholder="Ex: 7">
         <div class="modal-hint">Sem sábados, domingos e feriados</div>
@@ -628,7 +559,7 @@ const _pedidoId  = <?php echo $preos_id; ?>;
 const _totalBase = <?php echo (float)$total_valor; ?>;
 const _statusMap = <?php echo json_encode(array_map(fn($v)=>$v['icone'].' '.$v['label'], $status_map)); ?>;
 
-// Sidebar
+// ── Sidebar ──────────────────────────────────────────────────────
 function toggleSidebar() {
     document.getElementById('sidebar').classList.toggle('open');
     document.getElementById('sidebar-overlay').classList.toggle('open');
@@ -638,10 +569,186 @@ function closeSidebar() {
     document.getElementById('sidebar-overlay').classList.remove('open');
 }
 
-// Orçamento
+// ── Utilitários ───────────────────────────────────────────────────
+function fmt(v) { return 'R\u00a0' + v.toFixed(2).replace('.',',').replace(/\B(?=(\d{3})+(?!\d))/g,'.'); }
 function taxaMaquina(v) { return v > 2000 ? 15.38 : 21.58; }
-function fmt(v) { return 'R$ '+v.toFixed(2).replace('.',',').replace(/\B(?=(\d{3})+(?!\d))/g,'.'); }
+function _toast(msg) {
+    const el = document.createElement('div');
+    el.className = 'g-toast'; el.textContent = msg;
+    document.body.appendChild(el); setTimeout(() => el.remove(), 3000);
+}
+
+// ── Modais ────────────────────────────────────────────────────────
+function abrirModal(id)  { document.getElementById(id).classList.add('aberto'); }
+function fecharModal(id) { document.getElementById(id).classList.remove('aberto'); }
+document.querySelectorAll('.modal-overlay').forEach(o => {
+    o.addEventListener('click', e => { if (e.target === o) o.classList.remove('aberto'); });
+});
+
+// ── MODAL ANÁLISE ────────────────────────────────────────────────
+let _insumos = []; // lista em memória para submeter
+
+function abrirModalAnalise() {
+    document.getElementById('analise-corpo').innerHTML = '<div class="analise-loading">Carregando insumos...</div>';
+    document.getElementById('analise-acoes').style.display = 'none';
+    abrirModal('modal-analise');
+
+    fetch('analise_insumos.php?pre_os_id=' + _pedidoId)
+        .then(r => r.json())
+        .then(data => {
+            if (!data.sucesso) { _toast(data.erro || 'Erro ao carregar'); fecharModal('modal-analise'); return; }
+            _renderizarAnalise(data);
+        })
+        .catch(() => { _toast('Erro de conexão'); fecharModal('modal-analise'); });
+}
+
+function _renderizarAnalise(data) {
+    _insumos = (data.insumos || []).map(i => ({ ...i }));
+
+    let html = '';
+
+    // Resumo do pedido
+    html += '<div class="analise-resumo">';
+    html += '<div class="analise-resumo-title">Serviços do pedido</div>';
+    html += '<div class="analise-resumo-tags">';
+    if (data.servicos && data.servicos.length) {
+        data.servicos.forEach(s => { html += '<span class="analise-tag">' + _esc(s.nome) + '</span>'; });
+    } else {
+        html += '<span style="font-size:13px;color:var(--g-text-3)">Nenhum serviço</span>';
+    }
+    html += '</div></div>';
+    html += '<hr class="analise-sep">';
+
+    // Lista de insumos
+    html += '<div class="analise-insumos-title">Insumos necessários</div>';
+
+    if (!_insumos.length) {
+        html += '<div class="analise-vazio">Nenhum insumo vinculado a estes serviços. Você pode prosseguir para o orçamento.</div>';
+    } else {
+        _insumos.forEach((ins, idx) => {
+            const semEstoque = parseFloat(ins.quantidade_estoque) <= 0;
+            const cf = ins.cliente_fornece == 1;
+            const valorTotal = parseFloat(ins.valor_unitario) * parseFloat(ins.quantidade || 1);
+
+            html += `<div class="analise-insumo-row" id="row-ins-${idx}">`;
+
+            // Checkbox cliente fornece
+            html += `<label class="analise-cf-toggle">`;
+            html += `<input type="checkbox" onchange="_toggleCF(${idx}, this.checked)" ${cf ? 'checked' : ''}>`;
+            html += `<span>Cliente<br>fornece</span></label>`;
+
+            // Info
+            html += `<div class="analise-insumo-info">`;
+            html += `<div class="analise-insumo-nome">${_esc(ins.nome)}</div>`;
+            html += `<div class="analise-insumo-meta">`;
+            if (ins.servicos_origem) html += `Vinculado: ${_esc(ins.servicos_origem)} &bull; `;
+            html += `${_esc(ins.unidade)}`;
+            if (semEstoque) html += ` &bull; <span class="sem-estoque">Sem estoque</span>`;
+            html += `</div></div>`;
+
+            // Qtd
+            html += `<input type="number" class="analise-qtd" value="${parseFloat(ins.quantidade||1)}" min="0.001" step="0.001"
+                onchange="_mudarQtd(${idx}, this.value)" title="Quantidade">`;
+
+            // Valor
+            html += `<div class="analise-insumo-valor ${cf ? 'riscado' : ''}" id="val-ins-${idx}">${fmt(cf ? 0 : valorTotal)}</div>`;
+
+            html += `</div>`; // row
+        });
+    }
+
+    // Footer com total
+    html += '<div class="analise-footer">';
+    html += '<div class="analise-total-bloco">Insumos a cobrar:<strong id="analise-total-ins">—</strong></div>';
+    html += '</div>';
+
+    document.getElementById('analise-corpo').innerHTML = html;
+    document.getElementById('analise-acoes').style.display = 'flex';
+    _recalcularTotalAnalise();
+}
+
+function _esc(s) {
+    return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function _toggleCF(idx, checked) {
+    _insumos[idx].cliente_fornece = checked ? 1 : 0;
+    const valEl = document.getElementById('val-ins-' + idx);
+    if (valEl) {
+        const total = parseFloat(_insumos[idx].valor_unitario) * parseFloat(_insumos[idx].quantidade || 1);
+        valEl.textContent = checked ? fmt(0) : fmt(total);
+        valEl.classList.toggle('riscado', checked);
+    }
+    _recalcularTotalAnalise();
+}
+
+function _mudarQtd(idx, val) {
+    const qtd = Math.max(0.001, parseFloat(val) || 1);
+    _insumos[idx].quantidade = qtd;
+    const cf = _insumos[idx].cliente_fornece == 1;
+    const total = parseFloat(_insumos[idx].valor_unitario) * qtd;
+    const valEl = document.getElementById('val-ins-' + idx);
+    if (valEl) { valEl.textContent = cf ? fmt(0) : fmt(total); }
+    _recalcularTotalAnalise();
+}
+
+function _recalcularTotalAnalise() {
+    let total = 0;
+    _insumos.forEach(ins => {
+        if (!ins.cliente_fornece) total += parseFloat(ins.valor_unitario) * parseFloat(ins.quantidade || 1);
+    });
+    const el = document.getElementById('analise-total-ins');
+    if (el) el.textContent = fmt(total);
+}
+
+function confirmarAnalise() {
+    const btn = document.getElementById('btn-confirmar-analise');
+    btn.disabled = true; btn.textContent = 'Salvando...';
+
+    fetch('analise_insumos.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pre_os_id: _pedidoId, insumos: _insumos })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (!data.sucesso) { _toast(data.erro || 'Erro ao salvar'); btn.disabled = false; btn.textContent = 'Confirmar e Orçar →'; return; }
+        fecharModal('modal-analise');
+        // Atualiza label de status
+        document.getElementById('status-label').textContent = 'Em Análise';
+        // Abre modal orçamento já com valor pré-calculado
+        _abrirOrcamentoComValor(data.total_orcamento, data.total_servicos, data.total_insumos);
+    })
+    .catch(() => { _toast('Erro de conexão'); btn.disabled = false; btn.textContent = 'Confirmar e Orçar →'; });
+}
+
+// ── MODAL ORÇAMENTO ───────────────────────────────────────────────
 let valorEscolhido = null;
+
+function _abrirOrcamentoComValor(totalOrc, totalSrv, totalIns) {
+    valorEscolhido = null;
+    document.getElementById('input-valor').value = totalOrc > 0 ? totalOrc.toFixed(2) : '';
+    document.getElementById('input-prazo').value = '';
+    document.getElementById('input-valor-final').value = '';
+    document.getElementById('btn-confirmar-orc').disabled = true;
+    document.getElementById('sim-aviso').style.display = 'none';
+    ['card-base','card-maquina'].forEach(id => document.getElementById(id).classList.remove('ativo'));
+
+    // Mostra breakdown
+    let bd = document.getElementById('orc-breakdown');
+    if (totalSrv >= 0 && totalIns >= 0) {
+        bd.innerHTML = 'Serviços: ' + fmt(totalSrv) + ' + Insumos: ' + fmt(totalIns);
+    } else { bd.textContent = ''; }
+
+    simularValores();
+    abrirModal('modal-orcamento');
+    setTimeout(() => document.getElementById('input-valor').focus(), 150);
+}
+
+function abrirModalOrcamento() {
+    _abrirOrcamentoComValor(_totalBase, _totalBase, 0);
+}
+
 function simularValores() {
     const v = parseFloat(document.getElementById('input-valor').value);
     if (isNaN(v)||v<=0) { document.getElementById('sim-base-valor').textContent='\u2014'; document.getElementById('sim-maquina-valor').textContent='\u2014'; return; }
@@ -653,6 +760,7 @@ function simularValores() {
     if (valorEscolhido==='maquina') document.getElementById('input-valor-final').value=inteiro.toFixed(2);
     if (valorEscolhido) _atualizarAviso(v);
 }
+
 function escolherValor(tipo) {
     const v=parseFloat(document.getElementById('input-valor').value);
     if (isNaN(v)||v<=0) { _toast('Informe o valor primeiro'); return; }
@@ -664,6 +772,7 @@ function escolherValor(tipo) {
     _atualizarAviso(v);
     document.getElementById('btn-confirmar-orc').disabled=false;
 }
+
 function _atualizarAviso(v) {
     const taxa=taxaMaquina(v), inteiro=Math.ceil(v*(1+taxa/100)), real=inteiro/(1+taxa/100);
     const el=document.getElementById('sim-aviso'); el.style.display='block';
@@ -671,6 +780,7 @@ function _atualizarAviso(v) {
         ?'<strong>Enviando ao cliente: '+fmt(v)+'</strong>'
         :'<strong>Enviando ao cliente: '+fmt(inteiro)+'</strong><br>Digitar na máquina: <strong>'+fmt(real)+'</strong> em <strong>10x</strong>.';
 }
+
 function confirmarOrcamento() {
     const vf=parseFloat(document.getElementById('input-valor-final').value);
     const pr=parseInt(document.getElementById('input-prazo').value);
@@ -679,37 +789,23 @@ function confirmarOrcamento() {
     fecharModal('modal-orcamento');
     _enviar('Orcada',{valor_orcamento:vf,prazo_orcamento:pr});
 }
+
+// ── MODAL REPROVAÇÃO ─────────────────────────────────────────────
+function abrirModalReprovacao() { abrirModal('modal-reprovacao'); setTimeout(()=>document.getElementById('input-motivo').focus(),150); }
+
 function confirmarReprovacao() {
     const m=document.getElementById('input-motivo').value.trim();
     if (!m) { _toast('Informe o motivo'); return; }
     fecharModal('modal-reprovacao'); _enviar('Reprovada',{motivo:m});
 }
+
 function atualizarStatus(s) {
-    const label=_statusMap[s]||s;
-    if (!confirm('Alterar status para "'+label.replace(/^\S+\s/,'')+'"?')) return;
+    const label=(_statusMap[s]||s).replace(/^\S+\s/,'');
+    if (!confirm('Alterar status para "'+label+'"?')) return;
     _enviar(s,{});
 }
 
-// Modais
-function abrirModal(id) { document.getElementById(id).classList.add('aberto'); }
-function fecharModal(id) { document.getElementById(id).classList.remove('aberto'); }
-function abrirModalOrcamento() {
-    valorEscolhido=null;
-    document.getElementById('input-valor').value=_totalBase>0?_totalBase.toFixed(2):'';
-    document.getElementById('input-prazo').value='';
-    document.getElementById('input-valor-final').value='';
-    document.getElementById('btn-confirmar-orc').disabled=true;
-    document.getElementById('sim-aviso').style.display='none';
-    ['card-base','card-maquina'].forEach(id=>document.getElementById(id).classList.remove('ativo'));
-    simularValores(); abrirModal('modal-orcamento');
-    setTimeout(()=>document.getElementById('input-valor').focus(),150);
-}
-function abrirModalReprovacao() { abrirModal('modal-reprovacao'); setTimeout(()=>document.getElementById('input-motivo').focus(),150); }
-document.querySelectorAll('.modal-overlay').forEach(o=>{
-    o.addEventListener('click',e=>{if(e.target===o) o.classList.remove('aberto');});
-});
-
-// WhatsApp
+// ── WhatsApp ─────────────────────────────────────────────────────
 function _fecharWaEReload() { fecharModal('modal-wa'); setTimeout(()=>location.reload(),300); }
 function _abrirModalWa(waLink,statusLabel) {
     document.getElementById('wa-status-texto').innerHTML='Status atualizado para <strong>'+statusLabel+'</strong>. Deseja avisar o cliente?';
@@ -717,11 +813,7 @@ function _abrirModalWa(waLink,statusLabel) {
     abrirModal('modal-wa');
 }
 
-// Fetch
-function _toast(msg) {
-    const el=document.createElement('div'); el.className='g-toast'; el.textContent=msg;
-    document.body.appendChild(el); setTimeout(()=>el.remove(),3000);
-}
+// ── Fetch central ────────────────────────────────────────────────
 function _enviar(status,extras) {
     fetch('atualizar_status.php',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:_pedidoId,status,...extras})})
     .then(r=>r.json())
