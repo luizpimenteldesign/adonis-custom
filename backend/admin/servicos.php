@@ -5,12 +5,18 @@ require_once '../config/Database.php';
 $db   = new Database();
 $conn = $db->getConnection();
 
-try {
-    $conn->query("ALTER TABLE servicos ADD COLUMN prazo_padrao_dias INT DEFAULT NULL");
-} catch (Exception $e) { /* já existe */ }
+try { $conn->query("ALTER TABLE servicos ADD COLUMN prazo_padrao_dias INT DEFAULT NULL"); } catch (Exception $e) {}
+
+// API JSON: categorias
+if (isset($_GET['action']) && $_GET['action'] === 'categorias') {
+    header('Content-Type: application/json');
+    $cats = $conn->query("SELECT id, nome FROM categorias_servico WHERE ativo=1 ORDER BY nome")->fetchAll(PDO::FETCH_ASSOC);
+    echo json_encode($cats);
+    exit;
+}
 
 $busca = trim($_GET['q'] ?? '');
-$msg   = isset($_GET['msg']) ? $_GET['msg'] : '';
+$msg   = $_GET['msg'] ?? '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $acao = $_POST['acao'] ?? '';
@@ -21,19 +27,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $valor     = str_replace(',', '.', trim($_POST['valor_base'] ?? '0'));
         $prazo     = ($_POST['prazo_padrao_dias'] ?? '') !== '' ? (int)$_POST['prazo_padrao_dias'] : null;
         $ativo     = isset($_POST['ativo']) ? 1 : 0;
+        $cats      = array_map('intval', $_POST['categorias'] ?? []);
 
         if (!$nome) { header('Location: servicos.php?msg=erro:Nome obrigatório'); exit; }
 
         if ($acao === 'criar') {
             $conn->prepare('INSERT INTO servicos (nome, descricao, valor_base, prazo_padrao_dias, ativo) VALUES (?,?,?,?,?)')
                  ->execute([$nome, $descricao, $valor, $prazo, $ativo]);
-            header('Location: servicos.php?msg=sucesso:Serviço criado!'); exit;
+            $sid = (int)$conn->lastInsertId();
         } else {
-            $id = (int)$_POST['id'];
+            $sid = (int)$_POST['id'];
             $conn->prepare('UPDATE servicos SET nome=?, descricao=?, valor_base=?, prazo_padrao_dias=?, ativo=? WHERE id=?')
-                 ->execute([$nome, $descricao, $valor, $prazo, $ativo, $id]);
-            header('Location: servicos.php?msg=sucesso:Serviço atualizado!'); exit;
+                 ->execute([$nome, $descricao, $valor, $prazo, $ativo, $sid]);
         }
+
+        // Sincroniza categorias
+        $conn->prepare('DELETE FROM servico_categorias WHERE servico_id=?')->execute([$sid]);
+        foreach ($cats as $cid) {
+            if ($cid > 0) $conn->prepare('INSERT IGNORE INTO servico_categorias (servico_id, categoria_id) VALUES (?,?)')->execute([$sid, $cid]);
+        }
+
+        $label = $acao === 'criar' ? 'criado' : 'atualizado';
+        header("Location: servicos.php?msg=sucesso:Serviço {$label}!"); exit;
     }
 
     if ($acao === 'excluir') {
@@ -49,7 +64,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 try {
-    $sql = 'SELECT s.*, COUNT(ps.id) as total_uso FROM servicos s LEFT JOIN pre_os_servicos ps ON ps.servico_id = s.id'
+    $sql = 'SELECT s.*, COUNT(DISTINCT ps.id) as total_uso FROM servicos s LEFT JOIN pre_os_servicos ps ON ps.servico_id = s.id'
          . ($busca ? ' WHERE s.nome LIKE :q OR s.descricao LIKE :q' : '')
          . ' GROUP BY s.id ORDER BY s.nome';
     $stmt = $conn->prepare($sql);
@@ -57,6 +72,17 @@ try {
     else $stmt->execute();
     $servicos = $stmt->fetchAll(PDO::FETCH_ASSOC);
 } catch (Exception $e) { $servicos = []; }
+
+// Carrega categorias de cada serviço
+$cats_por_servico = [];
+try {
+    $rows = $conn->query("
+        SELECT sc.servico_id, c.nome
+        FROM servico_categorias sc
+        JOIN categorias_servico c ON c.id = sc.categoria_id
+    ")->fetchAll(PDO::FETCH_ASSOC);
+    foreach ($rows as $r) $cats_por_servico[$r['servico_id']][] = $r['nome'];
+} catch (Exception $e) {}
 
 $current_page = 'servicos.php';
 $v = time();
@@ -73,6 +99,23 @@ include '_sidebar_data.php';
     <link rel="stylesheet" href="assets/css/admin.css?v=<?php echo $v; ?>">
     <link rel="stylesheet" href="assets/css/sidebar.css?v=<?php echo $v; ?>">
     <link rel="stylesheet" href="assets/css/pages.css?v=<?php echo $v; ?>">
+    <style>
+    .chips-wrap { display:flex; flex-wrap:wrap; gap:8px; margin-top:6px; }
+    .chip {
+        display:inline-flex; align-items:center; gap:4px;
+        padding:5px 14px; border-radius:20px; font-size:13px; font-weight:500;
+        cursor:pointer; border:2px solid var(--g-border);
+        background:var(--g-surface); color:var(--g-text-2);
+        transition:all .15s;
+        user-select:none;
+    }
+    .chip.active {
+        background:var(--color-primary,#7c3aed);
+        border-color:var(--color-primary,#7c3aed);
+        color:#fff;
+    }
+    .chip .material-symbols-outlined { font-size:15px; }
+    </style>
 </head>
 <body>
 
@@ -130,7 +173,7 @@ include '_sidebar_data.php';
                 <thead>
                     <tr>
                         <th>Nome</th>
-                        <th>Descrição</th>
+                        <th>Categorias</th>
                         <th class="text-right">Valor Base</th>
                         <th class="text-center">Prazo (d.u.)</th>
                         <th class="text-center">Uso</th>
@@ -140,9 +183,16 @@ include '_sidebar_data.php';
                 </thead>
                 <tbody>
                 <?php foreach ($servicos as $s): ?>
+                <?php $sc = $cats_por_servico[$s['id']] ?? []; ?>
                 <tr class="<?php echo !$s['ativo'] ? 'row-inactive' : ''; ?>">
-                    <td><strong><?php echo htmlspecialchars($s['nome']); ?></strong></td>
-                    <td style="font-size:13px;color:var(--g-text-2)"><?php echo $s['descricao'] ? htmlspecialchars($s['descricao']) : '<span class="text-muted">—</span>'; ?></td>
+                    <td><strong><?php echo htmlspecialchars($s['nome']); ?></strong>
+                        <?php if ($s['descricao']): ?><br><span style="font-size:12px;color:var(--g-text-3)"><?php echo htmlspecialchars($s['descricao']); ?></span><?php endif; ?>
+                    </td>
+                    <td>
+                        <?php if ($sc): foreach ($sc as $cn): ?>
+                        <span class="badge badge-info" style="margin:1px 2px"><?php echo htmlspecialchars($cn); ?></span>
+                        <?php endforeach; else: ?><span class="text-muted">—</span><?php endif; ?>
+                    </td>
                     <td class="text-right"><strong>R$&nbsp;<?php echo number_format((float)$s['valor_base'], 2, ',', '.'); ?></strong></td>
                     <td class="text-center">
                         <?php if ($s['prazo_padrao_dias']): ?>
@@ -156,19 +206,15 @@ include '_sidebar_data.php';
                     </td>
                     <td class="text-center">
                         <?php if ($s['ativo']): ?>
-                        <span class="badge badge-success">
-                            <span class="material-symbols-outlined" style="font-size:11px;vertical-align:middle">check_circle</span> Ativo
-                        </span>
+                        <span class="badge badge-success"><span class="material-symbols-outlined" style="font-size:11px;vertical-align:middle">check_circle</span> Ativo</span>
                         <?php else: ?>
-                        <span class="badge badge-dark">
-                            <span class="material-symbols-outlined" style="font-size:11px;vertical-align:middle">cancel</span> Inativo
-                        </span>
+                        <span class="badge badge-dark"><span class="material-symbols-outlined" style="font-size:11px;vertical-align:middle">cancel</span> Inativo</span>
                         <?php endif; ?>
                     </td>
                     <td class="text-center">
                         <div class="table-actions">
                             <button class="btn-icon" title="Editar"
-                                onclick="editarServico(<?php echo $s['id']; ?>,<?php echo htmlspecialchars(json_encode($s['nome']),ENT_QUOTES); ?>,<?php echo htmlspecialchars(json_encode($s['descricao']),ENT_QUOTES); ?>,<?php echo $s['valor_base']; ?>,<?php echo $s['ativo']; ?>,<?php echo $s['prazo_padrao_dias'] !== null ? $s['prazo_padrao_dias'] : 'null'; ?>)">
+                                onclick="editarServico(<?php echo $s['id']; ?>,<?php echo htmlspecialchars(json_encode($s['nome']),ENT_QUOTES); ?>,<?php echo htmlspecialchars(json_encode($s['descricao']),ENT_QUOTES); ?>,<?php echo $s['valor_base']; ?>,<?php echo $s['ativo']; ?>,<?php echo $s['prazo_padrao_dias'] !== null ? $s['prazo_padrao_dias'] : 'null'; ?>,<?php echo htmlspecialchars(json_encode(array_map('intval', array_keys(array_flip(array_map(fn($n) => $n, array_column($conn->query('SELECT c.id FROM servico_categorias sc JOIN categorias_servico c ON c.id=sc.categoria_id WHERE sc.servico_id='.(int)$s['id'])->fetchAll(PDO::FETCH_ASSOC), 'id'))))),ENT_QUOTES); ?>)">
                                 <span class="material-symbols-outlined">edit</span>
                             </button>
                             <?php if ($s['total_uso'] == 0): ?>
@@ -197,18 +243,10 @@ include '_sidebar_data.php';
 </div>
 
 <nav class="bottom-nav">
-    <a href="dashboard.php">
-        <span class="material-symbols-outlined nav-icon">dashboard</span>Painel
-    </a>
-    <a href="clientes.php">
-        <span class="material-symbols-outlined nav-icon">group</span>Clientes
-    </a>
-    <a href="servicos.php" class="active">
-        <span class="material-symbols-outlined nav-icon">build</span>Serviços
-    </a>
-    <a href="logout.php">
-        <span class="material-symbols-outlined nav-icon">logout</span>Sair
-    </a>
+    <a href="dashboard.php"><span class="material-symbols-outlined nav-icon">dashboard</span>Painel</a>
+    <a href="clientes.php"><span class="material-symbols-outlined nav-icon">group</span>Clientes</a>
+    <a href="servicos.php" class="active"><span class="material-symbols-outlined nav-icon">build</span>Serviços</a>
+    <a href="logout.php"><span class="material-symbols-outlined nav-icon">logout</span>Sair</a>
 </nav>
 
 <!-- MODAL CRIAR / EDITAR -->
@@ -226,7 +264,11 @@ include '_sidebar_data.php';
             <label class="form-label">DESCRIÇÃO</label>
             <textarea class="form-input" name="descricao" id="f-descricao" rows="3" placeholder="Descreva brevemente o serviço..."></textarea>
 
-            <div style="display:flex;gap:12px">
+            <label class="form-label">CATEGORIAS</label>
+            <div class="chips-wrap" id="chips-categorias"></div>
+            <div id="hidden-cats"></div>
+
+            <div style="display:flex;gap:12px;margin-top:12px">
                 <div style="flex:1">
                     <label class="form-label">VALOR BASE (R$)</label>
                     <input class="form-input" type="number" name="valor_base" id="f-valor" min="0" step="0.01" placeholder="0,00">
@@ -252,7 +294,41 @@ include '_sidebar_data.php';
 
 <script src="assets/js/sidebar.js?v=<?php echo $v; ?>"></script>
 <script>
-function abrirModal() {
+let todasCategorias = [];
+let catsSelecionadas = new Set();
+
+async function carregarCategorias() {
+    if (todasCategorias.length) return;
+    const r = await fetch('servicos.php?action=categorias');
+    todasCategorias = await r.json();
+}
+
+function renderChips() {
+    const wrap = document.getElementById('chips-categorias');
+    const hidden = document.getElementById('hidden-cats');
+    wrap.innerHTML = '';
+    hidden.innerHTML = '';
+    todasCategorias.forEach(c => {
+        const chip = document.createElement('span');
+        chip.className = 'chip' + (catsSelecionadas.has(c.id) ? ' active' : '');
+        chip.innerHTML = (catsSelecionadas.has(c.id) ? '<span class="material-symbols-outlined">check</span>' : '') + c.nome;
+        chip.onclick = () => {
+            if (catsSelecionadas.has(c.id)) catsSelecionadas.delete(c.id);
+            else catsSelecionadas.add(c.id);
+            renderChips();
+        };
+        wrap.appendChild(chip);
+    });
+    catsSelecionadas.forEach(id => {
+        const inp = document.createElement('input');
+        inp.type = 'hidden'; inp.name = 'categorias[]'; inp.value = id;
+        hidden.appendChild(inp);
+    });
+}
+
+async function abrirModal() {
+    await carregarCategorias();
+    catsSelecionadas = new Set();
     document.getElementById('modal-titulo').textContent = 'Novo Serviço';
     document.getElementById('f-acao').value     = 'criar';
     document.getElementById('f-id').value       = '';
@@ -261,11 +337,14 @@ function abrirModal() {
     document.getElementById('f-valor').value    = '';
     document.getElementById('f-prazo').value    = '';
     document.getElementById('f-ativo').checked  = true;
+    renderChips();
     document.getElementById('modal-servico').classList.add('aberto');
     setTimeout(() => document.getElementById('f-nome').focus(), 150);
 }
 
-function editarServico(id, nome, desc, valor, ativo, prazo) {
+async function editarServico(id, nome, desc, valor, ativo, prazo, catIds) {
+    await carregarCategorias();
+    catsSelecionadas = new Set(catIds);
     document.getElementById('modal-titulo').textContent = 'Editar Serviço';
     document.getElementById('f-acao').value      = 'editar';
     document.getElementById('f-id').value        = id;
@@ -274,6 +353,7 @@ function editarServico(id, nome, desc, valor, ativo, prazo) {
     document.getElementById('f-valor').value     = Number(valor).toFixed(2);
     document.getElementById('f-prazo').value     = prazo !== null && prazo !== undefined ? prazo : '';
     document.getElementById('f-ativo').checked   = !!ativo;
+    renderChips();
     document.getElementById('modal-servico').classList.add('aberto');
     setTimeout(() => document.getElementById('f-nome').focus(), 150);
 }
