@@ -1,9 +1,9 @@
 /**
  * DASHBOARD.CSS — Estilos específicos do Dashboard
- * Versão: 10.0
+ * Versão: 10.1 — Interface de categorias + busca V3
  */
 
-/* ══ MAIN ════════════════════════════════════════════════════════════════ */
+/* ══ MAIN ════════════════════════════════════════════════════ */
 .page-content {
     flex: 1;
     padding: 20px;
@@ -19,7 +19,7 @@
     }
 }
 
-/* ══ STATS ═══════════════════════════════════════════════════════════════ */
+/* ══ STATS ═══════════════════════════════════════════════════ */
 .stats-row {
     display: flex;
     gap: 12px;
@@ -82,7 +82,7 @@
     opacity: 0.7;
 }
 
-/* ══ LISTA + PAINEL ══════════════════════════════════════════════════════ */
+/* ══ LISTA + PAINEL ═════════════════════════════════════════════ */
 .dashboard-grid {
     display: flex;
     gap: 0;
@@ -386,7 +386,7 @@
     background: var(--g-surface);
 }
 
-/* ══ BUSCA ═══════════════════════════════════════════════════════════════ */
+/* ══ BUSCA ══════════════════════════════════════════════════ */
 .search-loading {
     display: none;
     width: 16px;
@@ -408,7 +408,7 @@
     }
 }
 
-/* ══ MODAL ANÁLISE ═══════════════════════════════════════════════════════ */
+/* ══ MODAL ANÁLISE V3 — CATEGORIAS + BUSCA ════════════════════════ */
 .analise-resumo {
     padding: 12px 20px 0;
 }
@@ -444,38 +444,119 @@
     margin: 0 0 14px;
 }
 
-.analise-insumos-title {
+/* Botões de categorias */
+.analise-cats-titulo {
     font-size: 12px;
     font-weight: 600;
     color: var(--g-text-3);
     text-transform: uppercase;
     letter-spacing: 0.4px;
-    padding: 0 20px 8px;
+    padding: 0 20px 10px;
 }
 
-.analise-insumo-row {
-    padding: 12px 20px;
-    border-top: 1px solid var(--g-border);
+.analise-cats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 8px;
+    padding: 0 20px 14px;
 }
 
-.analise-insumo-row:first-child {
-    border-top: none;
-}
-
-.analise-insumo-top {
+.cat-btn {
     display: flex;
+    flex-direction: column;
     align-items: center;
     gap: 8px;
-    margin-bottom: 8px;
+    padding: 16px 12px;
+    border: 2px solid var(--g-border);
+    border-radius: 12px;
+    background: var(--g-surface);
+    cursor: pointer;
+    transition: all 0.15s;
+    font-family: 'Google Sans', sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--g-text);
 }
 
-.analise-insumo-info {
+.cat-btn:hover {
+    border-color: var(--g-blue);
+    background: var(--g-blue-light);
+}
+
+.cat-btn.ativo {
+    border-color: var(--g-blue);
+    background: var(--g-blue-light);
+    color: var(--g-blue);
+}
+
+.cat-btn .material-symbols-outlined {
+    font-size: 28px;
+}
+
+/* Área de insumos da categoria selecionada */
+.analise-cat-atual {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--g-blue);
+    padding: 0 20px 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+}
+
+.analise-busca {
+    width: calc(100% - 40px);
+    margin: 0 20px 12px;
+    padding: 10px 14px;
+    border: 1px solid var(--g-border);
+    border-radius: 10px;
+    font-size: 13px;
+    font-family: inherit;
+    background: var(--g-bg);
+    outline: none;
+}
+
+.analise-busca:focus {
+    border-color: var(--g-blue);
+    background: var(--g-surface);
+}
+
+.analise-insumos-disponiveis {
+    max-height: 200px;
+    overflow-y: auto;
+    margin: 0 20px 14px;
+    border: 1px solid var(--g-border);
+    border-radius: 10px;
+    background: var(--g-surface);
+}
+
+.insumo-disp-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--g-border);
+    transition: background 0.15s;
+}
+
+.insumo-disp-row:last-child {
+    border-bottom: none;
+}
+
+.insumo-disp-row:hover:not(.ja-adicionado) {
+    background: var(--g-hover);
+}
+
+.insumo-disp-row.ja-adicionado {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.insumo-disp-info {
     flex: 1;
     min-width: 0;
-    overflow: hidden;
 }
 
-.analise-insumo-nome {
+.insumo-disp-nome {
     font-size: 13px;
     font-weight: 500;
     color: var(--g-text);
@@ -484,68 +565,174 @@
     text-overflow: ellipsis;
 }
 
-.analise-insumo-meta {
+.insumo-disp-meta {
     font-size: 11px;
     color: var(--g-text-3);
     margin-top: 2px;
+}
+
+.insumo-disp-meta .estoque-zero {
+    color: var(--g-red);
+    font-weight: 600;
+}
+
+.insumo-disp-meta .estoque-baixo {
+    color: var(--g-orange);
+    font-weight: 600;
+}
+
+.insumo-disp-adicionado {
+    font-size: 11px;
+    color: var(--g-green);
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.insumo-disp-add {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: none;
+    background: var(--g-blue);
+    color: white;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.15s;
+    flex-shrink: 0;
+}
+
+.insumo-disp-add:hover {
+    transform: scale(1.1);
+}
+
+.insumo-disp-add .material-symbols-outlined {
+    font-size: 20px;
+}
+
+/* Insumos selecionados */
+.analise-selecionados-titulo {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--g-text-3);
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    padding: 0 20px 8px;
+}
+
+.analise-selecionados-lista {
+    padding: 0 20px;
+    max-height: 220px;
+    overflow-y: auto;
+}
+
+.insumo-sel-row {
+    border: 1px solid var(--g-border);
+    border-radius: 10px;
+    margin-bottom: 8px;
+    padding: 10px 12px;
+    background: var(--g-surface);
+}
+
+.insumo-sel-main {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.insumo-sel-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.insumo-sel-nome {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--g-text);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
 }
 
-.analise-insumo-meta .sem-estoque {
-    color: #c5221f;
-    font-weight: 600;
+.insumo-sel-meta {
+    font-size: 11px;
+    color: var(--g-text-3);
+    margin-top: 2px;
 }
 
-.analise-qtd {
-    width: 50px;
+.insumo-sel-qtd {
+    width: 60px;
+    padding: 6px 8px;
     border: 1px solid var(--g-border);
     border-radius: 6px;
-    padding: 5px 4px;
     font-size: 12px;
     text-align: center;
     flex-shrink: 0;
 }
 
-.analise-qtd:focus {
+.insumo-sel-qtd:focus {
     outline: 2px solid var(--g-blue);
     border-color: transparent;
 }
 
-.analise-insumo-valor {
+.insumo-sel-valor {
     font-size: 13px;
     font-weight: 600;
-    color: var(--g-text);
+    color: var(--g-green);
     white-space: nowrap;
     min-width: 70px;
     text-align: right;
     flex-shrink: 0;
 }
 
-.analise-insumo-valor.riscado {
+.insumo-sel-valor.riscado {
     text-decoration: line-through;
     color: var(--g-text-3);
     font-weight: 400;
 }
 
-.analise-insumo-bottom {
+.insumo-sel-remove {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: none;
+    background: var(--g-hover);
+    color: var(--g-text-2);
+    cursor: pointer;
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding-left: 0;
+    justify-content: center;
+    transition: background 0.15s;
+    flex-shrink: 0;
 }
 
-.analise-cf-toggle {
+.insumo-sel-remove:hover {
+    background: #fce8e6;
+    color: var(--g-red);
+}
+
+.insumo-sel-remove .material-symbols-outlined {
+    font-size: 18px;
+}
+
+.insumo-sel-footer {
+    display: flex;
+    align-items: center;
+}
+
+.insumo-sel-cf {
     display: flex;
     align-items: center;
     gap: 6px;
     font-size: 12px;
     color: var(--g-text-2);
     cursor: pointer;
+    user-select: none;
 }
 
-.analise-cf-toggle input {
+.insumo-sel-cf input {
     cursor: pointer;
     accent-color: var(--g-blue);
     width: 16px;
@@ -557,6 +744,7 @@
     text-align: center;
     color: var(--g-text-3);
     font-size: 13px;
+    line-height: 1.5;
 }
 
 .analise-footer {
@@ -575,9 +763,9 @@
 }
 
 .analise-total-bloco strong {
-    font-size: 16px;
-    color: var(--g-text);
-    display: block;
+    font-size: 17px;
+    color: var(--g-green);
+    font-weight: 700;
 }
 
 .analise-loading {
