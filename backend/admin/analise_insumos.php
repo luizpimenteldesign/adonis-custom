@@ -1,8 +1,8 @@
 <?php
 /**
- * API: Análise de insumos de uma Pré-OS
+ * API: Análise de insumos de uma Pré-OS (VERSÃO 2.0 - CATEGORIAS)
  *
- * GET  ?pre_os_id=X   → retorna insumos sugeridos pelos serviços
+ * GET  ?pre_os_id=X   → retorna insumos agrupados por categoria
  *                        (pré-marca cliente_fornece=1 quando estoque <= 0)
  *                        se já houver registros em pre_os_insumos, retorna eles
  * POST               → salva a lista confirmada em pre_os_insumos
@@ -47,16 +47,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     $stmt_s->execute([':id' => $pre_os_id]);
     $servicos = $stmt_s->fetchAll(PDO::FETCH_ASSOC);
 
+    // Buscar TODAS as categorias de insumos
+    try {
+        $stmt_cat = $conn->query("SELECT nome, icone FROM categorias_insumo WHERE ativo = 1 ORDER BY nome");
+        $categorias_raw = $stmt_cat->fetchAll(PDO::FETCH_ASSOC);
+        $categorias = array_column($categorias_raw, 'nome');
+        $categorias_icones = [];
+        foreach ($categorias_raw as $c) {
+            $categorias_icones[$c['nome']] = $c['icone'] ?? 'category';
+        }
+    } catch (Exception $e) {
+        $categorias = [];
+        $categorias_icones = [];
+    }
+
     // Verifica se já existem insumos confirmados
     $stmt_ex = $conn->prepare("SELECT COUNT(*) FROM pre_os_insumos WHERE pre_os_id = :id");
     $stmt_ex->execute([':id' => $pre_os_id]);
     $ja_confirmado = (int)$stmt_ex->fetchColumn() > 0;
 
+    $insumos_por_categoria = [];
+
     if ($ja_confirmado) {
-        // Retorna o que já foi salvo
+        // Retorna o que já foi salvo, agrupado por categoria
         $stmt_i = $conn->prepare("
             SELECT poi.id, poi.insumo_id, poi.quantidade, poi.valor_unitario, poi.cliente_fornece,
-                   ins.nome, ins.unidade, ins.quantidade_estoque,
+                   ins.nome, ins.unidade, ins.quantidade_estoque, ins.categoria,
                    (
                        SELECT GROUP_CONCAT(s2.nome SEPARATOR ', ')
                        FROM insumos_servicos is2
@@ -71,16 +87,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             WHERE poi.pre_os_id = :pre_os_id
         ");
         $stmt_i->execute([':pre_os_id' => $pre_os_id, ':pre_os_id2' => $pre_os_id]);
-        $insumos = $stmt_i->fetchAll(PDO::FETCH_ASSOC);
+        $rows = $stmt_i->fetchAll(PDO::FETCH_ASSOC);
+
+        foreach ($rows as $r) {
+            $cat = $r['categoria'] ?: 'Outros';
+            if (!isset($insumos_por_categoria[$cat])) $insumos_por_categoria[$cat] = [];
+            $insumos_por_categoria[$cat][] = [
+                'insumo_id'          => (int)$r['insumo_id'],
+                'nome'               => $r['nome'],
+                'unidade'            => $r['unidade'],
+                'valor_unitario'     => (float)$r['valor_unitario'],
+                'quantidade_estoque' => (float)$r['quantidade_estoque'],
+                'quantidade'         => (float)$r['quantidade'],
+                'cliente_fornece'    => (int)$r['cliente_fornece'],
+                'servicos_origem'    => $r['servicos_origem'],
+                'categoria'          => $cat,
+            ];
+        }
     } else {
         // Monta lista sugerida a partir dos serviços + insumos_servicos
         if (empty($servicos)) {
-            $insumos = [];
+            $insumos_por_categoria = [];
         } else {
             $ids_servicos = implode(',', array_map(fn($s) => (int)$s['id'], $servicos));
             $stmt_i = $conn->prepare("
                 SELECT ins.id AS insumo_id,
-                       ins.nome, ins.unidade,
+                       ins.nome, ins.unidade, ins.categoria,
                        ins.valor_unitario,
                        ins.quantidade_estoque,
                        GROUP_CONCAT(s.nome SEPARATOR ', ') AS servicos_origem
@@ -94,10 +126,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             $stmt_i->execute();
             $rows = $stmt_i->fetchAll(PDO::FETCH_ASSOC);
 
-            $insumos = [];
             foreach ($rows as $r) {
                 $sem_estoque = (float)$r['quantidade_estoque'] <= 0;
-                $insumos[] = [
+                $cat = $r['categoria'] ?: 'Outros';
+                if (!isset($insumos_por_categoria[$cat])) $insumos_por_categoria[$cat] = [];
+                $insumos_por_categoria[$cat][] = [
                     'insumo_id'          => (int)$r['insumo_id'],
                     'nome'               => $r['nome'],
                     'unidade'            => $r['unidade'],
@@ -106,22 +139,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                     'quantidade'         => 1,
                     'cliente_fornece'    => $sem_estoque ? 1 : 0,
                     'servicos_origem'    => $r['servicos_origem'],
+                    'categoria'          => $cat,
                 ];
             }
         }
     }
 
     echo json_encode([
-        'sucesso'        => true,
-        'ja_confirmado'  => $ja_confirmado,
-        'pedido'         => $pedido,
-        'servicos'       => $servicos,
-        'insumos'        => $insumos,
+        'sucesso'                => true,
+        'ja_confirmado'          => $ja_confirmado,
+        'pedido'                 => $pedido,
+        'servicos'               => $servicos,
+        'categorias'             => $categorias,
+        'categorias_icones'      => $categorias_icones,
+        'insumos_por_categoria'  => $insumos_por_categoria,
     ]);
     exit;
 }
 
-// ── POST ─────────────────────────────────────────────────────────────────────
+// ── POST ──────────────────────────────────────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $body = json_decode(file_get_contents('php://input'), true);
     $pre_os_id = isset($body['pre_os_id']) ? (int)$body['pre_os_id'] : 0;
