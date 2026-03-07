@@ -1,7 +1,7 @@
 /**
  * FORMULÁRIO LUTHIERIA - SISTEMA ADONIS
- * Versão: 5.1
- * Data: 06/03/2026
+ * Versão: 5.2
+ * Data: 07/03/2026
  */
 
 // ========================================
@@ -52,7 +52,7 @@ const modelosPorTipo = {
 // INICIALIZAÇÃO
 // ========================================
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('Iniciando formulário v5.1...');
+    console.log('Iniciando formulário v5.2...');
     inicializarElementos();
     carregarServicos();
     configurarEventos();
@@ -232,7 +232,8 @@ async function carregarServicos() {
 function renderizarServicos(servicos) {
     // Agrupar por categoria
     const reparo = servicos.filter(s => s.categoria === 'Reparo');
-    const customizacao = servicos.filter(s => s.categoria === 'Customizacao');
+    const customizacao = servicos.filter(s => s.categoria === 'Customizacao' || s.categoria === 'Customização');
+    const construcao = servicos.filter(s => s.categoria === 'Construcao' || s.categoria === 'Construção');
     
     let html = '';
     
@@ -243,7 +244,7 @@ function renderizarServicos(servicos) {
         html += '<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M22.7 19l-9.1-9.1c.9-2.3.4-5-1.5-6.9-2-2-5-2.4-7.4-1.3L9 6 6 9 1.6 4.7C.4 7.1.9 10.1 2.9 12.1c1.9 1.9 4.6 2.4 6.9 1.5l9.1 9.1c.4.4 1 .4 1.4 0l2.3-2.3c.5-.4.5-1.1.1-1.4z"/></svg>';
         html += 'Serviços de Reparo';
         html += '</h3>';
-        html += '<div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;">';
+        html += '<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px;">';
         reparo.forEach(servico => {
             html += criarCheckboxServico(servico);
         });
@@ -258,8 +259,23 @@ function renderizarServicos(servicos) {
         html += '<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M17.66 7.93L12 2.27 6.34 7.93c-3.12 3.12-3.12 8.19 0 11.31C7.9 20.8 9.95 21.58 12 21.58c2.05 0 4.1-.78 5.66-2.34 3.12-3.12 3.12-8.19 0-11.31zM12 19.59c-1.6 0-3.11-.62-4.24-1.76C6.62 16.69 6 15.19 6 13.59s.62-3.11 1.76-4.24L12 5.1l4.24 4.24C17.38 10.48 18 12 18 13.59s-.62 3.11-1.76 4.24C15.11 18.97 13.6 19.59 12 19.59z"/></svg>';
         html += 'Customização e Upgrades';
         html += '</h3>';
-        html += '<div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;">';
+        html += '<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px;">';
         customizacao.forEach(servico => {
+            html += criarCheckboxServico(servico);
+        });
+        html += '</div>';
+        html += '</div>';
+    }
+    
+    // CONSTRUÇÃO (NOVA CATEGORIA)
+    if (construcao.length > 0) {
+        html += '<div class="categoria-group" style="margin-bottom: 32px;">';
+        html += '<h3 style="font-size: 16px; font-weight: 600; margin-bottom: 16px; color: #ff6b35; display: flex; align-items: center; gap: 8px;">';
+        html += '<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M22.61 16.01L13 6.4V3L9.37 6.63l2.11 2.11-2.19 2.19-2.83-2.83-5.65 5.66 1.41 1.41 4.24-4.24 2.83 2.83 5.66-5.66-1.01-1.01 8.2 8.2c.39.39 1.02.39 1.41 0l.06-.06c.39-.39.39-1.02 0-1.42zm-10.55.96L4 9v3l8.06 8.07c.39.39 1.02.39 1.41 0l5.32-5.32-1.41-1.41-3.32 3.63z"/></svg>';
+        html += 'Construção de Instrumentos';
+        html += '</h3>';
+        html += '<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px;">';
+        construcao.forEach(servico => {
             html += criarCheckboxServico(servico);
         });
         html += '</div>';
@@ -550,5 +566,5 @@ function mostrarLoading(mostrar) {
 }
 
 // LOGS E DEBUG
-console.log('✅ Form Luthieria JS v5.1 carregado');
+console.log('✅ Form Luthieria JS v5.2 carregado');
 console.log('🔗 API URL:', API_URL);
