@@ -2,7 +2,7 @@
 /**
  * DETALHES DO PEDIDO — SISTEMA ADONIS
  * Visual: Google / Material Design 3
- * Versão: 8.3 — Corrige nome da tabela para insumos_servicos
+ * Versão: 8.4 — Carrega analise_insumos_v3.js, remove JS inline
  */
 require_once 'auth.php';
 require_once '../config/Database.php';
@@ -649,145 +649,6 @@ document.querySelectorAll('.modal-overlay').forEach(o => {
     o.addEventListener('click', e => { if (e.target === o) o.classList.remove('aberto'); });
 });
 
-// ── MODAL ANÁLISE ────────────────────────────────────────────
-let _insumos = [];
-
-function abrirModalAnalise() {
-    document.getElementById('analise-corpo').innerHTML = '<div class="analise-loading">Carregando insumos...</div>';
-    document.getElementById('analise-acoes').style.display = 'none';
-    abrirModal('modal-analise');
-
-    fetch('analise_insumos.php?pre_os_id=' + _pedidoId)
-        .then(r => r.json())
-        .then(data => {
-            if (!data.sucesso) { _toast(data.erro || 'Erro ao carregar'); fecharModal('modal-analise'); return; }
-            _renderizarAnalise(data);
-        })
-        .catch(() => { _toast('Erro de conexão'); fecharModal('modal-analise'); });
-}
-
-function _renderizarAnalise(data) {
-    _insumos = (data.insumos || []).map(i => ({ ...i }));
-
-    let html = '';
-
-    // Resumo do pedido
-    html += '<div class="analise-resumo">';
-    html += '<div class="analise-resumo-title">Serviços do pedido</div>';
-    html += '<div class="analise-resumo-tags">';
-    if (data.servicos && data.servicos.length) {
-        data.servicos.forEach(s => { html += '<span class="analise-tag">' + _esc(s.nome) + '</span>'; });
-    } else {
-        html += '<span style="font-size:13px;color:var(--g-text-3)">Nenhum serviço</span>';
-    }
-    html += '</div></div>';
-    html += '<hr class="analise-sep">';
-
-    // Lista de insumos
-    html += '<div class="analise-insumos-title">Insumos necessários</div>';
-
-    if (!_insumos.length) {
-        html += '<div class="analise-vazio">Nenhum insumo vinculado a estes serviços. Você pode prosseguir para o orçamento.</div>';
-    } else {
-        _insumos.forEach((ins, idx) => {
-            const semEstoque = parseFloat(ins.quantidade_estoque) <= 0;
-            const cf = ins.cliente_fornece == 1;
-            const valorTotal = parseFloat(ins.valor_unitario) * parseFloat(ins.quantidade || 1);
-
-            html += `<div class="analise-insumo-row" id="row-ins-${idx}">`;
-
-            // Top: info + qtd + valor
-            html += `<div class="analise-insumo-top">`;
-            html += `<div class="analise-insumo-info">`;
-            html += `<div class="analise-insumo-nome">${_esc(ins.nome)}</div>`;
-            html += `<div class="analise-insumo-meta">`;
-            if (ins.servicos_origem) html += `Vinculado: ${_esc(ins.servicos_origem)} &bull; `;
-            html += `${_esc(ins.unidade)}`;
-            if (semEstoque) html += ` &bull; <span class="sem-estoque">Sem estoque</span>`;
-            html += `</div></div>`;
-
-            html += `<input type="number" class="analise-qtd" value="${parseFloat(ins.quantidade||1)}" min="0.001" step="0.001"
-                onchange="_mudarQtd(${idx}, this.value)" title="Quantidade">`;
-
-            html += `<div class="analise-insumo-valor ${cf ? 'riscado' : ''}" id="val-ins-${idx}">${fmt(cf ? 0 : valorTotal)}</div>`;
-            html += `</div>`; // top
-
-            // Bottom: checkbox cliente fornece
-            html += `<div class="analise-insumo-bottom">`;
-            html += `<label class="analise-cf-toggle">`;
-            html += `<input type="checkbox" onchange="_toggleCF(${idx}, this.checked)" ${cf ? 'checked' : ''}>`;
-            html += `<span>Cliente fornece</span></label>`;
-            html += `</div>`; // bottom
-
-            html += `</div>`; // row
-        });
-    }
-
-    // Footer com total
-    html += '<div class="analise-footer">';
-    html += '<div class="analise-total-bloco">Insumos a cobrar:<strong id="analise-total-ins">—</strong></div>';
-    html += '</div>';
-
-    document.getElementById('analise-corpo').innerHTML = html;
-    document.getElementById('analise-acoes').style.display = 'flex';
-    _recalcularTotalAnalise();
-}
-
-function _esc(s) {
-    return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-}
-
-function _toggleCF(idx, checked) {
-    _insumos[idx].cliente_fornece = checked ? 1 : 0;
-    const valEl = document.getElementById('val-ins-' + idx);
-    if (valEl) {
-        const total = parseFloat(_insumos[idx].valor_unitario) * parseFloat(_insumos[idx].quantidade || 1);
-        valEl.textContent = checked ? fmt(0) : fmt(total);
-        valEl.classList.toggle('riscado', checked);
-    }
-    _recalcularTotalAnalise();
-}
-
-function _mudarQtd(idx, val) {
-    const qtd = Math.max(0.001, parseFloat(val) || 1);
-    _insumos[idx].quantidade = qtd;
-    const cf = _insumos[idx].cliente_fornece == 1;
-    const total = parseFloat(_insumos[idx].valor_unitario) * qtd;
-    const valEl = document.getElementById('val-ins-' + idx);
-    if (valEl) { valEl.textContent = cf ? fmt(0) : fmt(total); }
-    _recalcularTotalAnalise();
-}
-
-function _recalcularTotalAnalise() {
-    let total = 0;
-    _insumos.forEach(ins => {
-        if (!ins.cliente_fornece) total += parseFloat(ins.valor_unitario) * parseFloat(ins.quantidade || 1);
-    });
-    const el = document.getElementById('analise-total-ins');
-    if (el) el.textContent = fmt(total);
-}
-
-function confirmarAnalise() {
-    const btn = document.getElementById('btn-confirmar-analise');
-    btn.disabled = true; btn.textContent = 'Salvando...';
-
-    fetch('analise_insumos.php', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pre_os_id: _pedidoId, insumos: _insumos })
-    })
-    .then(r => r.json())
-    .then(data => {
-        if (!data.sucesso) { _toast(data.erro || 'Erro ao salvar'); btn.disabled = false; btn.textContent = 'Confirmar e Orçar →'; return; }
-        fecharModal('modal-analise');
-        // Atualiza label de status
-        document.getElementById('status-label').textContent = 'Em Análise';
-        // Abre modal orçamento já com valor pré-calculado
-        _abrirOrcamentoComValor(data.total_orcamento, data.total_servicos, data.total_insumos);
-    })
-    .catch(() => { _toast('Erro de conexão'); btn.disabled = false; btn.textContent = 'Confirmar e Orçar →'; });
-}
-
 // ─ Orçamento
 let valorEscolhido = null;
 
@@ -896,5 +757,6 @@ function _enviar(status,extras) {
 }
 </script>
 <script src="assets/js/admin.js?v=<?php echo $v; ?>"></script>
+<script src="assets/js/analise_insumos_v3.js?v=<?php echo $v; ?>"></script>
 </body>
 </html>
