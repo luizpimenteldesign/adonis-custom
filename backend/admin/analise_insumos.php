@@ -1,14 +1,10 @@
 <?php
 /**
- * API: Análise de insumos de uma Pré-OS (VERSÃO 2.0 - CATEGORIAS)
+ * API: Análise de insumos de uma Pré-OS (VERSÃO 3.0 - MANUAL POR CATEGORIAS)
  *
- * GET  ?pre_os_id=X   → retorna insumos agrupados por categoria
- *                        (pré-marca cliente_fornece=1 quando estoque <= 0)
- *                        se já houver registros em pre_os_insumos, retorna eles
- * POST               → salva a lista confirmada em pre_os_insumos
- *                        e muda status para 'Em analise'
- *
- * RETROCOMPATIBILIDADE: funciona com ou sem tabela categorias_insumo
+ * GET  ?pre_os_id=X       → retorna categorias disponíveis e insumos já selecionados
+ * GET  ?categoria=X       → retorna insumos de uma categoria específica
+ * POST                    → salva a lista confirmada em pre_os_insumos
  */
 require_once 'auth.php';
 require_once '../config/Database.php';
@@ -18,7 +14,47 @@ header('Content-Type: application/json; charset=utf-8');
 $db   = new Database();
 $conn = $db->getConnection();
 
-// ── GET ──────────────────────────────────────────────────────────────────────
+// ── GET: BUSCAR INSUMOS DE UMA CATEGORIA ─────────────────────────────
+if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['categoria'])) {
+    $categoria = trim($_GET['categoria']);
+    $busca = trim($_GET['q'] ?? '');
+    
+    $sql = "SELECT id, nome, unidade, valor_unitario, quantidade_estoque FROM insumos WHERE ativo=1";
+    
+    // Verifica se tabela categorias_insumo existe
+    $tem_categoria = false;
+    try {
+        $conn->query("SELECT 1 FROM categorias_insumo LIMIT 1");
+        $tem_categoria = true;
+    } catch (Exception $e) {}
+    
+    if ($tem_categoria && $categoria !== 'Todos') {
+        $sql .= " AND categoria = :cat";
+    }
+    
+    if ($busca) {
+        $sql .= " AND nome LIKE :busca";
+    }
+    
+    $sql .= " ORDER BY nome LIMIT 100";
+    
+    $stmt = $conn->prepare($sql);
+    
+    if ($tem_categoria && $categoria !== 'Todos') {
+        $stmt->bindValue(':cat', $categoria);
+    }
+    if ($busca) {
+        $stmt->bindValue(':busca', '%' . $busca . '%');
+    }
+    
+    $stmt->execute();
+    $insumos = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    echo json_encode(['sucesso' => true, 'insumos' => $insumos]);
+    exit;
+}
+
+// ── GET: DADOS INICIAIS DO PEDIDO ────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     $pre_os_id = isset($_GET['pre_os_id']) ? (int)$_GET['pre_os_id'] : 0;
     if (!$pre_os_id) { echo json_encode(['erro' => 'ID inválido']); exit; }
@@ -49,137 +85,44 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     $stmt_s->execute([':id' => $pre_os_id]);
     $servicos = $stmt_s->fetchAll(PDO::FETCH_ASSOC);
 
-    // RETROCOMPATIBILIDADE: Verifica se tabela categorias_insumo existe
-    $tabela_existe = false;
-    try {
-        $conn->query("SELECT 1 FROM categorias_insumo LIMIT 1");
-        $tabela_existe = true;
-    } catch (Exception $e) {
-        // Tabela não existe ainda
-    }
-
-    // Buscar categorias (se existirem)
+    // Verifica se tabela categorias_insumo existe
     $categorias = [];
-    $categorias_icones = [];
-
-    if ($tabela_existe) {
-        try {
-            $stmt_cat = $conn->query("SELECT nome, icone FROM categorias_insumo WHERE ativo = 1 ORDER BY nome");
-            $categorias_raw = $stmt_cat->fetchAll(PDO::FETCH_ASSOC);
-            $categorias = array_column($categorias_raw, 'nome');
-            foreach ($categorias_raw as $c) {
-                $categorias_icones[$c['nome']] = $c['icone'] ?? 'category';
-            }
-        } catch (Exception $e) {
-            // Falha silenciosa
-        }
-    }
-
-    // Se não houver categorias, criar uma padrão
-    if (empty($categorias)) {
-        $categorias = ['Insumos'];
-        $categorias_icones = ['Insumos' => 'inventory_2'];
-    }
-
-    // Verifica se já existem insumos confirmados
-    $stmt_ex = $conn->prepare("SELECT COUNT(*) FROM pre_os_insumos WHERE pre_os_id = :id");
-    $stmt_ex->execute([':id' => $pre_os_id]);
-    $ja_confirmado = (int)$stmt_ex->fetchColumn() > 0;
-
-    $insumos_por_categoria = [];
-
-    if ($ja_confirmado) {
-        // Retorna o que já foi salvo, agrupado por categoria
-        $query_cat = $tabela_existe ? "ins.categoria" : "'Insumos' AS categoria";
-        $stmt_i = $conn->prepare("
-            SELECT poi.id, poi.insumo_id, poi.quantidade, poi.valor_unitario, poi.cliente_fornece,
-                   ins.nome, ins.unidade, ins.quantidade_estoque, $query_cat,
-                   (
-                       SELECT GROUP_CONCAT(s2.nome SEPARATOR ', ')
-                       FROM insumos_servicos is2
-                       JOIN servicos s2 ON is2.servicoid = s2.id
-                       WHERE is2.insumoid = ins.id
-                       AND is2.servicoid IN (
-                           SELECT servico_id FROM pre_os_servicos WHERE pre_os_id = :pre_os_id2
-                       )
-                   ) AS servicos_origem
-            FROM pre_os_insumos poi
-            JOIN insumos ins ON poi.insumo_id = ins.id
-            WHERE poi.pre_os_id = :pre_os_id
-        ");
-        $stmt_i->execute([':pre_os_id' => $pre_os_id, ':pre_os_id2' => $pre_os_id]);
-        $rows = $stmt_i->fetchAll(PDO::FETCH_ASSOC);
-
+    try {
+        $stmt_cat = $conn->query("SELECT nome, icone FROM categorias_insumo WHERE ativo = 1 ORDER BY nome");
+        $rows = $stmt_cat->fetchAll(PDO::FETCH_ASSOC);
         foreach ($rows as $r) {
-            $cat = $tabela_existe ? ($r['categoria'] ?: 'Outros') : 'Insumos';
-            if (!isset($insumos_por_categoria[$cat])) $insumos_por_categoria[$cat] = [];
-            $insumos_por_categoria[$cat][] = [
-                'insumo_id'          => (int)$r['insumo_id'],
-                'nome'               => $r['nome'],
-                'unidade'            => $r['unidade'],
-                'valor_unitario'     => (float)$r['valor_unitario'],
-                'quantidade_estoque' => (float)$r['quantidade_estoque'],
-                'quantidade'         => (float)$r['quantidade'],
-                'cliente_fornece'    => (int)$r['cliente_fornece'],
-                'servicos_origem'    => $r['servicos_origem'],
-                'categoria'          => $cat,
-            ];
+            $categorias[] = ['nome' => $r['nome'], 'icone' => $r['icone'] ?: 'category'];
         }
-    } else {
-        // Monta lista sugerida a partir dos serviços + insumos_servicos
-        if (empty($servicos)) {
-            $insumos_por_categoria = [];
-        } else {
-            $ids_servicos = implode(',', array_map(fn($s) => (int)$s['id'], $servicos));
-            $query_cat = $tabela_existe ? "ins.categoria" : "'Insumos' AS categoria";
-            $stmt_i = $conn->prepare("
-                SELECT ins.id AS insumo_id,
-                       ins.nome, ins.unidade, $query_cat,
-                       ins.valor_unitario,
-                       ins.quantidade_estoque,
-                       GROUP_CONCAT(s.nome SEPARATOR ', ') AS servicos_origem
-                FROM insumos_servicos is_rel
-                JOIN insumos  ins ON is_rel.insumoid  = ins.id
-                JOIN servicos s   ON is_rel.servicoid = s.id
-                WHERE is_rel.servicoid IN ($ids_servicos)
-                  AND ins.ativo = 1
-                GROUP BY ins.id
-            ");
-            $stmt_i->execute();
-            $rows = $stmt_i->fetchAll(PDO::FETCH_ASSOC);
-
-            foreach ($rows as $r) {
-                $sem_estoque = (float)$r['quantidade_estoque'] <= 0;
-                $cat = $tabela_existe ? ($r['categoria'] ?: 'Outros') : 'Insumos';
-                if (!isset($insumos_por_categoria[$cat])) $insumos_por_categoria[$cat] = [];
-                $insumos_por_categoria[$cat][] = [
-                    'insumo_id'          => (int)$r['insumo_id'],
-                    'nome'               => $r['nome'],
-                    'unidade'            => $r['unidade'],
-                    'valor_unitario'     => (float)$r['valor_unitario'],
-                    'quantidade_estoque' => (float)$r['quantidade_estoque'],
-                    'quantidade'         => 1,
-                    'cliente_fornece'    => $sem_estoque ? 1 : 0,
-                    'servicos_origem'    => $r['servicos_origem'],
-                    'categoria'          => $cat,
-                ];
-            }
-        }
+    } catch (Exception $e) {
+        // Tabela não existe - usa categoria padrão
+        $categorias = [['nome' => 'Todos', 'icone' => 'inventory_2']];
     }
+
+    // Adiciona opção "Todos"
+    array_unshift($categorias, ['nome' => 'Todos', 'icone' => 'grid_view']);
+
+    // Insumos já selecionados (se houver)
+    $stmt_ins = $conn->prepare("
+        SELECT poi.insumo_id, poi.quantidade, poi.cliente_fornece,
+               ins.nome, ins.unidade, ins.valor_unitario, ins.quantidade_estoque
+        FROM pre_os_insumos poi
+        JOIN insumos ins ON poi.insumo_id = ins.id
+        WHERE poi.pre_os_id = :id
+    ");
+    $stmt_ins->execute([':id' => $pre_os_id]);
+    $insumos_selecionados = $stmt_ins->fetchAll(PDO::FETCH_ASSOC);
 
     echo json_encode([
-        'sucesso'                => true,
-        'ja_confirmado'          => $ja_confirmado,
-        'pedido'                 => $pedido,
-        'servicos'               => $servicos,
-        'categorias'             => $categorias,
-        'categorias_icones'      => $categorias_icones,
-        'insumos_por_categoria'  => $insumos_por_categoria,
+        'sucesso'              => true,
+        'pedido'               => $pedido,
+        'servicos'             => $servicos,
+        'categorias'           => $categorias,
+        'insumos_selecionados' => $insumos_selecionados,
     ]);
     exit;
 }
 
-// ── POST ──────────────────────────────────────────────────────────────────────
+// ── POST: SALVAR INSUMOS SELECIONADOS ───────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $body = json_decode(file_get_contents('php://input'), true);
     $pre_os_id = isset($body['pre_os_id']) ? (int)$body['pre_os_id'] : 0;
@@ -190,7 +133,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
         $conn->beginTransaction();
 
-        // Remove registros anteriores (re-análise)
+        // Remove registros anteriores
         $conn->prepare("DELETE FROM pre_os_insumos WHERE pre_os_id = :id")->execute([':id' => $pre_os_id]);
 
         // Insere insumos confirmados
@@ -219,10 +162,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt_st->execute([':id' => $pre_os_id]);
 
         // Auditoria
-        $conn->prepare("
-            INSERT INTO auditoria (usuario_id, entidade, entidade_id, acao, valor_novo)
-            VALUES (:uid, 'pre_os', :eid, 'edicao', 'Em analise')
-        ")->execute([':uid' => $_SESSION['usuario_id'] ?? null, ':eid' => $pre_os_id]);
+        try {
+            $conn->prepare("
+                INSERT INTO auditoria (usuario_id, entidade, entidade_id, acao, valor_novo)
+                VALUES (:uid, 'pre_os', :eid, 'edicao', 'Em analise')
+            ")->execute([':uid' => $_SESSION['usuario_id'] ?? null, ':eid' => $pre_os_id]);
+        } catch (Exception $e) {}
 
         $conn->commit();
 
