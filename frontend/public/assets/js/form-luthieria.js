@@ -1,6 +1,6 @@
 /**
  * FORMULÁRIO LUTHIERIA - SISTEMA ADONIS
- * Versão: 5.3
+ * Versão: 5.4
  * Data: 07/03/2026
  */
 
@@ -31,7 +31,9 @@ const elementos = {
 const estado = {
     servicosSelecionados: [],
     fotosSelecionadas: [],
-    enviando: false
+    enviando: false,
+    categoriaAtiva: null,
+    servicosPorCategoria: {}
 };
 
 // Modelos por tipo de instrumento
@@ -51,28 +53,28 @@ const modelosPorTipo = {
 // Configuração de categorias (ícones e títulos)
 const configCategorias = {
     'Reparo': {
-        titulo: 'Serviços de Reparo',
-        icone: '<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M22.7 19l-9.1-9.1c.9-2.3.4-5-1.5-6.9-2-2-5-2.4-7.4-1.3L9 6 6 9 1.6 4.7C.4 7.1.9 10.1 2.9 12.1c1.9 1.9 4.6 2.4 6.9 1.5l9.1 9.1c.4.4 1 .4 1.4 0l2.3-2.3c.5-.4.5-1.1.1-1.4z"/></svg>'
+        titulo: 'Reparo',
+        icone: '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M22.7 19l-9.1-9.1c.9-2.3.4-5-1.5-6.9-2-2-5-2.4-7.4-1.3L9 6 6 9 1.6 4.7C.4 7.1.9 10.1 2.9 12.1c1.9 1.9 4.6 2.4 6.9 1.5l9.1 9.1c.4.4 1 .4 1.4 0l2.3-2.3c.5-.4.5-1.1.1-1.4z"/></svg>'
     },
     'Customizacao': {
-        titulo: 'Customização e Upgrades',
-        icone: '<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M17.66 7.93L12 2.27 6.34 7.93c-3.12 3.12-3.12 8.19 0 11.31C7.9 20.8 9.95 21.58 12 21.58c2.05 0 4.1-.78 5.66-2.34 3.12-3.12 3.12-8.19 0-11.31zM12 19.59c-1.6 0-3.11-.62-4.24-1.76C6.62 16.69 6 15.19 6 13.59s.62-3.11 1.76-4.24L12 5.1l4.24 4.24C17.38 10.48 18 12 18 13.59s-.62 3.11-1.76 4.24C15.11 18.97 13.6 19.59 12 19.59z"/></svg>'
+        titulo: 'Customização',
+        icone: '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M17.66 7.93L12 2.27 6.34 7.93c-3.12 3.12-3.12 8.19 0 11.31C7.9 20.8 9.95 21.58 12 21.58c2.05 0 4.1-.78 5.66-2.34 3.12-3.12 3.12-8.19 0-11.31zM12 19.59c-1.6 0-3.11-.62-4.24-1.76C6.62 16.69 6 15.19 6 13.59s.62-3.11 1.76-4.24L12 5.1l4.24 4.24C17.38 10.48 18 12 18 13.59s-.62 3.11-1.76 4.24C15.11 18.97 13.6 19.59 12 19.59z"/></svg>'
     },
     'Customização': {
-        titulo: 'Customização e Upgrades',
-        icone: '<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M17.66 7.93L12 2.27 6.34 7.93c-3.12 3.12-3.12 8.19 0 11.31C7.9 20.8 9.95 21.58 12 21.58c2.05 0 4.1-.78 5.66-2.34 3.12-3.12 3.12-8.19 0-11.31zM12 19.59c-1.6 0-3.11-.62-4.24-1.76C6.62 16.69 6 15.19 6 13.59s.62-3.11 1.76-4.24L12 5.1l4.24 4.24C17.38 10.48 18 12 18 13.59s-.62 3.11-1.76 4.24C15.11 18.97 13.6 19.59 12 19.59z"/></svg>'
+        titulo: 'Customização',
+        icone: '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M17.66 7.93L12 2.27 6.34 7.93c-3.12 3.12-3.12 8.19 0 11.31C7.9 20.8 9.95 21.58 12 21.58c2.05 0 4.1-.78 5.66-2.34 3.12-3.12 3.12-8.19 0-11.31zM12 19.59c-1.6 0-3.11-.62-4.24-1.76C6.62 16.69 6 15.19 6 13.59s.62-3.11 1.76-4.24L12 5.1l4.24 4.24C17.38 10.48 18 12 18 13.59s-.62 3.11-1.76 4.24C15.11 18.97 13.6 19.59 12 19.59z"/></svg>'
     },
     'Regulagem': {
-        titulo: 'Regulagem e Ajustes',
-        icone: '<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M3 17v2h6v-2H3zM3 5v2h10V5H3zm10 16v-2h8v-2h-8v-2h-2v6h2zM7 9v2H3v2h4v2h2V9H7zm14 4v-2H11v2h10zm-6-4h2V7h4V5h-4V3h-2v6z"/></svg>'
+        titulo: 'Regulagem',
+        icone: '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M3 17v2h6v-2H3zM3 5v2h10V5H3zm10 16v-2h8v-2h-8v-2h-2v6h2zM7 9v2H3v2h4v2h2V9H7zm14 4v-2H11v2h10zm-6-4h2V7h4V5h-4V3h-2v6z"/></svg>'
     },
     'Construcao': {
-        titulo: 'Construção de Instrumentos',
-        icone: '<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M22.61 16.01L13 6.4V3L9.37 6.63l2.11 2.11-2.19 2.19-2.83-2.83-5.65 5.66 1.41 1.41 4.24-4.24 2.83 2.83 5.66-5.66-1.01-1.01 8.2 8.2c.39.39 1.02.39 1.41 0l.06-.06c.39-.39.39-1.02 0-1.42zm-10.55.96L4 9v3l8.06 8.07c.39.39 1.02.39 1.41 0l5.32-5.32-1.41-1.41-3.32 3.63z"/></svg>'
+        titulo: 'Construção',
+        icone: '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M22.61 16.01L13 6.4V3L9.37 6.63l2.11 2.11-2.19 2.19-2.83-2.83-5.65 5.66 1.41 1.41 4.24-4.24 2.83 2.83 5.66-5.66-1.01-1.01 8.2 8.2c.39.39 1.02.39 1.41 0l.06-.06c.39-.39.39-1.02 0-1.42zm-10.55.96L4 9v3l8.06 8.07c.39.39 1.02.39 1.41 0l5.32-5.32-1.41-1.41-3.32 3.63z"/></svg>'
     },
     'Construção': {
-        titulo: 'Construção de Instrumentos',
-        icone: '<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M22.61 16.01L13 6.4V3L9.37 6.63l2.11 2.11-2.19 2.19-2.83-2.83-5.65 5.66 1.41 1.41 4.24-4.24 2.83 2.83 5.66-5.66-1.01-1.01 8.2 8.2c.39.39 1.02.39 1.41 0l.06-.06c.39-.39.39-1.02 0-1.42zm-10.55.96L4 9v3l8.06 8.07c.39.39 1.02.39 1.41 0l5.32-5.32-1.41-1.41-3.32 3.63z"/></svg>'
+        titulo: 'Construção',
+        icone: '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M22.61 16.01L13 6.4V3L9.37 6.63l2.11 2.11-2.19 2.19-2.83-2.83-5.65 5.66 1.41 1.41 4.24-4.24 2.83 2.83 5.66-5.66-1.01-1.01 8.2 8.2c.39.39 1.02.39 1.41 0l.06-.06c.39-.39.39-1.02 0-1.42zm-10.55.96L4 9v3l8.06 8.07c.39.39 1.02.39 1.41 0l5.32-5.32-1.41-1.41-3.32 3.63z"/></svg>'
     }
 };
 
@@ -80,7 +82,7 @@ const configCategorias = {
 // INICIALIZAÇÃO
 // ========================================
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('Iniciando formulário v5.3...');
+    console.log('Iniciando formulário v5.4...');
     inicializarElementos();
     carregarServicos();
     configurarEventos();
@@ -258,7 +260,7 @@ async function carregarServicos() {
 }
 
 function renderizarServicos(servicos) {
-    // Agrupar por categoria dinamicamente
+    // Agrupar por categoria
     const categorias = {};
     
     servicos.forEach(servico => {
@@ -269,56 +271,152 @@ function renderizarServicos(servicos) {
         categorias[cat].push(servico);
     });
     
+    // Guardar no estado
+    estado.servicosPorCategoria = categorias;
+    
     // Ordem de exibição das categorias
     const ordemCategorias = ['Reparo', 'Customizacao', 'Customização', 'Regulagem', 'Construcao', 'Construção'];
+    const categoriasDisponiveis = ordemCategorias.filter(cat => categorias[cat] && categorias[cat].length > 0);
     
-    let html = '';
+    if (categoriasDisponiveis.length === 0) {
+        elementos.servicosContainer.innerHTML = '<p style="color: #f44336; padding: 20px; text-align: center;">Nenhum serviço disponível.</p>';
+        return;
+    }
     
-    // Renderizar categorias na ordem definida
-    ordemCategorias.forEach(catKey => {
-        if (categorias[catKey] && categorias[catKey].length > 0) {
-            const config = configCategorias[catKey] || {
-                titulo: catKey,
-                icone: '<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>'
-            };
-            
-            html += '<div class="categoria-group" style="margin-bottom: 32px;">';
-            html += `<h3 style="font-size: 16px; font-weight: 600; margin-bottom: 16px; color: #ff6b35; display: flex; align-items: center; gap: 8px;">`;
-            html += config.icone;
-            html += config.titulo;
-            html += '</h3>';
-            html += '<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px;">';
-            
-            categorias[catKey].forEach(servico => {
-                html += criarCheckboxServico(servico);
-            });
-            
-            html += '</div>';
-            html += '</div>';
-        }
+    // Definir primeira categoria como ativa
+    estado.categoriaAtiva = categoriasDisponiveis[0];
+    
+    // HTML das TABS
+    let html = `
+        <style>
+            .tabs-container {
+                margin-bottom: 24px;
+            }
+            .tabs-nav {
+                display: flex;
+                gap: 8px;
+                border-bottom: 2px solid #e0e0e0;
+                margin-bottom: 20px;
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+            }
+            .tab-button {
+                flex: 1;
+                min-width: 140px;
+                padding: 12px 16px;
+                background: transparent;
+                border: none;
+                border-bottom: 3px solid transparent;
+                color: #666;
+                font-size: 14px;
+                font-weight: 500;
+                cursor: pointer;
+                transition: all 0.2s ease;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: 6px;
+                white-space: nowrap;
+            }
+            .tab-button:hover {
+                color: #ff6b35;
+                background: #fff3e0;
+            }
+            .tab-button.active {
+                color: #ff6b35;
+                border-bottom-color: #ff6b35;
+                background: #fff3e0;
+            }
+            .tab-content {
+                display: none;
+                animation: fadeIn 0.3s ease;
+            }
+            .tab-content.active {
+                display: block;
+            }
+            @keyframes fadeIn {
+                from { opacity: 0; transform: translateY(10px); }
+                to { opacity: 1; transform: translateY(0); }
+            }
+            .servicos-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+                gap: 12px;
+            }
+        </style>
+        
+        <div class="tabs-container">
+            <div class="tabs-nav">
+    `;
+    
+    // Renderizar botões das tabs
+    categoriasDisponiveis.forEach(catKey => {
+        const config = configCategorias[catKey] || { titulo: catKey, icone: '' };
+        const isActive = catKey === estado.categoriaAtiva ? 'active' : '';
+        const count = categorias[catKey].length;
+        
+        html += `
+            <button type="button" class="tab-button ${isActive}" data-categoria="${catKey}" onclick="mudarCategoria('${catKey}')">
+                ${config.icone}
+                <span>${config.titulo} <small style="opacity: 0.7;">(${count})</small></span>
+            </button>
+        `;
     });
     
-    // Renderizar outras categorias não mapeadas
-    Object.keys(categorias).forEach(catKey => {
-        if (!ordemCategorias.includes(catKey) && categorias[catKey].length > 0) {
-            html += '<div class="categoria-group" style="margin-bottom: 32px;">';
-            html += `<h3 style="font-size: 16px; font-weight: 600; margin-bottom: 16px; color: #ff6b35;">${catKey}</h3>`;
-            html += '<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px;">';
-            
-            categorias[catKey].forEach(servico => {
-                html += criarCheckboxServico(servico);
-            });
-            
-            html += '</div>';
-            html += '</div>';
-        }
+    html += `</div>`; // Fecha tabs-nav
+    
+    // Renderizar conteúdo das tabs
+    categoriasDisponiveis.forEach(catKey => {
+        const isActive = catKey === estado.categoriaAtiva ? 'active' : '';
+        
+        html += `
+            <div class="tab-content ${isActive}" data-categoria="${catKey}">
+                <div class="servicos-grid">
+        `;
+        
+        categorias[catKey].forEach(servico => {
+            html += criarCheckboxServico(servico);
+        });
+        
+        html += `
+                </div>
+            </div>
+        `;
     });
+    
+    html += `</div>`; // Fecha tabs-container
     
     elementos.servicosContainer.innerHTML = html;
     
-    // Reconfigurar eventos após renderizar
+    // Configurar eventos
     configurarCheckboxesServicos();
 }
+
+// Função global para mudar categoria (chamada pelo onclick)
+window.mudarCategoria = function(categoria) {
+    console.log('Mudando para categoria:', categoria);
+    
+    // Atualizar estado
+    estado.categoriaAtiva = categoria;
+    
+    // Atualizar botões
+    document.querySelectorAll('.tab-button').forEach(btn => {
+        if (btn.dataset.categoria === categoria) {
+            btn.classList.add('active');
+        } else {
+            btn.classList.remove('active');
+        }
+    });
+    
+    // Atualizar conteúdo
+    document.querySelectorAll('.tab-content').forEach(content => {
+        if (content.dataset.categoria === categoria) {
+            content.classList.add('active');
+        } else {
+            content.classList.remove('active');
+        }
+    });
+};
 
 function criarCheckboxServico(servico) {
     return `
@@ -399,7 +497,7 @@ function renderizarPreviewFotos(files) {
     });
 }
 
-function removerFoto(index) {
+window.removerFoto = function(index) {
     const dt = new DataTransfer();
     const files = Array.from(elementos.fotosInput.files);
     
@@ -409,7 +507,7 @@ function removerFoto(index) {
     
     elementos.fotosInput.files = dt.files;
     handleFotosChange({ target: elementos.fotosInput });
-}
+};
 
 // ========================================
 // MÁSCARAS DE ENTRADA
@@ -578,8 +676,6 @@ async function enviarFormulario(formData) {
     }
 }
 
-
-
 // ========================================
 // FUNÇÕES AUXILIARES
 // ========================================
@@ -598,5 +694,5 @@ function mostrarLoading(mostrar) {
 }
 
 // LOGS E DEBUG
-console.log('✅ Form Luthieria JS v5.3 carregado');
+console.log('✅ Form Luthieria JS v5.4 carregado');
 console.log('🔗 API URL:', API_URL);
