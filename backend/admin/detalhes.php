@@ -2,7 +2,7 @@
 /**
  * DETALHES DO PEDIDO — SISTEMA ADONIS
  * Visual: Google / Material Design 3
- * Versão: 8.2 — Corrige erro quando tabela servico_insumos não existe
+ * Versão: 8.3 — Corrige nome da tabela para insumos_servicos
  */
 require_once 'auth.php';
 require_once '../config/Database.php';
@@ -44,7 +44,7 @@ try {
             $stmt_ins = $conn->prepare("
                 SELECT DISTINCT i.id, i.nome, i.unidade, i.valor_unitario, i.quantidade_estoque,
                        GROUP_CONCAT(DISTINCT s.nome SEPARATOR ', ') as servicos_origem
-                FROM servico_insumos si
+                FROM insumos_servicos si
                 JOIN insumos i ON si.insumo_id = i.id
                 JOIN servicos s ON si.servico_id = s.id
                 WHERE si.servico_id IN ($placeholders)
@@ -55,7 +55,7 @@ try {
             $insumos_pedido = $stmt_ins->fetchAll(PDO::FETCH_ASSOC);
         }
     } catch (PDOException $e) {
-        // Tabela servico_insumos pode não existir ainda - não quebra a página
+        // Tabela insumos_servicos pode não ter dados - não quebra a página
         $insumos_pedido = [];
     }
 
