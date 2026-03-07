@@ -269,17 +269,29 @@
     color: var(--g-text-3);
 }
 
-/* ✅ INPUT QUANTIDADE - Flex controlado */
+/* ✅ INPUT QUANTIDADE - CORRIGIDO PARA MELHOR VISIBILIDADE */
 .insumo-sel-qtd {
     flex: 0 0 auto;
     width: 70px;
     min-width: 60px;
     max-width: 100px;
-    padding: 6px 8px;
-    border: 1px solid var(--g-border);
+    min-height: 38px;
+    padding: 9px 10px;
+    border: 1.5px solid var(--g-border);
     border-radius: 6px;
     text-align: center;
-    font-size: 13px;
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 1.4;
+    color: var(--g-text);
+    background: var(--g-surface);
+    transition: border-color 0.15s;
+}
+
+.insumo-sel-qtd:focus {
+    outline: none;
+    border-color: var(--g-blue);
+    background: white;
 }
 
 /* ✅ VALOR - Tamanho fixo apropriado */
