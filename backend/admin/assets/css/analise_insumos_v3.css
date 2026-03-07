@@ -1,0 +1,374 @@
+/**
+ * ESTILOS PARA ANÁLISE DE INSUMOS V3
+ * Interface otimizada por categorias
+ */
+
+/* ── LOADING E VAZIOS ──────────────────────────────── */
+.analise-loading {
+    padding: 40px 20px;
+    text-align: center;
+    font-size: 14px;
+    color: var(--g-text-3);
+}
+
+.analise-vazio {
+    padding: 20px;
+    text-align: center;
+    font-size: 13px;
+    color: var(--g-text-3);
+    background: var(--g-bg);
+    border-radius: 8px;
+    margin: 12px 0;
+}
+
+/* ── RESUMO DO PEDIDO ────────────────────────────────── */
+.analise-resumo {
+    padding: 16px 0;
+}
+
+.analise-resumo-title {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--g-text-3);
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    margin-bottom: 8px;
+}
+
+.analise-resumo-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.analise-tag {
+    display: inline-block;
+    padding: 5px 12px;
+    background: var(--g-blue-light);
+    color: var(--g-blue);
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.analise-sep {
+    border: none;
+    border-top: 1px solid var(--g-border);
+    margin: 16px 0;
+}
+
+/* ── GRID DE CATEGORIAS ──────────────────────────────── */
+.analise-cats-titulo {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--g-text);
+    margin-bottom: 12px;
+}
+
+.analise-cats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 8px;
+    margin-bottom: 16px;
+}
+
+@media (max-width: 480px) {
+    .analise-cats-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+.cat-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 14px 12px;
+    background: var(--g-surface);
+    border: 1.5px solid var(--g-border);
+    border-radius: 10px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--g-text);
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.cat-btn:hover {
+    background: var(--g-hover);
+    border-color: var(--g-blue);
+}
+
+.cat-btn.ativo {
+    background: var(--g-blue-light);
+    border-color: var(--g-blue);
+    color: var(--g-blue);
+}
+
+.cat-btn .material-symbols-outlined {
+    font-size: 24px;
+}
+
+/* ── ÁREA DE BUSCA E INSUMOS DISPONÍVEIS ──────────────────── */
+.analise-cat-atual {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--g-text-2);
+    margin: 16px 0 8px;
+}
+
+.analise-busca {
+    width: 100%;
+    padding: 10px 14px;
+    border: 1.5px solid var(--g-border);
+    border-radius: 8px;
+    font-size: 13px;
+    margin-bottom: 12px;
+    transition: border-color 0.15s;
+}
+
+.analise-busca:focus {
+    outline: none;
+    border-color: var(--g-blue);
+}
+
+.analise-insumos-disponiveis {
+    max-height: 280px;
+    overflow-y: auto;
+    border: 1px solid var(--g-border);
+    border-radius: 8px;
+    background: var(--g-bg);
+    margin-bottom: 16px;
+}
+
+.insumo-disp-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--g-border);
+    transition: background 0.15s;
+}
+
+.insumo-disp-row:last-child {
+    border-bottom: none;
+}
+
+.insumo-disp-row:hover:not(.ja-adicionado) {
+    background: var(--g-hover);
+}
+
+.insumo-disp-row.ja-adicionado {
+    opacity: 0.5;
+    background: var(--g-bg);
+}
+
+.insumo-disp-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.insumo-disp-nome {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--g-text);
+    margin-bottom: 2px;
+}
+
+.insumo-disp-meta {
+    font-size: 11px;
+    color: var(--g-text-3);
+}
+
+.insumo-disp-meta .estoque-zero {
+    color: var(--g-red);
+    font-weight: 600;
+}
+
+.insumo-disp-meta .estoque-baixo {
+    color: var(--g-orange);
+    font-weight: 600;
+}
+
+.insumo-disp-add {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--g-blue);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: opacity 0.15s;
+}
+
+.insumo-disp-add:hover {
+    opacity: 0.85;
+}
+
+.insumo-disp-add .material-symbols-outlined {
+    font-size: 18px;
+}
+
+.insumo-disp-adicionado {
+    font-size: 11px;
+    color: var(--g-green);
+    font-weight: 600;
+    padding: 4px 8px;
+    background: var(--g-green-light);
+    border-radius: 4px;
+}
+
+/* ── INSUMOS SELECIONADOS ─────────────────────────────── */
+.analise-selecionados-titulo {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--g-text);
+    margin-bottom: 10px;
+}
+
+.analise-selecionados-lista {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 16px;
+}
+
+.insumo-sel-row {
+    background: var(--g-surface);
+    border: 1px solid var(--g-border);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.insumo-sel-main {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 14px;
+}
+
+.insumo-sel-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.insumo-sel-nome {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--g-text);
+    margin-bottom: 2px;
+}
+
+.insumo-sel-meta {
+    font-size: 11px;
+    color: var(--g-text-3);
+}
+
+.insumo-sel-qtd {
+    width: 70px;
+    padding: 6px 8px;
+    border: 1px solid var(--g-border);
+    border-radius: 6px;
+    text-align: center;
+    font-size: 13px;
+}
+
+.insumo-sel-valor {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--g-green);
+    min-width: 80px;
+    text-align: right;
+}
+
+.insumo-sel-valor.riscado {
+    text-decoration: line-through;
+    color: var(--g-text-3);
+}
+
+.insumo-sel-remove {
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    color: var(--g-text-3);
+    border: none;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.insumo-sel-remove:hover {
+    background: var(--g-red-light);
+    color: var(--g-red);
+}
+
+.insumo-sel-remove .material-symbols-outlined {
+    font-size: 18px;
+}
+
+.insumo-sel-footer {
+    padding: 8px 14px 10px;
+    background: var(--g-bg);
+    border-top: 1px solid var(--g-border);
+}
+
+.insumo-sel-cf {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--g-text-2);
+    cursor: pointer;
+}
+
+.insumo-sel-cf input[type="checkbox"] {
+    cursor: pointer;
+}
+
+/* ── FOOTER COM TOTAL ──────────────────────────────── */
+.analise-footer {
+    padding: 14px 0;
+    border-top: 2px solid var(--g-border);
+    margin-top: 8px;
+}
+
+.analise-total-bloco {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 14px;
+    color: var(--g-text-2);
+}
+
+.analise-total-bloco strong {
+    font-size: 17px;
+    font-weight: 600;
+    color: var(--g-green);
+}
+
+/* ── RESPONSIVE ──────────────────────────────────── */
+@media (max-width: 480px) {
+    .insumo-sel-main {
+        flex-wrap: wrap;
+    }
+    
+    .insumo-sel-info {
+        flex: 1 1 100%;
+    }
+    
+    .insumo-sel-qtd {
+        width: 60px;
+    }
+    
+    .insumo-sel-valor {
+        min-width: 70px;
+        font-size: 13px;
+    }
+}
