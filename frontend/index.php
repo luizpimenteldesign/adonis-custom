@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
     <meta name="description" content="Solicite orçamento para manutenção e customização de instrumentos musicais">
-    <meta name="theme-color" content="#ff6b35">
+    <meta name="theme-color" content="#1a1a1a">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Adonis Orçamento">
@@ -16,7 +16,7 @@
     <!-- FAVICON -->
     <link rel="icon" type="image/png" href="/frontend/public/assets/img/favicon.png">
     <link rel="shortcut icon" type="image/png" href="/frontend/public/assets/img/favicon.png">
-    <link rel="apple-touch-icon" href="/frontend/public/assets/img/icon-192.png">
+    <link rel="apple-touch-icon" href="/frontend/public/assets/img/favicon.png">
 
     <!-- CSS -->
     <link rel="stylesheet" href="/frontend/public/assets/css/style.css">

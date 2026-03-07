@@ -4,8 +4,8 @@
   "description": "Solicite orçamento para manutenção e customização de instrumentos musicais",
   "start_url": "/frontend/index.php",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#ff6b35",
+  "background_color": "#1a1a1a",
+  "theme_color": "#1a1a1a",
   "orientation": "portrait-primary",
   "icons": [
     {
