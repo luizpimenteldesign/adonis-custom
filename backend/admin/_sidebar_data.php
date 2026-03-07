@@ -5,9 +5,14 @@
  * Incluído antes do HTML em cada página do admin.
  */
 if (!isset($conn)) {
-    require_once '../config/Database.php';
-    $db   = new Database();
-    $conn = $db->getConnection();
+    try {
+        require_once '../config/Database.php';
+        $db   = new Database();
+        $conn = $db->getConnection();
+    } catch (Exception $e) {
+        // Se falhar, redireciona para login ou exibe erro
+        die('Erro de conexão: ' . htmlspecialchars($e->getMessage()));
+    }
 }
 if (!isset($current_page)) $current_page = '';
 if (!isset($filtro_status)) $filtro_status = '';
@@ -16,7 +21,10 @@ try {
     $rows = $conn->query('SELECT status, COUNT(*) as total FROM pre_os GROUP BY status')->fetchAll(PDO::FETCH_ASSOC);
     $sidebar_stats = [];
     foreach ($rows as $r) $sidebar_stats[$r['status']] = (int)$r['total'];
-} catch (Exception $e) { $sidebar_stats = []; }
+} catch (Exception $e) {
+    // Se a query falhar, deixa vazio (não quebra a página)
+    $sidebar_stats = [];
+}
 
 $sidebar_nav = [
     [
