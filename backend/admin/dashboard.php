@@ -3,7 +3,7 @@
  * DASHBOARD — SISTEMA ADONIS
  * Visual: Google / Material Design 3
  * Ícones: Material Symbols Outlined
- * Versão: 10.0 — CSS externo
+ * Versão: 11.0 — Análise de insumos por categoria
  */
 require_once 'auth.php';
 require_once '../config/Database.php';
@@ -58,7 +58,6 @@ try {
     foreach ($ts as $t) $totais_servicos[$t['pre_os_id']] = (float)$t['total'];
 } catch (Exception $e) {}
 
-// icone = nome do Material Symbol
 $status_map = [
     'Pre-OS'                        => ['label'=>'Pré-OS',                 'badge'=>'badge-new',     'icone'=>'note_add'],
     'Em analise'                    => ['label'=>'Em Análise',             'badge'=>'badge-info',    'icone'=>'search'],
@@ -127,7 +126,6 @@ $v = time();
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Adonis Admin — Dashboard</title>
     
-    <!-- PWA Meta Tags -->
     <meta name="theme-color" content="#1976d2">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -140,6 +138,36 @@ $v = time();
     <link rel="stylesheet" href="assets/css/admin.css?v=<?php echo $v; ?>">
     <link rel="stylesheet" href="assets/css/sidebar.css?v=<?php echo $v; ?>">
     <link rel="stylesheet" href="assets/css/dashboard.css?v=<?php echo $v; ?>">
+    <style>
+    /* CHIPS DE CATEGORIA */
+    .analise-chips-row {
+        display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px;
+    }
+    .analise-chip-cat {
+        display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px;
+        border-radius: 16px; background: var(--g-bg-hover); color: var(--g-text-2);
+        border: 1px solid var(--g-border); cursor: pointer; transition: 120ms;
+        font-size: 13px; font-weight: 500; user-select: none;
+    }
+    .analise-chip-cat:hover { background: var(--g-blue); color: white; border-color: var(--g-blue); }
+    .analise-chip-cat.ativo { background: var(--g-blue); color: white; border-color: var(--g-blue); }
+    .analise-chip-cat .material-symbols-outlined { font-size: 16px; }
+    .analise-chip-cat .badge-count { font-size: 11px; background: rgba(255,255,255,0.3); padding: 2px 6px; border-radius: 8px; margin-left: 4px; }
+
+    .analise-categoria-grupo { margin-bottom: 16px; }
+    .analise-categoria-header {
+        display: flex; align-items: center; justify-content: space-between;
+        padding: 8px 0; cursor: pointer; user-select: none;
+    }
+    .analise-categoria-titulo {
+        display: flex; align-items: center; gap: 6px;
+        font-weight: 500; color: var(--g-text);
+    }
+    .analise-categoria-chevron { transition: transform 0.2s; }
+    .analise-categoria-header.fechado .analise-categoria-chevron { transform: rotate(-90deg); }
+    .analise-categoria-content { padding-left: 8px; }
+    .analise-categoria-header.fechado + .analise-categoria-content { display: none; }
+    </style>
 </head>
 <body>
 
@@ -232,7 +260,6 @@ $v = time();
                     $data   = $p['atualizado_em'] ? date('d/m', strtotime($p['atualizado_em'])) : '–';
                     $tv     = $totais_servicos[$p['id']] ?? 0;
                     $orc    = (float)($p['valor_orcamento']??0);
-                    // Dados serializados com segurança em data-* attributes
                     $data_payload = htmlspecialchars(json_encode([
                         'id'       => (int)$p['id'],
                         'nome'     => $p['cliente_nome'] ?? 'Sem nome',
@@ -296,9 +323,7 @@ $v = time();
     </div>
 </div>
 
-<!-- ═══════════════════════════════════════════════════════════════
-     MODAL ANÁLISE DE INSUMOS
-═══════════════════════════════════════════════════════════════ -->
+<!-- MODAL ANÁLISE DE INSUMOS -->
 <div class="modal-overlay" id="modal-analise">
     <div class="modal-box" style="max-width:560px">
         <div class="modal-drag"></div>
@@ -374,7 +399,6 @@ function iconHtml(name, size){
     return `<span class="material-symbols-outlined" style="font-size:${size||16}px;vertical-align:middle">${name}</span>`;
 }
 
-// ─ Sidebar mobile
 function toggleSidebar(){
     document.getElementById('sidebar').classList.toggle('open');
     document.getElementById('sidebar-overlay').classList.toggle('open');
@@ -384,7 +408,6 @@ function closeSidebar(){
     document.getElementById('sidebar-overlay').classList.remove('open');
 }
 
-// ─ Grupos colapsáveis
 function toggleGroup(id){
     const toggle = document.getElementById('toggle-' + id);
     const sub    = document.getElementById('sub-'    + id);
@@ -396,7 +419,6 @@ function toggleGroup(id){
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    // Restaurar estado dos grupos
     const estado = JSON.parse(localStorage.getItem('nav_grupos') || '{}');
     for (const [id, aberto] of Object.entries(estado)) {
         const toggle = document.getElementById('toggle-' + id);
@@ -408,7 +430,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // ─ Event delegation para clique nos pedidos (evita quebra por caracteres especiais)
     document.querySelector('.pedido-list-wrap')?.addEventListener('click', function(e){
         const item = e.target.closest('.pedido-item[data-pedido]');
         if (!item) return;
@@ -420,7 +441,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
     
-    // ─ Registrar Service Worker PWA
     if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('service-worker-admin.js')
             .then(reg => console.log('✅ SW Admin registrado', reg.scope))
@@ -428,7 +448,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-// ─ BUSCA LIVE — debounce 400ms + Enter imediato
 (function() {
     const input   = document.getElementById('input-busca');
     const spinner = document.getElementById('search-spinner');
@@ -464,7 +483,6 @@ function limparBusca(){
     location.href = 'dashboard.php' + (s ? '?status=' + encodeURIComponent(s) : '');
 }
 
-// ─ Painel de ações
 let _idAtual = null, _telefoneAtual = '';
 let _orcEscolhido = null;
 
@@ -534,8 +552,10 @@ function renderAcoes(acoes, totalBase, status){
     return html;
 }
 
-// ── MODAL ANÁLISE ────────────────────────────────────────────
-let _insumos = [];
+// ── MODAL ANÁLISE V3 - POR CATEGORIAS ──
+let _insumosPorCategoria = {};
+let _categoriasAbertasState = {};
+let _categoriasAtivas = new Set();
 
 function _abrirAnalise() {
     if (!_idAtual) return;
@@ -547,13 +567,21 @@ function _abrirAnalise() {
         .then(r => r.json())
         .then(data => {
             if (!data.sucesso) { _toast(data.erro || 'Erro ao carregar'); fecharModal('modal-analise'); return; }
-            _renderizarAnalise(data);
+            _renderizarAnalisePorCategoria(data);
         })
         .catch(() => { _toast('Erro de conexão'); fecharModal('modal-analise'); });
 }
 
-function _renderizarAnalise(data) {
-    _insumos = (data.insumos || []).map(i => ({ ...i }));
+function _renderizarAnalisePorCategoria(data) {
+    // Estruturar insumos por categoria (vêm do backend)
+    _insumosPorCategoria = data.insumos_por_categoria || {};
+    const categorias = data.categorias || [];
+    const icones = data.categorias_icones || {};
+
+    // Todas as categorias começam abertas
+    _categoriasAbertasState = {};
+    categorias.forEach(c => { _categoriasAbertasState[c] = true; });
+    _categoriasAtivas = new Set(categorias);
 
     let html = '';
 
@@ -569,20 +597,44 @@ function _renderizarAnalise(data) {
     html += '</div></div>';
     html += '<hr class="analise-sep">';
 
-    // Lista de insumos
+    // Título
     html += '<div class="analise-insumos-title">Insumos necessários</div>';
 
-    if (!_insumos.length) {
-        html += '<div class="analise-vazio">Nenhum insumo vinculado a estes serviços. Você pode prosseguir para o orçamento.</div>';
-    } else {
-        _insumos.forEach((ins, idx) => {
+    // Chips de categoria
+    if (categorias.length) {
+        html += '<div class="analise-chips-row">';
+        categorias.forEach(cat => {
+            const qtdCat = _insumosPorCategoria[cat] ? _insumosPorCategoria[cat].length : 0;
+            const icone = icones[cat] || 'category';
+            html += `<div class="analise-chip-cat ativo" onclick="_toggleCategoria('${cat}')" id="chip-cat-${cat}">`;
+            html += iconHtml(icone, 16);
+            html += ` ${escHtml(cat)}<span class="badge-count">${qtdCat}</span></div>`;
+        });
+        html += '</div>';
+    }
+
+    // Renderiza insumos agrupados por categoria
+    categorias.forEach(cat => {
+        const insumos = _insumosPorCategoria[cat] || [];
+        if (!insumos.length) return;
+
+        html += `<div class="analise-categoria-grupo" id="grupo-cat-${cat}">`;
+        html += `<div class="analise-categoria-header" onclick="_toggleGrupoCategoria('${cat}')">`;
+        html += `<div class="analise-categoria-titulo">`;
+        html += iconHtml(icones[cat] || 'category', 18);
+        html += ` ${escHtml(cat)} (${insumos.length})</div>`;
+        html += `<span class="material-symbols-outlined analise-categoria-chevron" id="chevron-cat-${cat}">expand_more</span>`;
+        html += `</div>`; // header
+
+        html += `<div class="analise-categoria-content" id="content-cat-${cat}">`;
+
+        insumos.forEach((ins, idx) => {
+            const globalIdx = `${cat}-${idx}`;
             const semEstoque = parseFloat(ins.quantidade_estoque) <= 0;
             const cf = ins.cliente_fornece == 1;
             const valorTotal = parseFloat(ins.valor_unitario) * parseFloat(ins.quantidade || 1);
 
-            html += `<div class="analise-insumo-row" id="row-ins-${idx}">`;
-
-            // Top: info + qtd + valor
+            html += `<div class="analise-insumo-row" id="row-ins-${globalIdx}">`;
             html += `<div class="analise-insumo-top">`;
             html += `<div class="analise-insumo-info">`;
             html += `<div class="analise-insumo-nome">${escHtml(ins.nome)}</div>`;
@@ -593,21 +645,23 @@ function _renderizarAnalise(data) {
             html += `</div></div>`;
 
             html += `<input type="number" class="analise-qtd" value="${parseFloat(ins.quantidade||1)}" min="0.001" step="0.001"
-                onchange="_mudarQtd(${idx}, this.value)" title="Quantidade">`;
+                onchange="_mudarQtdCat('${cat}', ${idx}, this.value)" title="Quantidade">`;
 
-            html += `<div class="analise-insumo-valor ${cf ? 'riscado' : ''}" id="val-ins-${idx}">${fmt(cf ? 0 : valorTotal)}</div>`;
-            html += `</div>`; // top
+            html += `<div class="analise-insumo-valor ${cf ? 'riscado' : ''}" id="val-ins-${globalIdx}">${fmt(cf ? 0 : valorTotal)}</div>`;
+            html += `</div>`;
 
-            // Bottom: checkbox cliente fornece
             html += `<div class="analise-insumo-bottom">`;
             html += `<label class="analise-cf-toggle">`;
-            html += `<input type="checkbox" onchange="_toggleCF(${idx}, this.checked)" ${cf ? 'checked' : ''}>`;
+            html += `<input type="checkbox" onchange="_toggleCFCat('${cat}', ${idx}, this.checked)" ${cf ? 'checked' : ''}>`;
             html += `<span>Cliente fornece</span></label>`;
-            html += `</div>`; // bottom
+            html += `</div>`;
 
-            html += `</div>`; // row
+            html += `</div>`;
         });
-    }
+
+        html += `</div>`; // content
+        html += `</div>`; // grupo
+    });
 
     // Footer com total
     html += '<div class="analise-footer">';
@@ -616,33 +670,60 @@ function _renderizarAnalise(data) {
 
     document.getElementById('analise-corpo').innerHTML = html;
     document.getElementById('analise-acoes').style.display = 'flex';
-    _recalcularTotalAnalise();
+    _recalcularTotalAnaliseCat();
 }
 
-function _toggleCF(idx, checked) {
-    _insumos[idx].cliente_fornece = checked ? 1 : 0;
-    const valEl = document.getElementById('val-ins-' + idx);
+function _toggleCategoria(cat) {
+    const chip = document.getElementById('chip-cat-' + cat);
+    const grupo = document.getElementById('grupo-cat-' + cat);
+    if (!chip || !grupo) return;
+
+    if (_categoriasAtivas.has(cat)) {
+        _categoriasAtivas.delete(cat);
+        chip.classList.remove('ativo');
+        grupo.style.display = 'none';
+    } else {
+        _categoriasAtivas.add(cat);
+        chip.classList.add('ativo');
+        grupo.style.display = 'block';
+    }
+}
+
+function _toggleGrupoCategoria(cat) {
+    const header = document.querySelector(`#grupo-cat-${cat} .analise-categoria-header`);
+    if (!header) return;
+    _categoriasAbertasState[cat] = !_categoriasAbertasState[cat];
+    header.classList.toggle('fechado', !_categoriasAbertasState[cat]);
+}
+
+function _toggleCFCat(cat, idx, checked) {
+    _insumosPorCategoria[cat][idx].cliente_fornece = checked ? 1 : 0;
+    const globalIdx = `${cat}-${idx}`;
+    const ins = _insumosPorCategoria[cat][idx];
+    const valEl = document.getElementById('val-ins-' + globalIdx);
     if (valEl) {
-        const total = parseFloat(_insumos[idx].valor_unitario) * parseFloat(_insumos[idx].quantidade || 1);
+        const total = parseFloat(ins.valor_unitario) * parseFloat(ins.quantidade || 1);
         valEl.textContent = checked ? fmt(0) : fmt(total);
         valEl.classList.toggle('riscado', checked);
     }
-    _recalcularTotalAnalise();
+    _recalcularTotalAnaliseCat();
 }
 
-function _mudarQtd(idx, val) {
+function _mudarQtdCat(cat, idx, val) {
     const qtd = Math.max(0.001, parseFloat(val) || 1);
-    _insumos[idx].quantidade = qtd;
-    const cf = _insumos[idx].cliente_fornece == 1;
-    const total = parseFloat(_insumos[idx].valor_unitario) * qtd;
-    const valEl = document.getElementById('val-ins-' + idx);
+    _insumosPorCategoria[cat][idx].quantidade = qtd;
+    const ins = _insumosPorCategoria[cat][idx];
+    const cf = ins.cliente_fornece == 1;
+    const total = parseFloat(ins.valor_unitario) * qtd;
+    const globalIdx = `${cat}-${idx}`;
+    const valEl = document.getElementById('val-ins-' + globalIdx);
     if (valEl) { valEl.textContent = cf ? fmt(0) : fmt(total); }
-    _recalcularTotalAnalise();
+    _recalcularTotalAnaliseCat();
 }
 
-function _recalcularTotalAnalise() {
+function _recalcularTotalAnaliseCat() {
     let total = 0;
-    _insumos.forEach(ins => {
+    Object.values(_insumosPorCategoria).flat().forEach(ins => {
         if (!ins.cliente_fornece) total += parseFloat(ins.valor_unitario) * parseFloat(ins.quantidade || 1);
     });
     const el = document.getElementById('analise-total-ins');
@@ -653,16 +734,18 @@ function confirmarAnalise() {
     const btn = document.getElementById('btn-confirmar-analise');
     btn.disabled = true; btn.textContent = 'Salvando...';
 
+    // Montar array de insumos flat
+    const insumos = Object.values(_insumosPorCategoria).flat();
+
     fetch('analise_insumos.php', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pre_os_id: _idAtual, insumos: _insumos })
+        body: JSON.stringify({ pre_os_id: _idAtual, insumos })
     })
     .then(r => r.json())
     .then(data => {
         if (!data.sucesso) { _toast(data.erro || 'Erro ao salvar'); btn.disabled = false; btn.textContent = 'Confirmar e Orçar →'; return; }
         fecharModal('modal-analise');
-        // Abre modal orçamento já com valor pré-calculado
         _abrirOrcamentoComValor(data.total_orcamento, data.total_servicos, data.total_insumos);
     })
     .catch(() => { _toast('Erro de conexão'); btn.disabled = false; btn.textContent = 'Confirmar e Orçar →'; });
@@ -682,7 +765,6 @@ function _abrirOrcamentoComValor(totalOrc, totalSrv, totalIns) {
     document.getElementById('modal-sim-aviso').style.display='none';
     ['modal-card-base','modal-card-maquina'].forEach(id=>document.getElementById(id)?.classList.remove('ativo'));
 
-    // Mostra breakdown
     let bd = document.getElementById('orc-breakdown');
     if (totalSrv >= 0 && totalIns >= 0) {
         bd.innerHTML = 'Serviços: ' + fmt(totalSrv) + ' + Insumos: ' + fmt(totalIns);
@@ -752,7 +834,6 @@ document.querySelectorAll('.modal-overlay').forEach(o=>{
     o.addEventListener('click',e=>{if(e.target===o)o.classList.remove('aberto');});
 });
 
-// ─ WhatsApp
 function _waReload(){fecharModal('modal-wa');setTimeout(()=>location.reload(),300);}
 function _abrirWa(link,label){
     document.getElementById('wa-texto').innerHTML=`Status atualizado para <strong>${escHtml(label)}</strong>. Avisar o cliente?`;
@@ -760,7 +841,6 @@ function _abrirWa(link,label){
     document.getElementById('modal-wa').classList.add('aberto');
 }
 
-// ─ Toast
 function _toast(msg){
     const el=document.createElement('div'); el.className='g-toast'; el.textContent=msg;
     document.body.appendChild(el); setTimeout(()=>el.remove(),3000);
