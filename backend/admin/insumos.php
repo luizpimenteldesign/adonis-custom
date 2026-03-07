@@ -22,16 +22,23 @@ try {
 } catch (Exception $e) { $insumos = []; }
 
 try {
+    // Buscar TODAS as categorias (mesmo sem serviços vinculados)
+    $stmt_cat = $conn->query("SELECT nome FROM categorias_servico ORDER BY nome");
+    $categorias = $stmt_cat->fetchAll(PDO::FETCH_COLUMN);
+    
+    // Buscar todos os serviços ativos agrupados por categoria
     $todos_servicos = $conn->query(
         "SELECT id, nome, categoria FROM servicos WHERE ativo = 1 AND categoria IS NOT NULL AND categoria != '' ORDER BY categoria, nome"
     )->fetchAll(PDO::FETCH_ASSOC);
-    $categorias = [];
+    
     $servicos_por_categoria = [];
     foreach ($todos_servicos as $s) {
-        if (!in_array($s['categoria'], $categorias)) $categorias[] = $s['categoria'];
         $servicos_por_categoria[$s['categoria']][] = $s;
     }
-} catch (Exception $e) { $categorias = []; $servicos_por_categoria = []; }
+} catch (Exception $e) { 
+    $categorias = []; 
+    $servicos_por_categoria = []; 
+}
 
 $current_page = 'insumos.php';
 $v = time();
