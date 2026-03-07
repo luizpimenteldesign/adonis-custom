@@ -2,13 +2,21 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
     <meta name="description" content="Solicite orçamento para manutenção e customização de instrumentos musicais">
+    <meta name="theme-color" content="#ff6b35">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Adonis Orçamento">
     <title>Solicitar Orçamento - Adonis Luthieria</title>
+
+    <!-- PWA MANIFEST -->
+    <link rel="manifest" href="/frontend/public/manifest.json">
 
     <!-- FAVICON -->
     <link rel="icon" type="image/png" href="/frontend/public/assets/img/favicon.png">
     <link rel="shortcut icon" type="image/png" href="/frontend/public/assets/img/favicon.png">
+    <link rel="apple-touch-icon" href="/frontend/public/assets/img/icon-192.png">
 
     <!-- CSS -->
     <link rel="stylesheet" href="/frontend/public/assets/css/style.css">
@@ -271,6 +279,21 @@
             <p class="footer-text">© 2026 Adonis Custom Luthieria. Todos os direitos reservados. | Desenvolvido por <a href="https://luizpimentel.com" target="_blank" style="color: inherit; text-decoration: none;">LP Design</a></p>
         </div>
     </footer>
+
+    <!-- PWA SERVICE WORKER -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', function() {
+                navigator.serviceWorker.register('/frontend/public/service-worker.js')
+                    .then(function(registration) {
+                        console.log('✅ PWA Service Worker registrado:', registration.scope);
+                    })
+                    .catch(function(error) {
+                        console.log('❌ Erro ao registrar Service Worker:', error);
+                    });
+            });
+        }
+    </script>
 
     <!-- JAVASCRIPT COM VERSÃO DINÂMICA -->
     <script src="/frontend/public/assets/js/form-luthieria.js?v=<?php echo time(); ?>"></script>

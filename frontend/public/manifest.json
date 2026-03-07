@@ -1,0 +1,101 @@
+{
+  "name": "Adonis Luthieria - Orçamento",
+  "short_name": "Adonis Orçamento",
+  "description": "Solicite orçamento para manutenção e customização de instrumentos musicais",
+  "start_url": "/frontend/index.php",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#ff6b35",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/frontend/public/assets/img/icon-72.png",
+      "sizes": "72x72",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/frontend/public/assets/img/icon-96.png",
+      "sizes": "96x96",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/frontend/public/assets/img/icon-128.png",
+      "sizes": "128x128",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/frontend/public/assets/img/icon-144.png",
+      "sizes": "144x144",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/frontend/public/assets/img/icon-152.png",
+      "sizes": "152x152",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/frontend/public/assets/img/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/frontend/public/assets/img/icon-384.png",
+      "sizes": "384x384",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/frontend/public/assets/img/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/frontend/public/assets/img/screenshot-mobile.png",
+      "sizes": "540x720",
+      "type": "image/png",
+      "form_factor": "narrow"
+    },
+    {
+      "src": "/frontend/public/assets/img/screenshot-desktop.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide"
+    }
+  ],
+  "categories": ["business", "music", "productivity"],
+  "shortcuts": [
+    {
+      "name": "Novo Orçamento",
+      "short_name": "Orçamento",
+      "description": "Solicitar novo orçamento",
+      "url": "/frontend/index.php",
+      "icons": [
+        {
+          "src": "/frontend/public/assets/img/icon-96.png",
+          "sizes": "96x96"
+        }
+      ]
+    },
+    {
+      "name": "Acompanhar Pedido",
+      "short_name": "Acompanhar",
+      "description": "Acompanhar status do pedido",
+      "url": "/frontend/public/acompanhar.php",
+      "icons": [
+        {
+          "src": "/frontend/public/assets/img/icon-96.png",
+          "sizes": "96x96"
+        }
+      ]
+    }
+  ]
+}
