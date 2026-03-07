@@ -3,7 +3,7 @@
  * DASHBOARD — SISTEMA ADONIS
  * Visual: Google / Material Design 3
  * Ícones: Material Symbols Outlined
- * Versão: 9.1 — Layout modal análise ajustado
+ * Versão: 9.2 — Corrige margin breakdown modal orçamento
  */
 require_once 'auth.php';
 require_once '../config/Database.php';
@@ -402,7 +402,7 @@ $v = time();
         <div class="modal-title">Definir Orçamento</div>
         <label>Valor total (serviços + insumos) — R$</label>
         <input type="number" id="modal-input-valor" min="0" step="0.01" placeholder="Ex: 350.00" oninput="simularModal()">
-        <div id="orc-breakdown" style="font-size:12px;color:var(--g-text-3);margin:-8px 0 8px;padding:0 2px"></div>
+        <div id="orc-breakdown" style="font-size:12px;color:var(--g-text-3);margin:4px 0 12px;padding:0 2px"></div>
         <label>Prazo (dias úteis)</label>
         <input type="number" id="modal-input-prazo" min="1" step="1" placeholder="Ex: 7">
         <div class="modal-hint">Sem sábados, domingos e feriados</div>
