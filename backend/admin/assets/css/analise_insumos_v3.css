@@ -1,6 +1,6 @@
 /**
- * ESTILOS PARA ANÁLISE DE INSUMOS V3
- * Interface otimizada por categorias
+ * ESTILOS PARA ANÁLISE DE INSUMOS V3.1
+ * Interface otimizada por categorias + Layout Flexbox corrigido
  */
 
 /* ── LOADING E VAZIOS ──────────────────────────────── */
@@ -244,6 +244,7 @@
     overflow: hidden;
 }
 
+/* ✅ LAYOUT FLEXBOX CORRIGIDO - SEM WIDTH FIXO */
 .insumo-sel-main {
     display: flex;
     align-items: center;
@@ -252,7 +253,7 @@
 }
 
 .insumo-sel-info {
-    flex: 1;
+    flex: 1 1 auto;
     min-width: 0;
 }
 
@@ -268,8 +269,12 @@
     color: var(--g-text-3);
 }
 
+/* ✅ INPUT QUANTIDADE - Flex controlado */
 .insumo-sel-qtd {
+    flex: 0 0 auto;
     width: 70px;
+    min-width: 60px;
+    max-width: 100px;
     padding: 6px 8px;
     border: 1px solid var(--g-border);
     border-radius: 6px;
@@ -277,11 +282,13 @@
     font-size: 13px;
 }
 
+/* ✅ VALOR - Tamanho fixo apropriado */
 .insumo-sel-valor {
+    flex: 0 0 auto;
+    min-width: 80px;
     font-size: 14px;
     font-weight: 600;
     color: var(--g-green);
-    min-width: 80px;
     text-align: right;
 }
 
@@ -291,6 +298,7 @@
 }
 
 .insumo-sel-remove {
+    flex: 0 0 auto;
     width: 28px;
     height: 28px;
     display: flex;
@@ -357,18 +365,27 @@
 @media (max-width: 480px) {
     .insumo-sel-main {
         flex-wrap: wrap;
+        gap: 8px;
     }
     
     .insumo-sel-info {
         flex: 1 1 100%;
+        order: 1;
     }
     
     .insumo-sel-qtd {
+        order: 2;
         width: 60px;
     }
     
     .insumo-sel-valor {
+        order: 3;
         min-width: 70px;
         font-size: 13px;
+        flex: 1 1 auto;
+    }
+    
+    .insumo-sel-remove {
+        order: 4;
     }
 }

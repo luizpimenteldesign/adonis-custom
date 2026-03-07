@@ -1,8 +1,8 @@
 <?php
 /**
- * API: Análise de insumos de uma Pré-OS (VERSÃO 3.0 - MANUAL POR CATEGORIAS)
+ * API: Análise de insumos de uma Pré-OS (VERSÃO 3.1 - FILTRO POR SERVIÇOS)
  *
- * GET  ?pre_os_id=X       → retorna categorias disponíveis e insumos já selecionados
+ * GET  ?pre_os_id=X       → retorna categorias FILTRADAS pelos serviços e insumos já selecionados
  * GET  ?categoria=X       → retorna insumos de uma categoria específica
  * POST                    → salva a lista confirmada em pre_os_insumos
  */
@@ -78,19 +78,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     $stmt_s->execute([':id' => $pre_os_id]);
     $servicos = $stmt_s->fetchAll(PDO::FETCH_ASSOC);
 
-    // Busca categorias DISTINTAS da tabela insumos (campo categoria)
+    // ✅ FILTRO: Busca categorias APENAS dos insumos vinculados aos serviços selecionados
     $categorias = ['Todos']; // Sempre inclui "Todos" primeiro
     try {
-        $stmt_cat = $conn->query("
-            SELECT DISTINCT categoria 
-            FROM insumos 
-            WHERE ativo = 1 AND categoria IS NOT NULL AND categoria != ''
-            ORDER BY categoria
-        ");
-        $rows = $stmt_cat->fetchAll(PDO::FETCH_COLUMN);
-        $categorias = array_merge($categorias, $rows); // Adiciona as categorias encontradas
+        // Busca IDs dos serviços desta pré-OS
+        $servico_ids = array_column($servicos, 'id');
+        
+        if (!empty($servico_ids)) {
+            $placeholders = implode(',', array_fill(0, count($servico_ids), '?'));
+            
+            // SQL: Busca categorias dos insumos vinculados aos serviços
+            $sql_cat = "
+                SELECT DISTINCT i.categoria
+                FROM insumos i
+                INNER JOIN insumos_servicos isv ON i.id = isv.insumo_id
+                WHERE isv.servico_id IN ($placeholders)
+                  AND i.ativo = 1
+                  AND i.categoria IS NOT NULL
+                  AND i.categoria != ''
+                ORDER BY i.categoria
+            ";
+            
+            $stmt_cat = $conn->prepare($sql_cat);
+            $stmt_cat->execute($servico_ids);
+            $rows = $stmt_cat->fetchAll(PDO::FETCH_COLUMN);
+            
+            // Se encontrou categorias, adiciona. Senão, mantém só "Todos"
+            if (!empty($rows)) {
+                $categorias = array_merge($categorias, $rows);
+            }
+        }
     } catch (Exception $e) {
         // Se der erro, mantém apenas "Todos"
+        error_log('[ANALISE_INSUMOS] Erro ao buscar categorias: ' . $e->getMessage());
     }
 
     // Insumos já selecionados (se houver)
