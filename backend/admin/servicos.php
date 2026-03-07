@@ -41,7 +41,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                  ->execute([$nome, $descricao, $valor, $prazo, $ativo, $sid]);
         }
 
-        // Sincroniza categorias
         $conn->prepare('DELETE FROM servico_categorias WHERE servico_id=?')->execute([$sid]);
         foreach ($cats as $cid) {
             if ($cid > 0) $conn->prepare('INSERT IGNORE INTO servico_categorias (servico_id, categoria_id) VALUES (?,?)')->execute([$sid, $cid]);
@@ -73,15 +72,19 @@ try {
     $servicos = $stmt->fetchAll(PDO::FETCH_ASSOC);
 } catch (Exception $e) { $servicos = []; }
 
-// Carrega categorias de cada serviço
-$cats_por_servico = [];
+// Carrega nomes E ids das categorias por servico
+$cats_por_servico     = []; // servico_id => [nome, ...]
+$cat_ids_por_servico  = []; // servico_id => [id, ...]
 try {
     $rows = $conn->query("
-        SELECT sc.servico_id, c.nome
+        SELECT sc.servico_id, c.id as cat_id, c.nome
         FROM servico_categorias sc
         JOIN categorias_servico c ON c.id = sc.categoria_id
     ")->fetchAll(PDO::FETCH_ASSOC);
-    foreach ($rows as $r) $cats_por_servico[$r['servico_id']][] = $r['nome'];
+    foreach ($rows as $r) {
+        $cats_por_servico[$r['servico_id']][]    = $r['nome'];
+        $cat_ids_por_servico[$r['servico_id']][] = (int)$r['cat_id'];
+    }
 } catch (Exception $e) {}
 
 $current_page = 'servicos.php';
@@ -183,7 +186,11 @@ include '_sidebar_data.php';
                 </thead>
                 <tbody>
                 <?php foreach ($servicos as $s): ?>
-                <?php $sc = $cats_por_servico[$s['id']] ?? []; ?>
+                <?php
+                    $sc      = $cats_por_servico[$s['id']]    ?? [];
+                    $sc_ids  = $cat_ids_por_servico[$s['id']] ?? [];
+                    $prazo_v = $s['prazo_padrao_dias'] !== null ? (int)$s['prazo_padrao_dias'] : 'null';
+                ?>
                 <tr class="<?php echo !$s['ativo'] ? 'row-inactive' : ''; ?>">
                     <td><strong><?php echo htmlspecialchars($s['nome']); ?></strong>
                         <?php if ($s['descricao']): ?><br><span style="font-size:12px;color:var(--g-text-3)"><?php echo htmlspecialchars($s['descricao']); ?></span><?php endif; ?>
@@ -214,7 +221,7 @@ include '_sidebar_data.php';
                     <td class="text-center">
                         <div class="table-actions">
                             <button class="btn-icon" title="Editar"
-                                onclick="editarServico(<?php echo $s['id']; ?>,<?php echo htmlspecialchars(json_encode($s['nome']),ENT_QUOTES); ?>,<?php echo htmlspecialchars(json_encode($s['descricao']),ENT_QUOTES); ?>,<?php echo $s['valor_base']; ?>,<?php echo $s['ativo']; ?>,<?php echo $s['prazo_padrao_dias'] !== null ? $s['prazo_padrao_dias'] : 'null'; ?>,<?php echo htmlspecialchars(json_encode(array_map('intval', array_keys(array_flip(array_map(fn($n) => $n, array_column($conn->query('SELECT c.id FROM servico_categorias sc JOIN categorias_servico c ON c.id=sc.categoria_id WHERE sc.servico_id='.(int)$s['id'])->fetchAll(PDO::FETCH_ASSOC), 'id'))))),ENT_QUOTES); ?>)">
+                                onclick="editarServico(<?php echo $s['id']; ?>,<?php echo htmlspecialchars(json_encode($s['nome']),ENT_QUOTES); ?>,<?php echo htmlspecialchars(json_encode($s['descricao']),ENT_QUOTES); ?>,<?php echo $s['valor_base']; ?>,<?php echo $s['ativo']; ?>,<?php echo $prazo_v; ?>,<?php echo htmlspecialchars(json_encode($sc_ids),ENT_QUOTES); ?>)">
                                 <span class="material-symbols-outlined">edit</span>
                             </button>
                             <?php if ($s['total_uso'] == 0): ?>
