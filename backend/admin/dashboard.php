@@ -126,6 +126,15 @@ $v = time();
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Adonis Admin — Dashboard</title>
+    
+    <!-- PWA Meta Tags -->
+    <meta name="theme-color" content="#1976d2">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Adonis Admin">
+    <link rel="manifest" href="manifest-admin.json">
+    <link rel="apple-touch-icon" href="assets/img/favicon-admin.png">
+    
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="assets/css/admin.css?v=<?php echo $v; ?>">
@@ -410,6 +419,13 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error('Erro ao parsear pedido:', err);
         }
     });
+    
+    // ─ Registrar Service Worker PWA
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('service-worker-admin.js')
+            .then(reg => console.log('✅ SW Admin registrado', reg.scope))
+            .catch(err => console.error('❌ Erro ao registrar SW:', err));
+    }
 });
 
 // ─ BUSCA LIVE — debounce 400ms + Enter imediato
