@@ -1,5 +1,6 @@
 /**
- * ANÁLISE DE INSUMOS V3 - SELEÇÃO POR CATEGORIAS
+ * ANÁLISE DE INSUMOS V3.1 - SELEÇÃO POR CATEGORIAS
+ * Versão: 3.1.0 - Cache-bust forçado
  * Interface otimizada: Admin escolhe categoria > busca insumo > adiciona apenas o que precisa
  */
 
@@ -8,6 +9,7 @@ let _insumosSelecionados = [];
 let _categoriaAtual = null;
 
 function abrirModalAnalise() {
+    console.log('[V3.1] Abrindo modal de análise...');
     document.getElementById('analise-corpo').innerHTML = '<div class="analise-loading">Carregando...</div>';
     document.getElementById('analise-acoes').style.display = 'none';
     abrirModal('modal-analise');
@@ -15,6 +17,7 @@ function abrirModalAnalise() {
     fetch('analise_insumos.php?pre_os_id=' + _pedidoId)
         .then(r => r.json())
         .then(data => {
+            console.log('[V3.1] Dados recebidos:', data);
             if (!data.sucesso) {
                 _toast(data.erro || 'Erro ao carregar');
                 fecharModal('modal-analise');
@@ -30,6 +33,7 @@ function abrirModalAnalise() {
                 cliente_fornece: parseInt(ins.cliente_fornece),
                 quantidade_estoque: parseFloat(ins.quantidade_estoque)
             }));
+            console.log('[V3.1] Categorias:', data.categorias);
             _renderizarInterfaceCategorias();
         })
         .catch(() => {
@@ -39,6 +43,7 @@ function abrirModalAnalise() {
 }
 
 function _renderizarInterfaceCategorias() {
+    console.log('[V3.1] Renderizando interface...');
     let html = '';
 
     // Resumo dos serviços
@@ -60,16 +65,20 @@ function _renderizarInterfaceCategorias() {
     html += '<div class="analise-cats-grid" id="cats-grid">';
     if (_dadosAnalise.categorias && _dadosAnalise.categorias.length) {
         _dadosAnalise.categorias.forEach(cat => {
+            console.log('[V3.1] Processando categoria:', cat, 'Tipo:', typeof cat);
             // Verificação correta: objeto válido (não null, não array) com propriedade 'nome'
             const ehObjeto = cat && typeof cat === 'object' && !Array.isArray(cat) && cat.nome;
             const nomeCat = ehObjeto ? cat.nome : String(cat);
             const iconeCat = ehObjeto ? (cat.icone || 'category') : 'category';
+            
+            console.log('[V3.1]   -> Nome:', nomeCat, ', Ícone:', iconeCat);
             
             html += '<button class="cat-btn" onclick="_selecionarCategoria(\'' + _esc(nomeCat) + '\')">'
                  + '<span class="material-symbols-outlined">' + _esc(iconeCat) + '</span>'
                  + '<span>' + _esc(nomeCat) + '</span></button>';
         });
     } else {
+        console.log('[V3.1] FALLBACK: Sem categorias, usando botão Todos');
         // Fallback: sem categorias, mostra botão "Todos"
         html += '<button class="cat-btn" onclick="_selecionarCategoria(\'Todos\')">' +
                 '<span class="material-symbols-outlined">grid_view</span>' +
@@ -321,5 +330,7 @@ function confirmarAnalise() {
 }
 
 function _esc(s) {
-    return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/'/g, '&#39;').replace(/"/g, '&quot;');
+    return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/'/g, '&#39;').replace(/\"/g, '&quot;');
 }
+
+console.log('[V3.1] Script analise_insumos_v3.js carregado com sucesso!');
