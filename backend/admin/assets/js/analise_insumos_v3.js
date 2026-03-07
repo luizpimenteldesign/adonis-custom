@@ -60,12 +60,13 @@ function _renderizarInterfaceCategorias() {
     html += '<div class="analise-cats-grid" id="cats-grid">';
     if (_dadosAnalise.categorias && _dadosAnalise.categorias.length) {
         _dadosAnalise.categorias.forEach(cat => {
-            // Suporta tanto objetos {nome, icone} quanto strings simples
-            const nomeCat = typeof cat === 'object' ? cat.nome : cat;
-            const iconeCat = typeof cat === 'object' ? (cat.icone || 'category') : 'category';
+            // Verificação correta: objeto válido (não null, não array) com propriedade 'nome'
+            const ehObjeto = cat && typeof cat === 'object' && !Array.isArray(cat) && cat.nome;
+            const nomeCat = ehObjeto ? cat.nome : String(cat);
+            const iconeCat = ehObjeto ? (cat.icone || 'category') : 'category';
             
             html += '<button class="cat-btn" onclick="_selecionarCategoria(\'' + _esc(nomeCat) + '\')">'
-                 + '<span class="material-symbols-outlined">' + iconeCat + '</span>'
+                 + '<span class="material-symbols-outlined">' + _esc(iconeCat) + '</span>'
                  + '<span>' + _esc(nomeCat) + '</span></button>';
         });
     } else {
