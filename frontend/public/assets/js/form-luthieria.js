@@ -1,6 +1,6 @@
 /**
  * FORMULÁRIO LUTHIERIA - SISTEMA ADONIS
- * Versão: 5.4
+ * Versão: 6.0 - PWA + Mobile-First + Accordion/Tabs
  * Data: 07/03/2026
  */
 
@@ -16,7 +16,6 @@ const elementos = {
     fotosInput: null,
     fotosPreview: null,
     btnSubmit: null,
-    // Campos dinâmicos
     tipo: null,
     tipoOutro: null,
     marca: null,
@@ -33,7 +32,8 @@ const estado = {
     fotosSelecionadas: [],
     enviando: false,
     categoriaAtiva: null,
-    servicosPorCategoria: {}
+    servicosPorCategoria: {},
+    isMobile: window.innerWidth < 768
 };
 
 // Modelos por tipo de instrumento
@@ -50,7 +50,7 @@ const modelosPorTipo = {
     'Outro': ['Outro']
 };
 
-// Configuração de categorias (ícones e títulos)
+// Configuração de categorias
 const configCategorias = {
     'Reparo': {
         titulo: 'Reparo',
@@ -82,12 +82,13 @@ const configCategorias = {
 // INICIALIZAÇÃO
 // ========================================
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('Iniciando formulário v5.4...');
+    console.log('🚀 Iniciando formulário v6.0 PWA...');
     inicializarElementos();
     carregarServicos();
     configurarEventos();
     configurarCamposDinamicos();
     aplicarMascaras();
+    detectarResize();
 });
 
 function inicializarElementos() {
@@ -97,7 +98,6 @@ function inicializarElementos() {
     elementos.fotosPreview = document.getElementById('preview');
     elementos.btnSubmit = elementos.form ? elementos.form.querySelector('button[type="submit"]') : null;
     
-    // Campos dinâmicos
     elementos.tipo = document.getElementById('tipo');
     elementos.tipoOutro = document.getElementById('tipo_outro');
     elementos.marca = document.getElementById('marca');
@@ -107,7 +107,6 @@ function inicializarElementos() {
     elementos.cor = document.getElementById('cor');
     elementos.corOutro = document.getElementById('cor_outro');
     
-    // Validação de elementos críticos
     if (!elementos.servicosContainer) {
         console.error('ERRO: Container de serviços não encontrado!');
     }
@@ -116,13 +115,22 @@ function inicializarElementos() {
     }
 }
 
+function detectarResize() {
+    window.addEventListener('resize', function() {
+        const novoIsMobile = window.innerWidth < 768;
+        if (novoIsMobile !== estado.isMobile) {
+            estado.isMobile = novoIsMobile;
+            if (Object.keys(estado.servicosPorCategoria).length > 0) {
+                renderizarServicosResponsivo();
+            }
+        }
+    });
+}
+
 // ========================================
-// CAMPOS DINÂMICOS (TIPO, MARCA, MODELO, COR)
+// CAMPOS DINÂMICOS
 // ========================================
 function configurarCamposDinamicos() {
-    console.log('Configurando campos dinâmicos...');
-    
-    // TIPO - Mostrar campo "Outro" e atualizar modelos
     if (elementos.tipo) {
         elementos.tipo.addEventListener('change', function() {
             const campoTipoOutro = document.getElementById('campo_tipo_outro');
@@ -136,12 +144,10 @@ function configurarCamposDinamicos() {
                 elementos.tipoOutro.value = '';
             }
             
-            // Atualizar modelos
             if (this.value && this.value !== '') {
                 atualizarModelos(this.value);
             }
             
-            // Controlar visibilidade do campo cor
             const tiposSemCor = ['Amplificador', 'Pedal/Pedalboard'];
             const campoCor = document.getElementById('campo_cor');
             const corRequired = campoCor ? campoCor.querySelector('.cor-required') : null;
@@ -158,7 +164,6 @@ function configurarCamposDinamicos() {
         });
     }
     
-    // MARCA - Mostrar campo "Outro"
     if (elementos.marca) {
         elementos.marca.addEventListener('change', function() {
             const campoMarcaOutro = document.getElementById('campo_marca_outro');
@@ -174,7 +179,6 @@ function configurarCamposDinamicos() {
         });
     }
     
-    // MODELO - Mostrar campo "Outro"
     if (elementos.modelo) {
         elementos.modelo.addEventListener('change', function() {
             const campoModeloOutro = document.getElementById('campo_modelo_outro');
@@ -190,7 +194,6 @@ function configurarCamposDinamicos() {
         });
     }
     
-    // COR - Mostrar campo "Outra"
     if (elementos.cor) {
         elementos.cor.addEventListener('change', function() {
             const campoCorOutro = document.getElementById('campo_cor_outro');
@@ -227,82 +230,186 @@ function atualizarModelos(tipo) {
 }
 
 // ========================================
-// CARREGAR SERVIÇOS DO BACKEND
+// CARREGAR SERVIÇOS
 // ========================================
 async function carregarServicos() {
-    console.log('Carregando serviços...');
-    
     try {
         const response = await fetch(`${API_URL}/servicos.php`);
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
         
         const resultado = await response.json();
-        console.log('Serviços carregados:', resultado);
-        
-        // Extrai o array de serviços (resultado.data ou resultado direto)
         const servicos = resultado.data || resultado;
         
         if (servicos && servicos.length > 0) {
-            renderizarServicos(servicos);
+            // Agrupar por categoria
+            const categorias = {};
+            servicos.forEach(servico => {
+                const cat = servico.categoria || 'Outros';
+                if (!categorias[cat]) categorias[cat] = [];
+                categorias[cat].push(servico);
+            });
+            
+            estado.servicosPorCategoria = categorias;
+            renderizarServicosResponsivo();
         } else {
-            elementos.servicosContainer.innerHTML = '<p style="color: #f44336; padding: 20px; text-align: center;">Nenhum serviço disponível no momento.</p>';
+            elementos.servicosContainer.innerHTML = '<p style="color: #f44336; padding: 20px; text-align: center;">Nenhum serviço disponível.</p>';
         }
     } catch (error) {
         console.error('Erro ao carregar serviços:', error);
         elementos.servicosContainer.innerHTML = `
-            <div style="color: #f44336; padding: 20px; text-align: center; background: #ffebee; border-radius: 8px; margin: 20px 0;">
+            <div style="color: #f44336; padding: 20px; text-align: center; background: #ffebee; border-radius: 8px;">
                 <strong>Erro ao carregar serviços</strong><br>
-                <small>Por favor, recarregue a página ou tente novamente mais tarde.</small><br>
-                <small style="color: #666; margin-top: 8px; display: block;">Detalhes: ${error.message}</small>
+                <small>${error.message}</small>
             </div>
         `;
     }
 }
 
-function renderizarServicos(servicos) {
-    // Agrupar por categoria
-    const categorias = {};
-    
-    servicos.forEach(servico => {
-        const cat = servico.categoria || 'Outros';
-        if (!categorias[cat]) {
-            categorias[cat] = [];
-        }
-        categorias[cat].push(servico);
-    });
-    
-    // Guardar no estado
-    estado.servicosPorCategoria = categorias;
-    
-    // Ordem de exibição das categorias
+function renderizarServicosResponsivo() {
+    if (estado.isMobile) {
+        renderizarAccordion();
+    } else {
+        renderizarTabs();
+    }
+}
+
+// ========================================
+// ACCORDION (MOBILE)
+// ========================================
+function renderizarAccordion() {
+    const categorias = estado.servicosPorCategoria;
     const ordemCategorias = ['Reparo', 'Customizacao', 'Customização', 'Regulagem', 'Construcao', 'Construção'];
     const categoriasDisponiveis = ordemCategorias.filter(cat => categorias[cat] && categorias[cat].length > 0);
     
     if (categoriasDisponiveis.length === 0) {
-        elementos.servicosContainer.innerHTML = '<p style="color: #f44336; padding: 20px; text-align: center;">Nenhum serviço disponível.</p>';
+        elementos.servicosContainer.innerHTML = '<p style="color: #999; text-align: center;">Nenhuma categoria disponível.</p>';
         return;
     }
     
-    // Definir primeira categoria como ativa
-    estado.categoriaAtiva = categoriasDisponiveis[0];
-    
-    // HTML das TABS
     let html = `
         <style>
-            .tabs-container {
-                margin-bottom: 24px;
+            .accordion-item {
+                border: 1px solid #e0e0e0;
+                border-radius: 8px;
+                margin-bottom: 12px;
+                overflow: hidden;
+                background: white;
             }
+            .accordion-header {
+                padding: 16px;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                background: white;
+                transition: background 0.2s;
+                user-select: none;
+            }
+            .accordion-header:active {
+                background: #f5f5f5;
+            }
+            .accordion-title {
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                font-size: 15px;
+                font-weight: 500;
+                color: #333;
+            }
+            .accordion-count {
+                font-size: 13px;
+                color: #999;
+                font-weight: 400;
+            }
+            .accordion-icon {
+                transition: transform 0.3s ease;
+                color: #999;
+            }
+            .accordion-icon.open {
+                transform: rotate(180deg);
+            }
+            .accordion-content {
+                max-height: 0;
+                overflow: hidden;
+                transition: max-height 0.3s ease;
+            }
+            .accordion-content.open {
+                max-height: 2000px;
+            }
+            .accordion-body {
+                padding: 0 16px 16px 16px;
+                display: grid;
+                gap: 10px;
+            }
+        </style>
+    `;
+    
+    categoriasDisponiveis.forEach((catKey, index) => {
+        const config = configCategorias[catKey] || { titulo: catKey, icone: '' };
+        const count = categorias[catKey].length;
+        const isFirst = index === 0;
+        
+        html += `
+            <div class="accordion-item">
+                <div class="accordion-header" onclick="toggleAccordion(this)">
+                    <div class="accordion-title">
+                        ${config.icone}
+                        <span>${config.titulo} <span class="accordion-count">(${count})</span></span>
+                    </div>
+                    <svg class="accordion-icon ${isFirst ? 'open' : ''}" width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M7 10l5 5 5-5z"/>
+                    </svg>
+                </div>
+                <div class="accordion-content ${isFirst ? 'open' : ''}">
+                    <div class="accordion-body">
+        `;
+        
+        categorias[catKey].forEach(servico => {
+            html += criarCheckboxServico(servico);
+        });
+        
+        html += `
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    
+    elementos.servicosContainer.innerHTML = html;
+    configurarCheckboxesServicos();
+}
+
+window.toggleAccordion = function(header) {
+    const icon = header.querySelector('.accordion-icon');
+    const content = header.nextElementSibling;
+    
+    icon.classList.toggle('open');
+    content.classList.toggle('open');
+};
+
+// ========================================
+// TABS (DESKTOP)
+// ========================================
+function renderizarTabs() {
+    const categorias = estado.servicosPorCategoria;
+    const ordemCategorias = ['Reparo', 'Customizacao', 'Customização', 'Regulagem', 'Construcao', 'Construção'];
+    const categoriasDisponiveis = ordemCategorias.filter(cat => categorias[cat] && categorias[cat].length > 0);
+    
+    if (categoriasDisponiveis.length === 0) return;
+    
+    estado.categoriaAtiva = categoriasDisponiveis[0];
+    
+    let html = `
+        <style>
+            .tabs-container { margin-bottom: 24px; }
             .tabs-nav {
                 display: flex;
                 gap: 8px;
                 border-bottom: 2px solid #e0e0e0;
                 margin-bottom: 20px;
-                overflow-x: auto;
-                -webkit-overflow-scrolling: touch;
             }
             .tab-button {
                 flex: 1;
-                min-width: 140px;
                 padding: 12px 16px;
                 background: transparent;
                 border: none;
@@ -311,12 +418,11 @@ function renderizarServicos(servicos) {
                 font-size: 14px;
                 font-weight: 500;
                 cursor: pointer;
-                transition: all 0.2s ease;
+                transition: all 0.2s;
                 display: flex;
                 align-items: center;
                 justify-content: center;
                 gap: 6px;
-                white-space: nowrap;
             }
             .tab-button:hover {
                 color: #ff6b35;
@@ -327,13 +433,8 @@ function renderizarServicos(servicos) {
                 border-bottom-color: #ff6b35;
                 background: #fff3e0;
             }
-            .tab-content {
-                display: none;
-                animation: fadeIn 0.3s ease;
-            }
-            .tab-content.active {
-                display: block;
-            }
+            .tab-content { display: none; animation: fadeIn 0.3s; }
+            .tab-content.active { display: block; }
             @keyframes fadeIn {
                 from { opacity: 0; transform: translateY(10px); }
                 to { opacity: 1; transform: translateY(0); }
@@ -344,84 +445,54 @@ function renderizarServicos(servicos) {
                 gap: 12px;
             }
         </style>
-        
         <div class="tabs-container">
             <div class="tabs-nav">
     `;
     
-    // Renderizar botões das tabs
     categoriasDisponiveis.forEach(catKey => {
         const config = configCategorias[catKey] || { titulo: catKey, icone: '' };
-        const isActive = catKey === estado.categoriaAtiva ? 'active' : '';
+        const isActive = catKey === estado.categoriaAtiva;
         const count = categorias[catKey].length;
         
         html += `
-            <button type="button" class="tab-button ${isActive}" data-categoria="${catKey}" onclick="mudarCategoria('${catKey}')">
+            <button type="button" class="tab-button ${isActive ? 'active' : ''}" data-categoria="${catKey}" onclick="mudarCategoria('${catKey}')">
                 ${config.icone}
                 <span>${config.titulo} <small style="opacity: 0.7;">(${count})</small></span>
             </button>
         `;
     });
     
-    html += `</div>`; // Fecha tabs-nav
+    html += `</div>`;
     
-    // Renderizar conteúdo das tabs
     categoriasDisponiveis.forEach(catKey => {
-        const isActive = catKey === estado.categoriaAtiva ? 'active' : '';
-        
-        html += `
-            <div class="tab-content ${isActive}" data-categoria="${catKey}">
-                <div class="servicos-grid">
-        `;
-        
-        categorias[catKey].forEach(servico => {
-            html += criarCheckboxServico(servico);
-        });
-        
-        html += `
-                </div>
-            </div>
-        `;
+        const isActive = catKey === estado.categoriaAtiva;
+        html += `<div class="tab-content ${isActive ? 'active' : ''}" data-categoria="${catKey}"><div class="servicos-grid">`;
+        categorias[catKey].forEach(servico => html += criarCheckboxServico(servico));
+        html += `</div></div>`;
     });
     
-    html += `</div>`; // Fecha tabs-container
-    
+    html += `</div>`;
     elementos.servicosContainer.innerHTML = html;
-    
-    // Configurar eventos
     configurarCheckboxesServicos();
 }
 
-// Função global para mudar categoria (chamada pelo onclick)
 window.mudarCategoria = function(categoria) {
-    console.log('Mudando para categoria:', categoria);
-    
-    // Atualizar estado
     estado.categoriaAtiva = categoria;
-    
-    // Atualizar botões
     document.querySelectorAll('.tab-button').forEach(btn => {
-        if (btn.dataset.categoria === categoria) {
-            btn.classList.add('active');
-        } else {
-            btn.classList.remove('active');
-        }
+        btn.classList.toggle('active', btn.dataset.categoria === categoria);
     });
-    
-    // Atualizar conteúdo
     document.querySelectorAll('.tab-content').forEach(content => {
-        if (content.dataset.categoria === categoria) {
-            content.classList.add('active');
-        } else {
-            content.classList.remove('active');
-        }
+        content.classList.toggle('active', content.dataset.categoria === categoria);
     });
 };
 
+// ========================================
+// CHECKBOX SERVIÇO
+// ========================================
 function criarCheckboxServico(servico) {
     return `
-        <div class="checkbox-item" style="padding: 12px; background: #f9f9f9; border-radius: 8px; border-left: 3px solid #ddd; transition: all 0.2s ease; height: 100%;">
-            <label for="servico_${servico.id}" style="cursor: pointer; display: flex; align-items: start; gap: 8px; height: 100%;">
+        <div class="checkbox-item" style="padding: 12px; background: #f9f9f9; border-radius: 8px; border-left: 3px solid #ddd; transition: all 0.2s;">
+            <label for="servico_${servico.id}" style="cursor: pointer; display: flex; align-items: start; gap: 8px;">
                 <input type="checkbox" name="servicos[]" value="${servico.id}" id="servico_${servico.id}" 
                        data-nome="${servico.nome}" data-valor="${servico.valor_base}" data-prazo="${servico.prazo_base}"
                        style="margin-top: 2px; width: 16px; height: 16px; cursor: pointer; flex-shrink: 0;">
@@ -435,8 +506,7 @@ function criarCheckboxServico(servico) {
 }
 
 function configurarCheckboxesServicos() {
-    const checkboxes = document.querySelectorAll('input[name="servicos[]"]');
-    checkboxes.forEach(checkbox => {
+    document.querySelectorAll('input[name="servicos[]"]').forEach(checkbox => {
         checkbox.addEventListener('change', function() {
             const item = checkbox.closest('.checkbox-item');
             if (checkbox.checked) {
@@ -459,7 +529,6 @@ function configurarEventos() {
     if (elementos.fotosInput) {
         elementos.fotosInput.addEventListener('change', handleFotosChange);
     }
-    
     if (elementos.form) {
         elementos.form.addEventListener('submit', handleFormSubmit);
     }
@@ -467,8 +536,6 @@ function configurarEventos() {
 
 function handleFotosChange(event) {
     const files = Array.from(event.target.files);
-    console.log('Fotos selecionadas:', files.length);
-    
     estado.fotosSelecionadas = files;
     
     if (elementos.fotosPreview) {
@@ -478,7 +545,6 @@ function handleFotosChange(event) {
 
 function renderizarPreviewFotos(files) {
     elementos.fotosPreview.innerHTML = '';
-    
     if (files.length === 0) return;
     
     files.forEach((file, index) => {
@@ -489,7 +555,7 @@ function renderizarPreviewFotos(files) {
             preview.innerHTML = `
                 <img src="${e.target.result}" style="width: 100%; height: 100%; object-fit: cover;">
                 <button type="button" onclick="removerFoto(${index})" 
-                        style="position: absolute; top: 4px; right: 4px; background: rgba(244, 67, 54, 0.9); color: white; border: none; border-radius: 50%; width: 24px; height: 24px; cursor: pointer; font-size: 16px; line-height: 1;">×</button>
+                        style="position: absolute; top: 4px; right: 4px; background: rgba(244, 67, 54, 0.9); color: white; border: none; border-radius: 50%; width: 24px; height: 24px; cursor: pointer; font-size: 16px;">×</button>
             `;
             elementos.fotosPreview.appendChild(preview);
         };
@@ -500,80 +566,52 @@ function renderizarPreviewFotos(files) {
 window.removerFoto = function(index) {
     const dt = new DataTransfer();
     const files = Array.from(elementos.fotosInput.files);
-    
     files.forEach((file, i) => {
         if (i !== index) dt.items.add(file);
     });
-    
     elementos.fotosInput.files = dt.files;
     handleFotosChange({ target: elementos.fotosInput });
 };
 
 // ========================================
-// MÁSCARAS DE ENTRADA
+// MÁSCARAS
 // ========================================
 function aplicarMascaras() {
     const telefoneInput = document.getElementById('cliente_telefone');
-    
     if (telefoneInput) {
         telefoneInput.addEventListener('input', function(e) {
             let value = e.target.value.replace(/\D/g, '');
-            
             if (value.length <= 11) {
                 value = value.replace(/(\d{2})(\d)/, '($1) $2');
                 value = value.replace(/(\d{4,5})(\d{4})/, '$1-$2');
             }
-            
             e.target.value = value;
         });
     }
 }
 
 // ========================================
-// VALIDAÇÃO E ENVIO DO FORMULÁRIO
+// ENVIO DO FORMULÁRIO
 // ========================================
 async function handleFormSubmit(event) {
     event.preventDefault();
-    
     if (estado.enviando) return;
     
-    // Validações
     const nome = document.getElementById('cliente_nome').value.trim();
     const telefone = document.getElementById('cliente_telefone').value.trim();
     const email = document.getElementById('cliente_email').value.trim();
     const servicosSelecionados = document.querySelectorAll('input[name="servicos[]"]:checked');
     
-    if (nome.length < 3) {
-        alert('Por favor, informe seu nome completo.');
-        return;
-    }
+    if (nome.length < 3) { alert('Nome completo é obrigatório.'); return; }
+    if (telefone.length < 14) { alert('Telefone válido é obrigatório.'); return; }
+    if (email && !validarEmail(email)) { alert('E-mail inválido.'); return; }
+    if (servicosSelecionados.length === 0) { alert('Selecione pelo menos um serviço.'); return; }
     
-    if (telefone.length < 14) {
-        alert('Por favor, informe um telefone válido.');
-        return;
-    }
-    
-    if (email && !validarEmail(email)) {
-        alert('Por favor, informe um e-mail válido.');
-        return;
-    }
-    
-    if (servicosSelecionados.length === 0) {
-        alert('Por favor, selecione pelo menos um serviço.');
-        return;
-    }
-    
-    // Preparar dados
     const formData = new FormData(elementos.form);
-    
-    // Adicionar serviços selecionados
     const servicosIds = [];
-    servicosSelecionados.forEach(checkbox => {
-        servicosIds.push(checkbox.value);
-    });
+    servicosSelecionados.forEach(checkbox => servicosIds.push(checkbox.value));
     formData.append('servicos', JSON.stringify(servicosIds));
     
-    // Enviar
     await enviarFormulario(formData);
 }
 
@@ -581,107 +619,51 @@ async function enviarFormulario(formData) {
     estado.enviando = true;
     mostrarLoading(true);
     
-    const urlAPI = `${API_URL}/preos.php`;
-    console.log('✉️ Enviando formulário para:', urlAPI);
-    
     try {
-        const response = await fetch(urlAPI, {
-            method: 'POST',
-            body: formData
-        });
-        
-        console.log('📡 Status da resposta:', response.status);
-        
+        const response = await fetch(`${API_URL}/preos.php`, { method: 'POST', body: formData });
         const textoResposta = await response.text();
-        console.log('📄 Resposta bruta do servidor:', textoResposta);
         
         let resultado;
         try {
             resultado = JSON.parse(textoResposta);
         } catch (jsonError) {
-            console.error('❌ Erro ao fazer parse do JSON:', jsonError);
             const match = textoResposta.match(/<b>(.*?)<\/b>/);
-            const erroExtraido = match ? match[1] : 'Erro no servidor';
-            estado.enviando = false;
-            mostrarLoading(false);
-            alert('Erro no backend: ' + erroExtraido);
-            return;
+            throw new Error(match ? match[1] : 'Erro no servidor');
         }
         
-        console.log('✅ Resposta JSON:', resultado);
-        
-        // VERIFICAR SUCESSO
         if (resultado.success === true) {
-            console.log('🎉 SUCESSO! Iniciando redirecionamento...');
-            
-            // CORREÇÃO: Buscar dados dentro de resultado.data
             let token, pedidoId;
-            
-            // Se os dados estão em resultado.data (nova estrutura)
             if (resultado.data) {
                 token = resultado.data.public_token || resultado.data.token;
                 pedidoId = resultado.data.id || resultado.data.preos_id;
             } else {
-                // Se os dados estão direto em resultado (estrutura antiga)
                 token = resultado.token || resultado.public_token;
                 pedidoId = resultado.preos_id || resultado.preosid || resultado.id;
             }
             
-            const tipoElement = document.getElementById('tipo');
-            const tipo = tipoElement ? tipoElement.value : '';
+            const tipo = elementos.tipo ? elementos.tipo.value : '';
             
-            // Validar se token e pedidoId existem
             if (!token || !pedidoId) {
-                console.error('❌ Token ou Pedido ID não encontrados na resposta:', resultado);
-                console.error('Token extraído:', token);
-                console.error('Pedido ID extraído:', pedidoId);
-                alert('Erro: Dados incompletos na resposta do servidor');
-                estado.enviando = false;
-                mostrarLoading(false);
-                return;
+                throw new Error('Dados incompletos na resposta do servidor');
             }
             
             const urlDestino = `sucesso.html?token=${encodeURIComponent(token)}&pedido=${encodeURIComponent(pedidoId)}&instrumento=${encodeURIComponent(tipo)}`;
-            
-            console.log('🔗 Token:', token);
-            console.log('🔗 Pedido ID:', pedidoId);
-            console.log('🔗 Tipo:', tipo);
-            console.log('🔗 URL DE DESTINO:', urlDestino);
-            console.log('🚀 EXECUTANDO window.location.replace...');
-            
-            // MÉTODO 1
             window.location.replace(urlDestino);
-            
-            // MÉTODO 2 (backup)
-            setTimeout(function() {
-                console.log('⚠️ Tentando backup: window.location.href');
-                window.location.href = urlDestino;
-            }, 500);
-            
+            setTimeout(() => window.location.href = urlDestino, 500);
             return;
         }
         
-        // ERRO
-        estado.enviando = false;
-        mostrarLoading(false);
-        const mensagemErro = resultado.message || resultado.error || 'Erro desconhecido';
-        console.error('❌ Erro do servidor:', mensagemErro);
-        alert(mensagemErro);
+        throw new Error(resultado.message || resultado.error || 'Erro desconhecido');
         
     } catch (error) {
         estado.enviando = false;
         mostrarLoading(false);
-        console.error('❌ Erro fatal:', error);
         alert('Erro: ' + error.message);
     }
 }
 
-// ========================================
-// FUNÇÕES AUXILIARES
-// ========================================
 function validarEmail(email) {
-    const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return regex.test(email);
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
 function mostrarLoading(mostrar) {
@@ -693,6 +675,5 @@ function mostrarLoading(mostrar) {
     }
 }
 
-// LOGS E DEBUG
-console.log('✅ Form Luthieria JS v5.4 carregado');
-console.log('🔗 API URL:', API_URL);
+console.log('✅ Form Luthieria JS v6.0 PWA carregado');
+console.log('📱 Mobile:', estado.isMobile);
