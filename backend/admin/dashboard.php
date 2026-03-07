@@ -3,7 +3,7 @@
  * DASHBOARD — SISTEMA ADONIS
  * Visual: Google / Material Design 3
  * Ícones: Material Symbols Outlined
- * Versão: 9.3 — Ajusta layout modal análise insumos
+ * Versão: 9.4 — Ajusta width input quantidade modal
  */
 require_once 'auth.php';
 require_once '../config/Database.php';
@@ -204,14 +204,14 @@ $v = time();
     .analise-insumos-title{font-size:12px;font-weight:600;color:var(--g-text-3);text-transform:uppercase;letter-spacing:.4px;padding:0 20px 8px}
     .analise-insumo-row{padding:12px 20px;border-top:1px solid var(--g-border)}
     .analise-insumo-row:first-child{border-top:none}
-    .analise-insumo-top{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+    .analise-insumo-top{display:flex;align-items:center;gap:8px;margin-bottom:8px}
     .analise-insumo-info{flex:1;min-width:0}
     .analise-insumo-nome{font-size:13px;font-weight:500;color:var(--g-text)}
     .analise-insumo-meta{font-size:11px;color:var(--g-text-3);margin-top:2px}
     .analise-insumo-meta .sem-estoque{color:#c5221f;font-weight:600}
-    .analise-qtd{width:60px;border:1px solid var(--g-border);border-radius:6px;padding:6px 8px;font-size:13px;text-align:center;flex-shrink:0}
+    .analise-qtd{width:55px;max-width:100%;border:1px solid var(--g-border);border-radius:6px;padding:5px 6px;font-size:13px;text-align:center;flex-shrink:0}
     .analise-qtd:focus{outline:2px solid var(--g-blue);border-color:transparent}
-    .analise-insumo-valor{font-size:14px;font-weight:600;color:var(--g-text);white-space:nowrap;min-width:80px;text-align:right;flex-shrink:0}
+    .analise-insumo-valor{font-size:14px;font-weight:600;color:var(--g-text);white-space:nowrap;min-width:72px;text-align:right;flex-shrink:0}
     .analise-insumo-valor.riscado{text-decoration:line-through;color:var(--g-text-3);font-weight:400}
     .analise-insumo-bottom{display:flex;align-items:center;gap:8px;padding-left:0}
     .analise-cf-toggle{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--g-text-2);cursor:pointer}
