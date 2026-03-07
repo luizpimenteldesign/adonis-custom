@@ -3,7 +3,7 @@
  * DASHBOARD — SISTEMA ADONIS
  * Visual: Google / Material Design 3
  * Ícones: Material Symbols Outlined
- * Versão: 9.4 — Ajusta width input quantidade modal
+ * Versão: 10.0 — CSS externo
  */
 require_once 'auth.php';
 require_once '../config/Database.php';
@@ -130,98 +130,7 @@ $v = time();
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="assets/css/admin.css?v=<?php echo $v; ?>">
     <link rel="stylesheet" href="assets/css/sidebar.css?v=<?php echo $v; ?>">
-    <style>
-    /* ── MAIN ───────────────────────────────────────── */
-    .page-content{flex:1;padding:20px;max-width:1400px}
-    @media(min-width:960px){body{padding-bottom:0}.bottom-nav{display:none}}
-
-    /* ── STATS ────────────────────────────────────── */
-    .stats-row{display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap}
-    .stat-chip{display:flex;align-items:center;gap:10px;background:var(--g-surface);border:1px solid var(--g-border);border-radius:12px;padding:12px 18px;cursor:pointer;transition:box-shadow .15s,border-color .15s;-webkit-tap-highlight-color:transparent;flex:1;min-width:120px}
-    .stat-chip:hover{box-shadow:var(--g-shadow-md);border-color:var(--g-blue)}
-    .stat-chip-val{font-family:'Google Sans',sans-serif;font-size:26px;font-weight:700;line-height:1}
-    .stat-chip-lbl{font-size:12px;color:var(--g-text-2);font-weight:500}
-    .stat-chip.blue .stat-chip-val{color:var(--g-blue)}
-    .stat-chip.yellow .stat-chip-val{color:var(--g-yellow)}
-    .stat-chip.orange .stat-chip-val{color:#e37400}
-    .stat-chip.green .stat-chip-val{color:var(--g-green)}
-    .stat-chip-icon{font-size:28px;color:inherit;opacity:.7}
-
-    /* ── LISTA + PAINEL ────────────────────────────────── */
-    .dashboard-grid{display:flex;gap:0;align-items:flex-start}
-    .pedido-list-wrap{flex:1;min-width:0;background:var(--g-surface);border-radius:var(--g-radius-lg);border:1px solid var(--g-border);overflow:hidden}
-    .acao-panel{width:320px;flex-shrink:0;background:var(--g-surface);border:1px solid var(--g-border);border-left:none;border-radius:0 var(--g-radius-lg) var(--g-radius-lg) 0;display:none;flex-direction:column;position:sticky;top:20px;max-height:calc(100vh - 40px);overflow-y:auto}
-    .acao-panel.visible{display:flex}
-    @media(max-width:959px){.acao-panel{display:none !important}}
-    .acao-panel-header{padding:16px 20px;border-bottom:1px solid var(--g-border);display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
-    .acao-panel-nome{font-family:'Google Sans',sans-serif;font-size:15px;font-weight:500;color:var(--g-text)}
-    .acao-panel-instr{font-size:12px;color:var(--g-text-2);margin-top:2px}
-    .acao-panel-close{width:28px;height:28px;border-radius:50%;background:var(--g-hover);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--g-text-2);flex-shrink:0}
-    .acao-panel-close:hover{background:var(--g-border)}
-    .acao-panel-status{padding:12px 20px;border-bottom:1px solid var(--g-border)}
-    .acao-panel-orc{padding:10px 20px;background:#e6f4ea;border-bottom:1px solid #c8e6c9;font-size:13px;color:var(--g-green);font-weight:500;display:flex;gap:12px;flex-wrap:wrap;align-items:center}
-    .acao-section{padding:14px 20px 4px}
-    .acao-section-label{font-size:11px;font-weight:600;color:var(--g-text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px}
-    .acao-btns{display:flex;flex-direction:column;gap:6px}
-    .acao-btns .btn{width:100%;justify-content:flex-start;border-radius:10px;padding:9px 14px;font-size:13px}
-    .acao-panel-link{padding:12px 20px;border-top:1px solid var(--g-border);margin-top:auto}
-    .acao-panel-link a{display:block;text-align:center;font-size:13px;color:var(--g-text-2);padding:8px;border-radius:8px;transition:background .15s}
-    .acao-panel-link a:hover{background:var(--g-hover);text-decoration:none}
-    .acao-sheet{display:none;position:fixed;inset:0;z-index:500}
-    .acao-sheet.open{display:flex;flex-direction:column;justify-content:flex-end}
-    .acao-sheet-overlay{position:absolute;inset:0;background:rgba(0,0,0,.4)}
-    .acao-sheet-box{position:relative;background:var(--g-surface);border-radius:20px 20px 0 0;max-height:85vh;overflow-y:auto;padding-bottom:32px}
-    .acao-sheet-drag{width:40px;height:4px;background:var(--g-border);border-radius:2px;margin:12px auto 0}
-    .pedido-item.selected{background:var(--g-blue-light)}
-    .orc-inline{padding:0 20px 16px}
-    .orc-inline label{font-size:11px;font-weight:600;color:var(--g-text-2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px;display:block;margin-top:12px}
-    .orc-inline input{width:100%;padding:9px 12px;border:1px solid var(--g-border);border-radius:8px;font-size:13px;color:var(--g-text);background:var(--g-bg);font-family:inherit;outline:none}
-    .orc-inline input:focus{border-color:var(--g-blue);background:var(--g-surface)}
-    .sim-row{display:flex;gap:8px;margin:10px 0}
-    .sim-mini{flex:1;border:2px solid var(--g-border);border-radius:10px;padding:10px;cursor:pointer;text-align:center;transition:border-color .15s,background .15s;background:var(--g-surface)}
-    .sim-mini:hover{border-color:var(--g-blue)}
-    .sim-mini.ativo{border-color:var(--g-blue);background:var(--g-blue-light)}
-    .sim-mini-label{font-size:9px;font-weight:700;text-transform:uppercase;color:var(--g-text-3);margin-bottom:4px;letter-spacing:.4px}
-    .sim-mini-valor{font-family:'Google Sans',sans-serif;font-size:15px;font-weight:700;color:var(--g-green)}
-    .sim-mini.maq .sim-mini-valor{color:#e65100}
-    .sim-mini-sub{font-size:10px;color:var(--g-text-3);margin-top:3px}
-    .orc-aviso{font-size:11px;color:var(--g-text-2);background:var(--g-bg);border-radius:8px;padding:8px 12px;border-left:3px solid var(--g-blue);line-height:1.5;margin:8px 0}
-    .rep-inline{padding:0 20px 12px}
-    .rep-inline textarea{width:100%;padding:9px 12px;border:1px solid var(--g-border);border-radius:8px;font-size:13px;font-family:inherit;resize:vertical;min-height:70px;background:var(--g-bg);outline:none}
-    .rep-inline textarea:focus{border-color:var(--g-red);background:var(--g-surface)}
-
-    /* ── BUSCA ───────────────────────────────────────── */
-    .search-loading{display:none;width:16px;height:16px;border:2px solid var(--g-border);border-top-color:var(--g-blue);border-radius:50%;animation:spin .6s linear infinite;flex-shrink:0}
-    .search-loading.active{display:block}
-    @keyframes spin{to{transform:rotate(360deg)}}
-
-    /* ── MODAL ANÁLISE ───────────────────────────────────── */
-    .analise-resumo{padding:12px 20px 0}
-    .analise-resumo-title{font-size:12px;font-weight:600;color:var(--g-text-3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px}
-    .analise-resumo-tags{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}
-    .analise-tag{background:var(--g-bg);border:1px solid var(--g-border);border-radius:20px;padding:4px 12px;font-size:12px;color:var(--g-text-2)}
-    .analise-sep{border:none;border-top:1px solid var(--g-border);margin:0 0 14px}
-    .analise-insumos-title{font-size:12px;font-weight:600;color:var(--g-text-3);text-transform:uppercase;letter-spacing:.4px;padding:0 20px 8px}
-    .analise-insumo-row{padding:12px 20px;border-top:1px solid var(--g-border)}
-    .analise-insumo-row:first-child{border-top:none}
-    .analise-insumo-top{display:flex;align-items:center;gap:8px;margin-bottom:8px}
-    .analise-insumo-info{flex:1;min-width:0}
-    .analise-insumo-nome{font-size:13px;font-weight:500;color:var(--g-text)}
-    .analise-insumo-meta{font-size:11px;color:var(--g-text-3);margin-top:2px}
-    .analise-insumo-meta .sem-estoque{color:#c5221f;font-weight:600}
-    .analise-qtd{width:55px;max-width:100%;border:1px solid var(--g-border);border-radius:6px;padding:5px 6px;font-size:13px;text-align:center;flex-shrink:0}
-    .analise-qtd:focus{outline:2px solid var(--g-blue);border-color:transparent}
-    .analise-insumo-valor{font-size:14px;font-weight:600;color:var(--g-text);white-space:nowrap;min-width:72px;text-align:right;flex-shrink:0}
-    .analise-insumo-valor.riscado{text-decoration:line-through;color:var(--g-text-3);font-weight:400}
-    .analise-insumo-bottom{display:flex;align-items:center;gap:8px;padding-left:0}
-    .analise-cf-toggle{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--g-text-2);cursor:pointer}
-    .analise-cf-toggle input{cursor:pointer;accent-color:var(--g-blue);width:16px;height:16px}
-    .analise-vazio{padding:20px;text-align:center;color:var(--g-text-3);font-size:13px}
-    .analise-footer{padding:14px 20px 0;border-top:2px solid var(--g-border);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}
-    .analise-total-bloco{font-size:13px;color:var(--g-text-2)}
-    .analise-total-bloco strong{font-size:16px;color:var(--g-text);display:block}
-    .analise-loading{padding:30px 20px;text-align:center;color:var(--g-text-3);font-size:13px}
-    </style>
+    <link rel="stylesheet" href="assets/css/dashboard.css?v=<?php echo $v; ?>">
 </head>
 <body>
 
@@ -603,7 +512,7 @@ function renderAcoes(acoes, totalBase, status){
         const[s,label,cls,modal]=a;
         if(modal==='modal-analise') html+=`<button class="btn ${cls}" onclick="_abrirAnalise()">${label}</button>`;
         else if(modal==='modal-rep') html+=`<button class="btn ${cls}" onclick="_abrirReprovacao()">${label}</button>`;
-        else                         html+=`<button class="btn ${cls}" onclick="_enviar('${s.replace(/'/g,"\\'")}')">${label}</button>`;
+        else                         html+=`<button class="btn ${cls}" onclick="_enviar('${s.replace(/'/g,"\\\\'")}')">${label}</button>`;
     }
     html+=`</div></div>`;
     return html;
