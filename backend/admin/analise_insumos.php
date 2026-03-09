@@ -1,15 +1,17 @@
 <?php
 /**
  * API: Análise de insumos de uma Pré-OS
- * v3 — Captura QUALQUER erro fatal (inclusive parse/require)
+ * v4 — Ordem correta: session_start() ANTES de headers
  */
 
 // Captura erro fatal que acontece antes do set_error_handler
 register_shutdown_function(function() {
     $error = error_get_last();
     if ($error && in_array($error['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR])) {
-        header('Content-Type: application/json; charset=utf-8');
-        http_response_code(500);
+        if (!headers_sent()) {
+            header('Content-Type: application/json; charset=utf-8');
+            http_response_code(500);
+        }
         echo json_encode([
             'sucesso' => false,
             'erro' => 'Erro fatal PHP: ' . $error['message'] . ' em ' . basename($error['file']) . ':' . $error['line']
@@ -18,6 +20,17 @@ register_shutdown_function(function() {
     }
 });
 
+// AUTH ANTES DE HEADERS (session_start precisa vir primeiro)
+try {
+    require_once 'auth.php';
+    require_once '../config/Database.php';
+} catch (Exception $e) {
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode(['sucesso'=>false,'erro'=>'Erro ao carregar dependências: '.$e->getMessage()]);
+    exit;
+}
+
+// Agora sim os headers
 header('Content-Type: application/json; charset=utf-8');
 
 // Tratamento global de erros — garante JSON sempre
@@ -32,14 +45,6 @@ set_exception_handler(function($e) {
     echo json_encode(['sucesso'=>false,'erro'=>'Exceção: '.$e->getMessage()]);
     exit;
 });
-
-try {
-    require_once 'auth.php';
-    require_once '../config/Database.php';
-} catch (Exception $e) {
-    echo json_encode(['sucesso'=>false,'erro'=>'Erro ao carregar dependências: '.$e->getMessage()]);
-    exit;
-}
 
 $db   = new Database();
 $conn = $db->getConnection();
