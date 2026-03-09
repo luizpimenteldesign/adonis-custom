@@ -1,12 +1,24 @@
 <?php
 /**
  * API: Análise de insumos de uma Pré-OS
- * GET  ?pre_os_id=X                 → categorias + insumos fixos pré-selecionados
- * GET  ?pre_os_id=X&categoria=Y&q=Z → lista insumos da categoria para seleção manual
- * POST                              → salva insumos confirmados em pre_os_insumos
- * 
- * v2 — Nunca dispara HTTP 500: tratamento global + LEFT JOINs + validação de estrutura BD
+ * v3 — Captura QUALQUER erro fatal (inclusive parse/require)
  */
+
+// Captura erro fatal que acontece antes do set_error_handler
+register_shutdown_function(function() {
+    $error = error_get_last();
+    if ($error && in_array($error['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR])) {
+        header('Content-Type: application/json; charset=utf-8');
+        http_response_code(500);
+        echo json_encode([
+            'sucesso' => false,
+            'erro' => 'Erro fatal PHP: ' . $error['message'] . ' em ' . basename($error['file']) . ':' . $error['line']
+        ]);
+        exit;
+    }
+});
+
+header('Content-Type: application/json; charset=utf-8');
 
 // Tratamento global de erros — garante JSON sempre
 set_error_handler(function($errno, $errstr, $errfile, $errline) {
@@ -20,8 +32,6 @@ set_exception_handler(function($e) {
     echo json_encode(['sucesso'=>false,'erro'=>'Exceção: '.$e->getMessage()]);
     exit;
 });
-
-header('Content-Type: application/json; charset=utf-8');
 
 try {
     require_once 'auth.php';
