@@ -1,10 +1,11 @@
 /**
  * SERVICE WORKER - ADONIS ADMIN PWA
- * Versão: 1.0
- * Data: 07/03/2026
+ * Versão: 1.1
+ * Data: 09/03/2026
+ * Fix: ignora métodos POST e requisições não cacheáveis (Cache API não suporta PUT em POST)
  */
 
-const CACHE_NAME = 'adonis-admin-v1';
+const CACHE_NAME = 'adonis-admin-v2';
 const urlsToCache = [
   '/backend/admin/dashboard.php',
   '/backend/admin/assets/css/admin.css',
@@ -15,9 +16,20 @@ const urlsToCache = [
   'https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap'
 ];
 
+// Verifica se a requisição pode ser cacheada
+function isCacheable(request) {
+  // Só cacheia GET e HEAD — POST, PUT, DELETE nunca são cacheáveis
+  if (request.method !== 'GET' && request.method !== 'HEAD') return false;
+  // Ignora chrome-extension e outros esquemas não-http
+  if (!request.url.startsWith('http')) return false;
+  // Ignora requisições com credenciais ou range headers (streams)
+  if (request.headers.get('range')) return false;
+  return true;
+}
+
 // Instalação
 self.addEventListener('install', event => {
-  console.log('[⚡ Admin SW] Instalando...');
+  console.log('[⚡ Admin SW] Instalando v2...');
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then(cache => {
@@ -33,7 +45,7 @@ self.addEventListener('install', event => {
 
 // Ativação
 self.addEventListener('activate', event => {
-  console.log('[⚡ Admin SW] Ativando...');
+  console.log('[⚡ Admin SW] Ativando v2...');
   event.waitUntil(
     caches.keys().then(cacheNames => {
       return Promise.all(
@@ -51,6 +63,11 @@ self.addEventListener('activate', event => {
 
 // Fetch - Network First (admin precisa de dados atualizados)
 self.addEventListener('fetch', event => {
+  // POST e outros métodos não-GET: deixa passar direto, sem interceptar
+  if (!isCacheable(event.request)) {
+    return;
+  }
+
   // Ignora requisições externas (exceto Google Fonts)
   if (!event.request.url.startsWith(self.location.origin) && !event.request.url.includes('fonts.googleapis.com')) {
     return;
@@ -59,11 +76,13 @@ self.addEventListener('fetch', event => {
   event.respondWith(
     fetch(event.request)
       .then(response => {
-        // Clona a resposta para salvar no cache
-        const responseToCache = response.clone();
-        caches.open(CACHE_NAME).then(cache => {
-          cache.put(event.request, responseToCache);
-        });
+        // Só cacheia respostas básicas/CORS válidas com status 200
+        if (response && response.status === 200 && (response.type === 'basic' || response.type === 'cors')) {
+          const responseToCache = response.clone();
+          caches.open(CACHE_NAME).then(cache => {
+            cache.put(event.request, responseToCache);
+          });
+        }
         return response;
       })
       .catch(() => {
@@ -73,7 +92,6 @@ self.addEventListener('fetch', event => {
             if (cachedResponse) {
               return cachedResponse;
             }
-            // Se não tiver no cache, retorna página offline
             return new Response(
               '<html><body style="font-family:system-ui;text-align:center;padding:40px"><h1>🚫 Sem conexão</h1><p>Verifique sua internet</p></body></html>',
               { headers: { 'Content-Type': 'text/html' } }
@@ -83,4 +101,4 @@ self.addEventListener('fetch', event => {
   );
 });
 
-console.log('✅ Adonis Admin Service Worker carregado');
+console.log('✅ Adonis Admin Service Worker v2 carregado');
