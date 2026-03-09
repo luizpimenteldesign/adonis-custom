@@ -25,6 +25,12 @@ RewriteRule ^index\.html$ index.html [L]
 # /orcamento → formulário de orçamento
 RewriteRule ^orcamento/?$ frontend/index.php [L]
 
+# /sucesso.html → página de sucesso do formulário
+RewriteRule ^sucesso\.html$ frontend/sucesso.html [L]
+
+# /public/ → assets do frontend (css, js, img)
+RewriteRule ^public/(.*)$ frontend/public/$1 [L]
+
 # /admin → painel backend
 RewriteRule ^admin/?$ backend/admin/login.php [L]
 
