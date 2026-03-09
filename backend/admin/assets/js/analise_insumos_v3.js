@@ -1,8 +1,8 @@
 /**
- * ANÁLISE DE INSUMOS V4.0
+ * ANÁLISE DE INSUMOS V4.1
  * - Insumos FIXOS chegam pré-selecionados do servidor
  * - Insumos VARIÁVEIS: admin busca por categoria e adiciona manualmente
- * - Nomes de colunas corretos: valorunitario, estoque
+ * - Exibe erros REAIS do servidor (não só "Erro de conexão")
  */
 
 let _dadosAnalise        = null;
@@ -16,9 +16,23 @@ function abrirModalAnalise() {
     abrirModal('modal-analise');
 
     fetch('analise_insumos.php?pre_os_id=' + _pedidoId)
-        .then(r => r.json())
+        .then(r => {
+            // Sempre tenta ler JSON, mesmo em erro HTTP
+            if (!r.ok) {
+                return r.text().then(txt => {
+                    console.error('[Análise] HTTP', r.status, txt);
+                    throw new Error('HTTP ' + r.status + ': ' + (txt.substring(0,200) || 'Sem resposta'));
+                });
+            }
+            return r.json();
+        })
         .then(data => {
-            if (!data.sucesso) { _toast(data.erro || 'Erro ao carregar'); fecharModal('modal-analise'); return; }
+            if (!data.sucesso) {
+                console.error('[Análise] Erro do servidor:', data.erro);
+                _toast(data.erro || 'Erro ao carregar');
+                fecharModal('modal-analise');
+                return;
+            }
             _dadosAnalise = data;
             // Pré-carrega insumos (fixos já vêm do servidor, ou salvos anteriormente)
             _insumosSelecionados = (data.insumos_selecionados || []).map(ins => ({
@@ -34,7 +48,11 @@ function abrirModalAnalise() {
             }));
             _renderizarInterface();
         })
-        .catch(() => { _toast('Erro de conexão'); fecharModal('modal-analise'); });
+        .catch(err => {
+            console.error('[Análise] Exceção:', err);
+            _toast('Erro: ' + err.message);
+            fecharModal('modal-analise');
+        });
 }
 
 function _renderizarInterface() {
@@ -101,18 +119,28 @@ function _buscarInsumosCategoria() {
         document.getElementById('lista-insumos-disponiveis').innerHTML =
             '<div style="padding:12px;color:var(--g-text-3);font-size:13px">Buscando...</div>';
         fetch('analise_insumos.php?' + params)
-            .then(r => r.json())
+            .then(r => {
+                if (!r.ok) {
+                    return r.text().then(txt => {
+                        console.error('[Busca insumos] HTTP', r.status, txt);
+                        throw new Error('Erro HTTP ' + r.status);
+                    });
+                }
+                return r.json();
+            })
             .then(data => {
                 if (!data.sucesso) {
+                    console.error('[Busca insumos] Erro:', data.erro);
                     document.getElementById('lista-insumos-disponiveis').innerHTML =
-                        '<div style="padding:12px;color:var(--g-red);font-size:13px">Erro ao buscar</div>';
+                        '<div style="padding:12px;color:var(--g-red);font-size:12px">' + _esc(data.erro || 'Erro ao buscar') + '</div>';
                     return;
                 }
                 _renderizarInsumosDisponiveis(data.insumos || []);
             })
-            .catch(() => {
+            .catch(err => {
+                console.error('[Busca insumos] Exceção:', err);
                 document.getElementById('lista-insumos-disponiveis').innerHTML =
-                    '<div style="padding:12px;color:var(--g-red);font-size:13px">Erro de conexão</div>';
+                    '<div style="padding:12px;color:var(--g-red);font-size:12px">Erro: ' + _esc(err.message) + '</div>';
             });
     }, 260);
 }
@@ -245,9 +273,18 @@ function confirmarAnalise() {
         headers: {'Content-Type':'application/json'},
         body: JSON.stringify({ pre_os_id: _pedidoId, insumos: _insumosSelecionados })
     })
-    .then(r => r.json())
+    .then(r => {
+        if (!r.ok) {
+            return r.text().then(txt => {
+                console.error('[Confirmar Análise] HTTP', r.status, txt);
+                throw new Error('HTTP ' + r.status + ': ' + (txt.substring(0,150) || 'Sem resposta'));
+            });
+        }
+        return r.json();
+    })
     .then(data => {
         if (!data.sucesso) {
+            console.error('[Confirmar Análise] Erro:', data.erro);
             _toast(data.erro || 'Erro ao salvar');
             btn.disabled = false; btn.textContent = 'Confirmar e Orçar →';
             return;
@@ -256,11 +293,16 @@ function confirmarAnalise() {
         document.getElementById('status-label').textContent = 'Em Análise';
         _abrirOrcamentoComValor(data.total_orcamento, data.total_servicos, data.total_insumos);
     })
-    .catch(() => { _toast('Erro de conexão'); btn.disabled=false; btn.textContent='Confirmar e Orçar →'; });
+    .catch(err => {
+        console.error('[Confirmar Análise] Exceção:', err);
+        _toast('Erro: ' + err.message);
+        btn.disabled=false;
+        btn.textContent='Confirmar e Orçar →';
+    });
 }
 
 function _esc(s) {
     return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/'/g,'&#39;').replace(/"/g,'&quot;');
 }
 
-console.log('[V4.0] analise_insumos_v3.js carregado.');
+console.log('[V4.1] analise_insumos_v3.js carregado.');
