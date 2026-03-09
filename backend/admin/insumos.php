@@ -11,8 +11,8 @@ $msg   = isset($_GET['msg']) ? $_GET['msg'] : '';
 try {
     $sql = "SELECT i.*, GROUP_CONCAT(s.nome ORDER BY s.nome SEPARATOR ', ') as servicos_nomes
             FROM insumos i
-            LEFT JOIN insumos_servicos ins ON ins.insumoid = i.id
-            LEFT JOIN servicos s ON s.id = ins.servicoid";
+            LEFT JOIN servicos_insumos si ON si.insumo_id = i.id
+            LEFT JOIN servicos s ON s.id = si.servico_id";
     if ($busca) $sql .= " WHERE i.nome LIKE :q OR i.marca LIKE :q OR i.modelo LIKE :q OR i.unidade LIKE :q";
     $sql .= " GROUP BY i.id ORDER BY i.nome";
     $stmt = $conn->prepare($sql);
@@ -57,9 +57,9 @@ include '_sidebar_data.php';
     <link rel="stylesheet" href="assets/css/pages.css?v=<?php echo $v; ?>">
     <style>
     .cat-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
-    .cat-chip{display:flex;align-items:center;gap:4px;padding:4px 10px;border-radius:20px;border:1px solid var(--g-border);background:var(--g-bg);font-size:13px;cursor:pointer;user-select:none;transition:background .15s,border-color .15s}
+    .cat-chip{display:flex;align-items:center;gap:4px;padding:4px 10px;border-radius:20px;border:1px solid var(--g-border);background:var(--g-bg);font-size:13px;cursor:pointer;user-select:none;transition:background .15s,border-color .15s,color .15s}
     .cat-chip:hover{background:var(--g-hover)}
-    .cat-chip.ativa{background:var(--primary);border-color:var(--primary);color:#fff}
+    .cat-chip.ativa{background:var(--color-primary,#7c3aed);border-color:var(--color-primary,#7c3aed);color:#fff}
     .cat-chip .material-symbols-outlined{font-size:14px}
     .servicos-grupos{display:flex;flex-direction:column;gap:0;margin-top:12px;border:1px solid var(--g-border);border-radius:8px;overflow:hidden}
     .grupo-cat{border-bottom:1px solid var(--g-border)}
@@ -69,7 +69,7 @@ include '_sidebar_data.php';
     .servico-check-item{display:flex;align-items:center;gap:10px;padding:8px 12px;font-size:14px;cursor:pointer;border-top:1px solid var(--g-border);transition:background .1s}
     .servico-check-item:first-child{border-top:none}
     .servico-check-item:hover{background:var(--g-hover)}
-    .servico-check-item input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:var(--primary)}
+    .servico-check-item input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:var(--color-primary,#7c3aed)}
     </style>
 </head>
 <body>
@@ -150,10 +150,10 @@ include '_sidebar_data.php';
                     <td class="text-center">
                         <span class="badge badge-dark"><?php echo htmlspecialchars($ins['unidade']); ?></span>
                     </td>
-                    <td class="text-right"><strong>R$&nbsp;<?php echo number_format((float)$ins['valor_unitario'], 2, ',', '.'); ?></strong></td>
+                    <td class="text-right"><strong>R$&nbsp;<?php echo number_format((float)$ins['valorunitario'], 2, ',', '.'); ?></strong></td>
                     <td class="text-center">
                         <?php
-                            $estoque = (float)$ins['quantidade_estoque'];
+                            $estoque = (float)$ins['quantidadeestoque'];
                             $badge_class = $estoque <= 0 ? 'badge-danger' : ($estoque <= 5 ? 'badge-warning' : 'badge-success');
                         ?>
                         <span class="badge <?php echo $badge_class; ?>"><?php echo rtrim(rtrim(number_format($estoque, 3, ',', '.'), '0'), ','); ?></span>
@@ -356,8 +356,8 @@ function editarInsumo(id) {
             document.getElementById('f-marca').value   = ins.marca  || '';
             document.getElementById('f-modelo').value  = ins.modelo || '';
             document.getElementById('f-unidade').value = ins.unidade;
-            document.getElementById('f-valor').value   = parseFloat(ins.valor_unitario).toFixed(2);
-            document.getElementById('f-estoque').value = parseFloat(ins.quantidade_estoque);
+            document.getElementById('f-valor').value   = parseFloat(ins.valorunitario || 0).toFixed(2);
+            document.getElementById('f-estoque').value = parseFloat(ins.quantidadeestoque || 0);
             document.getElementById('f-ativo').checked = ins.ativo == 1;
             resetModal();
             servicosSelecionados = (ins.servicos || []).map(Number);
@@ -383,7 +383,7 @@ function salvarInsumo() {
     const estoque = document.getElementById('f-estoque').value;
     const ativo   = document.getElementById('f-ativo').checked ? 1 : 0;
     if (!nome || !unidade) { alert('Nome e unidade sao obrigatorios.'); return; }
-    const payload = { nome, marca, modelo, unidade, valor_unitario: valor, quantidade_estoque: estoque, ativo, servicos: servicosSelecionados };
+    const payload = { nome, marca, modelo, unidade, valorunitario: valor, quantidadeestoque: estoque, ativo, servicos: servicosSelecionados };
     const method  = id ? 'PUT' : 'POST';
     const url     = id ? 'insumos-api.php?id=' + id : 'insumos-api.php';
     fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
