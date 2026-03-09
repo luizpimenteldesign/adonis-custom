@@ -389,6 +389,32 @@ function toggleGroup(id){
     localStorage.setItem('nav_grupos', JSON.stringify(estado));
 }
 
+// ─────────────────────────────────────────────────────────
+// SERVICE WORKER — registro com cache bust + auto-unregister
+// de versões antigas que não bloqueiam POST
+// ─────────────────────────────────────────────────────────
+const SW_VERSION = 'v3';
+
+if ('serviceWorker' in navigator) {
+    // 1. Desregistra qualquer SW antigo (versão < v3) antes de registrar
+    navigator.serviceWorker.getRegistrations().then(regs => {
+        const promises = regs.map(reg =>
+            reg.active && !reg.active.scriptURL.includes('v3')
+                ? reg.unregister().then(() => console.log('[SW] Desregistrado SW antigo:', reg.scope))
+                : Promise.resolve()
+        );
+        return Promise.all(promises);
+    }).then(() => {
+        // 2. Registra o SW novo com cache bust para forçar o browser a baixar o arquivo atualizado
+        const swUrl = 'service-worker-admin.js?v=<?php echo $v; ?>';
+        return navigator.serviceWorker.register(swUrl, { updateViaCache: 'none' });
+    }).then(reg => {
+        console.log('[SW] Registrado:', reg.scope);
+        // 3. Força verificação de atualização imediata
+        reg.update();
+    }).catch(err => console.error('[SW] Erro:', err));
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     const estado = JSON.parse(localStorage.getItem('nav_grupos') || '{}');
     for (const [id, aberto] of Object.entries(estado)) {
@@ -411,12 +437,6 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error('Erro ao parsear pedido:', err);
         }
     });
-    
-    if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('service-worker-admin.js')
-            .then(reg => console.log('✅ SW Admin registrado', reg.scope))
-            .catch(err => console.error('❌ Erro ao registrar SW:', err));
-    }
 });
 
 (function() {
