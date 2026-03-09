@@ -1,8 +1,8 @@
 /**
- * ANÁLISE DE INSUMOS V4.1
+ * ANÁLISE DE INSUMOS V4.2
  * - Insumos FIXOS chegam pré-selecionados do servidor
  * - Insumos VARIÁVEIS: admin busca por categoria e adiciona manualmente
- * - Exibe erros REAIS do servidor (não só "Erro de conexão")
+ * - Log COMPLETO de resposta antes de parsear (mesmo em 500)
  */
 
 let _dadosAnalise        = null;
@@ -17,16 +17,24 @@ function abrirModalAnalise() {
 
     fetch('analise_insumos.php?pre_os_id=' + _pedidoId)
         .then(r => {
-            // Sempre tenta ler JSON, mesmo em erro HTTP
-            if (!r.ok) {
-                return r.text().then(txt => {
-                    console.error('[Análise] HTTP', r.status, txt);
-                    throw new Error('HTTP ' + r.status + ': ' + (txt.substring(0,200) || 'Sem resposta'));
-                });
-            }
-            return r.json();
+            console.log('[Análise] HTTP status:', r.status, r.statusText);
+            // Lê o texto SEMPRE (mesmo em sucesso) para logar
+            return r.text().then(txt => {
+                console.log('[Análise] Resposta RAW (primeiros 500 chars):', txt.substring(0, 500));
+                if (!r.ok) {
+                    throw new Error('HTTP ' + r.status + ': ' + txt.substring(0, 200));
+                }
+                // Tenta parsear JSON
+                try {
+                    return JSON.parse(txt);
+                } catch (e) {
+                    console.error('[Análise] Erro ao parsear JSON:', e);
+                    throw new Error('Resposta não é JSON válido');
+                }
+            });
         })
         .then(data => {
+            console.log('[Análise] Dados parseados:', data);
             if (!data.sucesso) {
                 console.error('[Análise] Erro do servidor:', data.erro);
                 _toast(data.erro || 'Erro ao carregar');
@@ -120,13 +128,18 @@ function _buscarInsumosCategoria() {
             '<div style="padding:12px;color:var(--g-text-3);font-size:13px">Buscando...</div>';
         fetch('analise_insumos.php?' + params)
             .then(r => {
-                if (!r.ok) {
-                    return r.text().then(txt => {
-                        console.error('[Busca insumos] HTTP', r.status, txt);
+                return r.text().then(txt => {
+                    if (!r.ok) {
+                        console.error('[Busca insumos] HTTP', r.status, 'Resposta:', txt.substring(0,300));
                         throw new Error('Erro HTTP ' + r.status);
-                    });
-                }
-                return r.json();
+                    }
+                    try {
+                        return JSON.parse(txt);
+                    } catch(e) {
+                        console.error('[Busca] Resposta não é JSON:', txt.substring(0,300));
+                        throw new Error('Resposta inválida');
+                    }
+                });
             })
             .then(data => {
                 if (!data.sucesso) {
@@ -274,13 +287,18 @@ function confirmarAnalise() {
         body: JSON.stringify({ pre_os_id: _pedidoId, insumos: _insumosSelecionados })
     })
     .then(r => {
-        if (!r.ok) {
-            return r.text().then(txt => {
-                console.error('[Confirmar Análise] HTTP', r.status, txt);
-                throw new Error('HTTP ' + r.status + ': ' + (txt.substring(0,150) || 'Sem resposta'));
-            });
-        }
-        return r.json();
+        return r.text().then(txt => {
+            if (!r.ok) {
+                console.error('[Confirmar] HTTP', r.status, 'Resposta:', txt.substring(0,300));
+                throw new Error('HTTP ' + r.status);
+            }
+            try {
+                return JSON.parse(txt);
+            } catch(e) {
+                console.error('[Confirmar] Resposta não é JSON:', txt.substring(0,300));
+                throw new Error('Resposta inválida');
+            }
+        });
     })
     .then(data => {
         if (!data.sucesso) {
@@ -305,4 +323,4 @@ function _esc(s) {
     return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/'/g,'&#39;').replace(/"/g,'&quot;');
 }
 
-console.log('[V4.1] analise_insumos_v3.js carregado.');
+console.log('[V4.2] analise_insumos_v3.js carregado — log completo de HTTP 500.');
