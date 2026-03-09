@@ -1,7 +1,7 @@
 <?php
 /**
  * DETALHES DO PEDIDO — SISTEMA ADONIS
- * Versão 9.0 — colunas BD corrigidas, tipo_vinculo na tabela de insumos
+ * Versão 9.1 — orc-breakdown margin corrigido
  */
 require_once 'auth.php';
 require_once '../config/Database.php';
@@ -223,6 +223,8 @@ function iconHtml($name,$size=16){return '<span class="material-symbols-outlined
     .tl-detalhe.motivo{background:#fce8e6;color:#c5221f}
     .token-row{display:flex;align-items:center;gap:10px;padding:14px 20px}
     .token-val{font-family:'Roboto Mono',monospace;font-size:11px;color:var(--g-text-2);background:var(--g-bg);border:1px solid var(--g-border);border-radius:6px;padding:7px 10px;flex:1;word-break:break-all}
+    /* orc-breakdown abaixo do input, sem sobreposição */
+    #orc-breakdown{font-size:12px;color:var(--g-text-3);margin-top:6px;margin-bottom:10px;padding:0 2px;min-height:16px}
     </style>
 </head>
 <body>
@@ -534,7 +536,7 @@ function iconHtml($name,$size=16){return '<span class="material-symbols-outlined
         <div class="modal-title">Definir Orçamento</div>
         <label>Valor total (serviços + insumos) — R$</label>
         <input type="number" id="input-valor" min="0" step="0.01" placeholder="Ex: 350.00" oninput="simularValores()">
-        <div id="orc-breakdown" style="font-size:12px;color:var(--g-text-3);margin:-8px 0 8px;padding:0 2px"></div>
+        <div id="orc-breakdown"></div>
         <label>Prazo de entrega (dias úteis)</label>
         <input type="number" id="input-prazo" min="1" step="1" placeholder="Ex: 7">
         <div class="modal-hint">Sem sábados, domingos e feriados</div>
