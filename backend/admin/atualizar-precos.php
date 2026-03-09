@@ -34,13 +34,13 @@ if (isset($_POST['action']) && $_POST['action'] === 'atualizar') {
     $insumo_id = (int)($_POST['insumo_id'] ?? 0);
     if (!$insumo_id) { echo json_encode(['ok' => false, 'erro' => 'ID inválido']); exit; }
 
-    $insumo = $conn->prepare('SELECT id, nome, valor_unitario FROM insumos WHERE id = ? AND ativo = 1');
+    $insumo = $conn->prepare('SELECT id, nome, valorunitario FROM insumos WHERE id = ? AND ativo = 1');
     $insumo->execute([$insumo_id]);
     $ins = $insumo->fetch(PDO::FETCH_ASSOC);
     if (!$ins) { echo json_encode(['ok' => false, 'erro' => 'Insumo não encontrado']); exit; }
 
     $query   = trim($_POST['query'] ?? $ins['nome']);
-    $preco_atual = (float)$ins['valor_unitario'];
+    $preco_atual = (float)$ins['valorunitario'];
 
     // Busca na API do Mercado Livre
     $url = 'https://api.mercadolibre.com/sites/' . ML_SITE . '/search?q=' . urlencode($query) . '&limit=' . ML_LIMIT;
@@ -88,7 +88,7 @@ if (isset($_POST['action']) && $_POST['action'] === 'atualizar') {
     $atualizado = false;
     if (abs($variacao_pct) >= MIN_VARIACAO || $preco_atual == 0) {
         // Atualiza preço no insumo
-        $conn->prepare('UPDATE insumos SET valor_unitario = ? WHERE id = ?')
+        $conn->prepare('UPDATE insumos SET valorunitario = ? WHERE id = ?')
              ->execute([$mediana, $insumo_id]);
 
         // Grava histórico
@@ -135,7 +135,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'historico') {
 
 // ── CARREGA INSUMOS PARA A PÁGINA ───────────────────────────
 $insumos = $conn->query('
-    SELECT i.id, i.nome, i.unidade, i.valor_unitario,
+    SELECT i.id, i.nome, i.unidade, i.valorunitario,
            MAX(h.atualizado_em) as ultima_atualizacao
     FROM insumos i
     LEFT JOIN insumos_precos_historico h ON h.insumo_id = i.id AND h.fonte = "mercadolivre"
@@ -302,7 +302,7 @@ include '_sidebar_data.php';
                 </div>
             </div>
             <div class="preco-valor" id="val-<?php echo $ins['id']; ?>">
-                R$ <?php echo number_format((float)$ins['valor_unitario'], 2, ',', '.'); ?>
+                R$ <?php echo number_format((float)$ins['valorunitario'], 2, ',', '.'); ?>
             </div>
             <span class="preco-status aguardando" id="status-<?php echo $ins['id']; ?>">Aguardando</span>
             <button class="btn-hist" onclick="verHistorico(<?php echo $ins['id']; ?>, '<?php echo htmlspecialchars(addslashes($ins['nome'])); ?>')"
