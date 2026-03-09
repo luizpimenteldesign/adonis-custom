@@ -1,7 +1,7 @@
 <?php
 /**
  * API: Análise de insumos de uma Pré-OS
- * v5 — Usa apenas colunas que existem na tabela insumos
+ * v6 — Coluna correta: valor_unitario (com underscore)
  */
 
 register_shutdown_function(function() {
@@ -38,36 +38,30 @@ $db   = new Database();
 $conn = $db->getConnection();
 if (!$conn) { echo json_encode(['sucesso'=>false,'erro'=>'Falha na conexão BD']); exit; }
 
-// Detecta colunas opcionais da tabela insumos uma única vez
+// Detecta colunas opcionais da tabela insumos
 $cols_insumos = [];
 try {
     $res = $conn->query('SHOW COLUMNS FROM insumos');
-    foreach ($res->fetchAll(PDO::FETCH_ASSOC) as $col) {
-        $cols_insumos[] = $col['Field'];
-    }
+    foreach ($res->fetchAll(PDO::FETCH_ASSOC) as $col) $cols_insumos[] = $col['Field'];
 } catch (Exception $e) {
     echo json_encode(['sucesso'=>false,'erro'=>'Erro ao ler estrutura BD: '.$e->getMessage()]);
     exit;
 }
 
-$tem_estoque   = in_array('estoque',   $cols_insumos);
+$tem_estoque   = in_array('estoque',     $cols_insumos);
 $tem_tipo      = in_array('tipo_insumo', $cols_insumos);
-$tem_categoria = in_array('categoria', $cols_insumos);
-$tem_ativo     = in_array('ativo',     $cols_insumos);
+$tem_categoria = in_array('categoria',   $cols_insumos);
+$tem_ativo     = in_array('ativo',       $cols_insumos);
 
-// Monta SELECT dinâmico de insumos
-function _select_insumos($tem_estoque, $tem_tipo, $tem_categoria) {
-    $cols = ['i.id', 'i.nome', 'i.unidade', 'i.valorunitario'];
-    if ($tem_estoque)   $cols[] = 'i.estoque';
-    else                $cols[] = '0 AS estoque';
-    if ($tem_tipo)      $cols[] = 'i.tipo_insumo';
-    else                $cols[] = "'variavel' AS tipo_insumo";
-    if ($tem_categoria) $cols[] = 'i.categoria';
-    else                $cols[] = "'' AS categoria";
-    return implode(', ', $cols);
+function _sel($tem_estoque, $tem_tipo, $tem_categoria) {
+    $c = ['i.id','i.nome','i.unidade','i.valorunitario'];
+    $c[] = $tem_estoque   ? 'i.estoque'             : '0 AS estoque';
+    $c[] = $tem_tipo      ? 'i.tipo_insumo'         : "'variavel' AS tipo_insumo";
+    $c[] = $tem_categoria ? 'i.categoria'           : "'' AS categoria";
+    return implode(', ', $c);
 }
 
-$sel = _select_insumos($tem_estoque, $tem_tipo, $tem_categoria);
+$sel = _sel($tem_estoque, $tem_tipo, $tem_categoria);
 
 // ── GET: lista insumos de uma categoria ──────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['categoria'])) {
@@ -83,7 +77,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['categoria'])) {
         WHERE pos.pre_os_id = :pre_os_id";
     $params = [':pre_os_id' => $pre_os_id];
 
-    if ($tem_ativo)     $sql .= ' AND i.ativo = 1';
+    if ($tem_ativo) $sql .= ' AND i.ativo = 1';
     if ($tem_categoria && $categoria !== 'Todos') { $sql .= ' AND i.categoria = :cat'; $params[':cat'] = $categoria; }
     if ($busca) { $sql .= ' AND i.nome LIKE :busca'; $params[':busca'] = "%$busca%"; }
     $sql .= ' ORDER BY i.nome LIMIT 100';
@@ -117,7 +111,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         $pedido = $stmt->fetch(PDO::FETCH_ASSOC);
         if (!$pedido) { echo json_encode(['erro'=>'Pedido não encontrado']); exit; }
 
-        // Serviços
         $stmt_s = $conn->prepare("SELECT s.id, s.nome FROM pre_os_servicos ps JOIN servicos s ON ps.servico_id = s.id WHERE ps.pre_os_id = :id");
         $stmt_s->execute([':id' => $pre_os_id]);
         $servicos = $stmt_s->fetchAll(PDO::FETCH_ASSOC);
@@ -135,16 +128,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             try {
                 $stmt_cat = $conn->prepare($sql_cat);
                 $stmt_cat->execute($servico_ids);
-                $cats = $stmt_cat->fetchAll(PDO::FETCH_COLUMN);
-                $categorias = array_merge(['Todos'], $cats);
+                $categorias = array_merge(['Todos'], $stmt_cat->fetchAll(PDO::FETCH_COLUMN));
             } catch (Exception $e) {}
         }
 
-        // Insumos fixos pré-selecionados
+        // Insumos fixos
         $insumos_fixos = [];
         if (!empty($servico_ids)) {
             $ph = implode(',', array_fill(0, count($servico_ids), '?'));
-
             $usa_qtd = false;
             try { $t = $conn->query("SHOW COLUMNS FROM servicos_insumos LIKE 'quantidade_padrao'"); $usa_qtd = $t->rowCount() > 0; } catch(Exception $e){}
             $qtd_col = $usa_qtd ? 'si.quantidade_padrao' : '1';
@@ -152,10 +143,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             $sql_fixo = "SELECT si.insumo_id, $qtd_col AS quantidade, $sel
                 FROM servicos_insumos si JOIN insumos i ON si.insumo_id = i.id
                 WHERE si.servico_id IN ($ph)";
-
             try { $t = $conn->query("SHOW COLUMNS FROM servicos_insumos LIKE 'tipo_vinculo'"); if($t->rowCount()>0) $sql_fixo .= " AND si.tipo_vinculo='fixo'"; } catch(Exception $e){}
             if ($tem_ativo) $sql_fixo .= ' AND i.ativo=1';
-
             try {
                 $stmt_f = $conn->prepare($sql_fixo);
                 $stmt_f->execute($servico_ids);
@@ -163,12 +152,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             } catch (Exception $e) {}
         }
 
-        // Insumos já salvos
+        // Insumos já salvos — coluna valor_unitario (com underscore)
         $insumos_selecionados = [];
         try {
             $chk = $conn->query("SHOW TABLES LIKE 'pre_os_insumos'");
             if ($chk->rowCount() > 0) {
-                $stmt_sel = $conn->prepare("SELECT poi.insumo_id, poi.quantidade, poi.cliente_fornece, $sel
+                $stmt_sel = $conn->prepare("
+                    SELECT poi.insumo_id, poi.quantidade, poi.cliente_fornece,
+                           poi.valor_unitario AS valorunitario,
+                           $sel
                     FROM pre_os_insumos poi JOIN insumos i ON poi.insumo_id = i.id
                     WHERE poi.pre_os_id = :id");
                 $stmt_sel->execute([':id' => $pre_os_id]);
@@ -208,17 +200,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
         $chk = $conn->query("SHOW TABLES LIKE 'pre_os_insumos'");
         if ($chk->rowCount() === 0) {
-            echo json_encode(['sucesso'=>false,'erro'=>'Tabela pre_os_insumos não existe. Execute a migration.']);
+            echo json_encode(['sucesso'=>false,'erro'=>'Tabela pre_os_insumos não existe.']);
             exit;
         }
 
         $conn->beginTransaction();
         $conn->prepare("DELETE FROM pre_os_insumos WHERE pre_os_id = :id")->execute([':id'=>$pre_os_id]);
 
-        $stmt_ins = $conn->prepare("INSERT INTO pre_os_insumos (pre_os_id, insumo_id, quantidade, valorunitario, cliente_fornece) VALUES (:pid,:iid,:qtd,:val,:cf)");
+        // INSERT usa valor_unitario (nome real da coluna no banco)
+        $stmt_ins = $conn->prepare("
+            INSERT INTO pre_os_insumos (pre_os_id, insumo_id, quantidade, valor_unitario, cliente_fornece)
+            VALUES (:pid, :iid, :qtd, :val, :cf)
+        ");
         $total_insumos = 0.0;
         foreach ($insumos as $ins) {
-            $cf=$ins['cliente_fornece']??0; $qtd=(float)($ins['quantidade']??1); $val=(float)($ins['valorunitario']??0);
+            $cf  = (int)($ins['cliente_fornece'] ?? 0);
+            $qtd = (float)($ins['quantidade'] ?? 1);
+            $val = (float)($ins['valorunitario'] ?? 0);
             $stmt_ins->execute([':pid'=>$pre_os_id,':iid'=>(int)$ins['insumo_id'],':qtd'=>$qtd,':val'=>$val,':cf'=>$cf]);
             if (!$cf) $total_insumos += $qtd * $val;
         }
