@@ -3,11 +3,11 @@
  * Migration 004 — Insumos Fixos vs Variáveis
  *
  * Adiciona:
- *   - insumos.categoria        (varchar 80)  — agrupa por tipo de material
- *   - insumos.tipo_insumo      (enum)        — 'fixo' ou 'variavel'
- *   - insumos.quantidade_padrao(decimal)     — qtd automática quando fixo
- *   - insumosservicos.tipo_vinculo  (enum)   — fixo/variável POR serviço
- *   - insumosservicos.quantidade_padrao      — qtd padrão POR serviço
+ *   - insumos.categoria           (varchar 80)  — agrupa por tipo de material
+ *   - insumos.tipo_insumo         (enum)        — 'fixo' ou 'variavel'
+ *   - insumos.quantidade_padrao   (decimal)     — qtd automática quando fixo
+ *   - servicos_insumos.tipo_vinculo   (enum)    — fixo/variável POR serviço
+ *   - servicos_insumos.quantidade_padrao        — qtd padrão POR serviço (já existe, será ignorada)
  *
  * COMO RODAR: acesse /backend/admin/migrations/004_insumos_fixos_variaveis.php
  */
@@ -38,15 +38,10 @@ $migracoes = [
         'sql'   => "ALTER TABLE insumos ADD COLUMN quantidade_padrao DECIMAL(10,3) NOT NULL DEFAULT 1.000 AFTER tipo_insumo",
         'label' => 'Coluna insumos.quantidade_padrao'
     ],
-    'insumosservicos.tipo_vinculo' => [
-        'check' => "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'insumosservicos' AND COLUMN_NAME = 'tipo_vinculo'",
-        'sql'   => "ALTER TABLE insumosservicos ADD COLUMN tipo_vinculo ENUM('fixo','variavel') NOT NULL DEFAULT 'variavel' AFTER servicoid",
-        'label' => 'Coluna insumosservicos.tipo_vinculo'
-    ],
-    'insumosservicos.quantidade_padrao' => [
-        'check' => "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'insumosservicos' AND COLUMN_NAME = 'quantidade_padrao'",
-        'sql'   => "ALTER TABLE insumosservicos ADD COLUMN quantidade_padrao DECIMAL(10,3) NOT NULL DEFAULT 1.000 AFTER tipo_vinculo",
-        'label' => 'Coluna insumosservicos.quantidade_padrao'
+    'servicos_insumos.tipo_vinculo' => [
+        'check' => "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'servicos_insumos' AND COLUMN_NAME = 'tipo_vinculo'",
+        'sql'   => "ALTER TABLE servicos_insumos ADD COLUMN tipo_vinculo ENUM('fixo','variavel') NOT NULL DEFAULT 'variavel' AFTER insumo_id",
+        'label' => 'Coluna servicos_insumos.tipo_vinculo'
     ],
 ];
 
@@ -64,18 +59,12 @@ foreach ($migracoes as $key => $m) {
     }
 }
 
-// Tenta popular categoria nos insumos existentes com base na coluna 'categoria' antiga (VARCHAR)
-// (o banco atual já tem a coluna 'categoria' em alguns registros legados)
+// Garante tipo_vinculo = variavel em todos os vínculos existentes que ainda não têm valor
 try {
-    $conn->exec("
-        UPDATE insumosservicos isv
-        INNER JOIN insumos i ON i.id = isv.insumoid
-        SET isv.tipo_vinculo = 'variavel'
-        WHERE isv.tipo_vinculo = 'variavel'
-    ");
-    $resultados[] = ['status' => 'ok', 'label' => 'Dados padrão insumosservicos', 'msg' => 'tipo_vinculo=variavel aplicado nos vínculos existentes.'];
+    $affected = $conn->exec("UPDATE servicos_insumos SET tipo_vinculo = 'variavel' WHERE tipo_vinculo IS NULL OR tipo_vinculo = ''");
+    $resultados[] = ['status' => 'ok', 'label' => 'Dados padrão servicos_insumos', 'msg' => 'tipo_vinculo=variavel aplicado nos vínculos existentes (' . $affected . ' linhas).' ];
 } catch (Exception $e) {
-    $resultados[] = ['status' => 'skip', 'label' => 'Dados padrão insumosservicos', 'msg' => $e->getMessage()];
+    $resultados[] = ['status' => 'skip', 'label' => 'Dados padrão servicos_insumos', 'msg' => $e->getMessage()];
 }
 ?>
 <!DOCTYPE html>
