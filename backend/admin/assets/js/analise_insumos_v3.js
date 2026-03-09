@@ -1,8 +1,7 @@
 /**
- * ANÁLISE DE INSUMOS V4.2
- * - Insumos FIXOS chegam pré-selecionados do servidor
- * - Insumos VARIÁVEIS: admin busca por categoria e adiciona manualmente
- * - Log COMPLETO de resposta antes de parsear (mesmo em 500)
+ * ANÁLISE DE INSUMOS V4.3
+ * - Log COMPLETO de resposta
+ * - Verifica existência de elementos DOM antes de manipular
  */
 
 let _dadosAnalise        = null;
@@ -18,31 +17,17 @@ function abrirModalAnalise() {
     fetch('analise_insumos.php?pre_os_id=' + _pedidoId)
         .then(r => {
             console.log('[Análise] HTTP status:', r.status, r.statusText);
-            // Lê o texto SEMPRE (mesmo em sucesso) para logar
             return r.text().then(txt => {
                 console.log('[Análise] Resposta RAW (primeiros 500 chars):', txt.substring(0, 500));
-                if (!r.ok) {
-                    throw new Error('HTTP ' + r.status + ': ' + txt.substring(0, 200));
-                }
-                // Tenta parsear JSON
-                try {
-                    return JSON.parse(txt);
-                } catch (e) {
-                    console.error('[Análise] Erro ao parsear JSON:', e);
-                    throw new Error('Resposta não é JSON válido');
-                }
+                if (!r.ok) throw new Error('HTTP ' + r.status + ': ' + txt.substring(0, 200));
+                try { return JSON.parse(txt); }
+                catch (e) { throw new Error('Resposta não é JSON válido'); }
             });
         })
         .then(data => {
             console.log('[Análise] Dados parseados:', data);
-            if (!data.sucesso) {
-                console.error('[Análise] Erro do servidor:', data.erro);
-                _toast(data.erro || 'Erro ao carregar');
-                fecharModal('modal-analise');
-                return;
-            }
+            if (!data.sucesso) { console.error('[Análise] Erro:', data.erro); _toast(data.erro || 'Erro ao carregar'); fecharModal('modal-analise'); return; }
             _dadosAnalise = data;
-            // Pré-carrega insumos (fixos já vêm do servidor, ou salvos anteriormente)
             _insumosSelecionados = (data.insumos_selecionados || []).map(ins => ({
                 insumo_id:      parseInt(ins.insumo_id),
                 nome:           ins.nome,
@@ -56,29 +41,23 @@ function abrirModalAnalise() {
             }));
             _renderizarInterface();
         })
-        .catch(err => {
-            console.error('[Análise] Exceção:', err);
-            _toast('Erro: ' + err.message);
-            fecharModal('modal-analise');
-        });
+        .catch(err => { console.error('[Análise] Exceção:', err); _toast('Erro: ' + err.message); fecharModal('modal-analise'); });
 }
 
 function _renderizarInterface() {
     const cats = _dadosAnalise.categorias || [];
     let html = '';
 
-    // Resumo serviços
     html += '<div class="analise-resumo"><div class="analise-resumo-title">Serviços do pedido</div>';
     html += '<div class="analise-resumo-tags">';
     (_dadosAnalise.servicos || []).forEach(s => { html += '<span class="analise-tag">' + _esc(s.nome) + '</span>'; });
     if (!(_dadosAnalise.servicos || []).length) html += '<span style="font-size:13px;color:var(--g-text-3)">Nenhum serviço</span>';
     html += '</div></div><hr class="analise-sep">';
 
-    // Categorias para busca de insumos variáveis
     html += '<div class="analise-cats-titulo">Adicionar insumos variáveis por categoria:</div>';
     html += '<div class="analise-cats-grid" id="cats-grid">';
     cats.forEach(cat => {
-        const nome = (cat && typeof cat === 'object') ? cat.nome : String(cat);
+        const nome  = (cat && typeof cat === 'object') ? cat.nome  : String(cat);
         const icone = (cat && typeof cat === 'object' && cat.icone) ? cat.icone : 'category';
         html += '<button class="cat-btn" onclick="_selecionarCategoria(\'' + _esc(nome) + '\')">'
              + '<span class="material-symbols-outlined">' + _esc(icone) + '</span>'
@@ -90,14 +69,12 @@ function _renderizarInterface() {
     }
     html += '</div>';
 
-    // Área de busca da categoria
     html += '<div id="area-insumos-cat" style="display:none">';
     html += '<div class="analise-cat-atual" id="cat-atual-label"></div>';
     html += '<input type="text" class="analise-busca" id="busca-insumo" placeholder="Buscar insumo..." oninput="_buscarInsumosCategoria()">';
     html += '<div class="analise-insumos-disponiveis" id="lista-insumos-disponiveis"></div>';
     html += '</div><hr class="analise-sep">';
 
-    // Insumos selecionados
     html += '<div class="analise-selecionados-titulo" id="sel-titulo">Insumos selecionados (' + _insumosSelecionados.length + ')</div>';
     html += '<div class="analise-selecionados-lista" id="lista-selecionados"></div>';
     html += '<div class="analise-footer"><div class="analise-total-bloco">Total insumos: <strong id="analise-total-ins">—</strong></div></div>';
@@ -121,29 +98,18 @@ function _selecionarCategoria(categoria) {
 function _buscarInsumosCategoria() {
     clearTimeout(_timeoutBuscaAnalise);
     _timeoutBuscaAnalise = setTimeout(() => {
-        const busca = document.getElementById('busca-insumo').value.trim();
+        const busca  = document.getElementById('busca-insumo').value.trim();
         const params = new URLSearchParams({ pre_os_id: _pedidoId, categoria: _categoriaAtual });
         if (busca) params.append('q', busca);
         document.getElementById('lista-insumos-disponiveis').innerHTML =
             '<div style="padding:12px;color:var(--g-text-3);font-size:13px">Buscando...</div>';
         fetch('analise_insumos.php?' + params)
-            .then(r => {
-                return r.text().then(txt => {
-                    if (!r.ok) {
-                        console.error('[Busca insumos] HTTP', r.status, 'Resposta:', txt.substring(0,300));
-                        throw new Error('Erro HTTP ' + r.status);
-                    }
-                    try {
-                        return JSON.parse(txt);
-                    } catch(e) {
-                        console.error('[Busca] Resposta não é JSON:', txt.substring(0,300));
-                        throw new Error('Resposta inválida');
-                    }
-                });
-            })
+            .then(r => r.text().then(txt => {
+                if (!r.ok) { console.error('[Busca] HTTP', r.status, txt.substring(0,300)); throw new Error('Erro HTTP ' + r.status); }
+                try { return JSON.parse(txt); } catch(e) { console.error('[Busca] JSON inválido:', txt.substring(0,300)); throw new Error('Resposta inválida'); }
+            }))
             .then(data => {
                 if (!data.sucesso) {
-                    console.error('[Busca insumos] Erro:', data.erro);
                     document.getElementById('lista-insumos-disponiveis').innerHTML =
                         '<div style="padding:12px;color:var(--g-red);font-size:12px">' + _esc(data.erro || 'Erro ao buscar') + '</div>';
                     return;
@@ -151,7 +117,6 @@ function _buscarInsumosCategoria() {
                 _renderizarInsumosDisponiveis(data.insumos || []);
             })
             .catch(err => {
-                console.error('[Busca insumos] Exceção:', err);
                 document.getElementById('lista-insumos-disponiveis').innerHTML =
                     '<div style="padding:12px;color:var(--g-red);font-size:12px">Erro: ' + _esc(err.message) + '</div>';
             });
@@ -195,15 +160,15 @@ function _renderizarInsumosDisponiveis(insumos) {
 function _adicionarInsumo(id, nome, unidade, valorUnit, estoque, tipoInsumo, categoria) {
     if (_insumosSelecionados.some(s => s.insumo_id == id)) { _toast('Insumo já adicionado'); return; }
     _insumosSelecionados.push({
-        insumo_id:      id,
-        nome:           nome,
-        unidade:        unidade,
-        valorunitario:  parseFloat(valorUnit),
-        quantidade:     1,
+        insumo_id:       id,
+        nome:            nome,
+        unidade:         unidade,
+        valorunitario:   parseFloat(valorUnit),
+        quantidade:      1,
         cliente_fornece: estoque <= 0 ? 1 : 0,
-        estoque:        parseFloat(estoque),
-        tipo_insumo:    tipoInsumo,
-        categoria:      categoria
+        estoque:         parseFloat(estoque),
+        tipo_insumo:     tipoInsumo,
+        categoria:       categoria
     });
     _renderizarInsumosSelecionados();
     _buscarInsumosCategoria();
@@ -236,15 +201,18 @@ function _toggleCFSel(idx, checked) {
 function _recalcularTotal() {
     let total = 0;
     _insumosSelecionados.forEach(i => { if (!i.cliente_fornece) total += i.valorunitario * i.quantidade; });
-    document.getElementById('analise-total-ins').textContent = fmt(total);
+    const el = document.getElementById('analise-total-ins');
+    if (el) el.textContent = fmt(total);
 }
 
 function _renderizarInsumosSelecionados() {
     const container = document.getElementById('lista-selecionados');
-    document.getElementById('sel-titulo').textContent = 'Insumos selecionados (' + _insumosSelecionados.length + ')';
+    const titulo    = document.getElementById('sel-titulo');
+    if (titulo) titulo.textContent = 'Insumos selecionados (' + _insumosSelecionados.length + ')';
     if (!_insumosSelecionados.length) {
-        container.innerHTML = '<div class="analise-vazio">Nenhum insumo selecionado. Insumos fixos dos serviços aparecem automaticamente — adicione variáveis pelas categorias acima.</div>';
-        document.getElementById('analise-total-ins').textContent = fmt(0);
+        if (container) container.innerHTML = '<div class="analise-vazio">Nenhum insumo selecionado. Insumos fixos dos serviços aparecem automaticamente — adicione variáveis pelas categorias acima.</div>';
+        const tot = document.getElementById('analise-total-ins');
+        if (tot) tot.textContent = fmt(0);
         return;
     }
     let html = '';
@@ -256,66 +224,62 @@ function _renderizarInsumosSelecionados() {
         const tipoCls = ins.tipo_insumo === 'fixo' ? 'tipo-fixo' : 'tipo-variavel';
         const tipoTxt = ins.tipo_insumo === 'fixo' ? 'Fixo' : 'Variável';
         html += '<div class="insumo-sel-row" id="sel-row-' + idx + '">';
-        html += '<div class="insumo-sel-main">';
-        html += '<div class="insumo-sel-info">';
+        html += '<div class="insumo-sel-main"><div class="insumo-sel-info">';
         html += '<div class="insumo-sel-nome">' + _esc(ins.nome)
              + ' <span style="font-size:10px;font-weight:600;padding:1px 5px;border-radius:6px" class="' + tipoCls + '">' + tipoTxt + '</span></div>';
-        html += '<div class="insumo-sel-meta">' + _esc(ins.unidade)
-             + ' · R$ ' + ins.valorunitario.toFixed(2) + ' cada';
+        html += '<div class="insumo-sel-meta">' + _esc(ins.unidade) + ' · R$ ' + ins.valorunitario.toFixed(2) + ' cada';
         if (ins.categoria) html += ' · ' + _esc(ins.categoria);
         html += '</div></div>';
-        html += '<input type="number" class="insumo-sel-qtd" value="' + ins.quantidade
-             + '" min="0.001" step="0.001" onchange="_alterarQuantidadeSel(' + idx + ',this.value)">';
+        html += '<input type="number" class="insumo-sel-qtd" value="' + ins.quantidade + '" min="0.001" step="0.001" onchange="_alterarQuantidadeSel(' + idx + ',this.value)">';
         html += '<div class="insumo-sel-valor ' + (cf ? 'riscado' : '') + '" id="sel-val-' + idx + '">' + fmt(cf ? 0 : tot) + '</div>';
-        html += '<button class="insumo-sel-remove" onclick="_removerInsumoSel(' + idx + ')" title="Remover">';
-        html += '<span class="material-symbols-outlined">close</span></button>';
-        html += '</div>';
-        html += '<div class="insumo-sel-footer">';
+        html += '<button class="insumo-sel-remove" onclick="_removerInsumoSel(' + idx + ')" title="Remover"><span class="material-symbols-outlined">close</span></button>';
+        html += '</div><div class="insumo-sel-footer">';
         html += '<label class="insumo-sel-cf"><input type="checkbox" ' + (cf?'checked':'') + ' onchange="_toggleCFSel(' + idx + ',this.checked)"> Cliente fornece</label>';
         html += '</div></div>';
     });
-    container.innerHTML = html;
-    document.getElementById('analise-total-ins').textContent = fmt(totalCobrar);
+    if (container) container.innerHTML = html;
+    const totEl = document.getElementById('analise-total-ins');
+    if (totEl) totEl.textContent = fmt(totalCobrar);
 }
 
 function confirmarAnalise() {
     const btn = document.getElementById('btn-confirmar-analise');
     btn.disabled = true; btn.textContent = 'Salvando...';
     fetch('analise_insumos.php', {
-        method: 'POST',
+        method:  'POST',
         headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({ pre_os_id: _pedidoId, insumos: _insumosSelecionados })
+        body:    JSON.stringify({ pre_os_id: _pedidoId, insumos: _insumosSelecionados })
     })
-    .then(r => {
-        return r.text().then(txt => {
-            if (!r.ok) {
-                console.error('[Confirmar] HTTP', r.status, 'Resposta:', txt.substring(0,300));
-                throw new Error('HTTP ' + r.status);
-            }
-            try {
-                return JSON.parse(txt);
-            } catch(e) {
-                console.error('[Confirmar] Resposta não é JSON:', txt.substring(0,300));
-                throw new Error('Resposta inválida');
-            }
-        });
-    })
+    .then(r => r.text().then(txt => {
+        if (!r.ok) { console.error('[Confirmar] HTTP', r.status, txt.substring(0,300)); throw new Error('HTTP ' + r.status); }
+        try { return JSON.parse(txt); } catch(e) { console.error('[Confirmar] JSON inválido:', txt.substring(0,300)); throw new Error('Resposta inválida'); }
+    }))
     .then(data => {
         if (!data.sucesso) {
-            console.error('[Confirmar Análise] Erro:', data.erro);
+            console.error('[Confirmar] Erro:', data.erro);
             _toast(data.erro || 'Erro ao salvar');
             btn.disabled = false; btn.textContent = 'Confirmar e Orçar →';
             return;
         }
         fecharModal('modal-analise');
-        document.getElementById('status-label').textContent = 'Em Análise';
+
+        // Atualiza badge de status na página (tenta vários IDs possíveis)
+        const statusEl = document.getElementById('status-label')
+                      || document.getElementById('pedido-status')
+                      || document.getElementById('status-badge')
+                      || document.querySelector('[data-status]')
+                      || document.querySelector('.status-badge');
+        if (statusEl) {
+            statusEl.textContent = 'Em Análise';
+            if (statusEl.dataset) statusEl.dataset.status = 'Em analise';
+        }
+
         _abrirOrcamentoComValor(data.total_orcamento, data.total_servicos, data.total_insumos);
     })
     .catch(err => {
-        console.error('[Confirmar Análise] Exceção:', err);
+        console.error('[Confirmar] Exceção:', err);
         _toast('Erro: ' + err.message);
-        btn.disabled=false;
-        btn.textContent='Confirmar e Orçar →';
+        btn.disabled = false; btn.textContent = 'Confirmar e Orçar →';
     });
 }
 
@@ -323,4 +287,4 @@ function _esc(s) {
     return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/'/g,'&#39;').replace(/"/g,'&quot;');
 }
 
-console.log('[V4.2] analise_insumos_v3.js carregado — log completo de HTTP 500.');
+console.log('[V4.3] analise_insumos_v3.js carregado.');
