@@ -1,8 +1,11 @@
 <?php
 /**
  * LOGIN ADMINISTRATIVO - SISTEMA ADONIS
- * Versão: 1.7 - Redirect absoluto
+ * Versão: 1.8 - session_save_path fixo
  */
+
+// Força session_save_path para pasta do projeto (resolve conflito no cPanel)
+ini_set('session.save_path', dirname(__DIR__) . '/sessions');
 
 session_start();
 

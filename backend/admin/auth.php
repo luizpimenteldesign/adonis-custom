@@ -1,5 +1,7 @@
 <?php
-// Inicia sessão apenas se ainda não foi iniciada
+// Força session_save_path para pasta do projeto (resolve conflito no cPanel)
+ini_set('session.save_path', dirname(__DIR__) . '/sessions');
+
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
