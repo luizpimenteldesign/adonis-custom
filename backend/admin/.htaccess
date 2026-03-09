@@ -1,5 +1,8 @@
 # BACKEND ADMIN - CONFIGURAÇÃO DE ACESSO E SEGURANÇA
 
+# Injeta favicon em todas as páginas PHP do admin automaticamente
+php_value auto_prepend_file "/home1/luizpi39/adns.luizpimentel.com/backend/admin/includes/_favicon.php"
+
 # PERMITE ACESSO PÚBLICO (autenticação via auth.php em cada página)
 Require all granted
 
@@ -27,7 +30,7 @@ RewriteRule ^$ login.php [L]
     Require all denied
 </FilesMatch>
 
-# Bloqueia acesso direto a arquivos internos (mas permite criar_tabela_servicos_insumos.php)
+# Bloqueia acesso direto a arquivos internos
 <FilesMatch "^(auth|_sidebar|_sidebar_data|criar_tabela_historico|criar_coluna_prazo)\.php$">
     Require all denied
 </FilesMatch>
