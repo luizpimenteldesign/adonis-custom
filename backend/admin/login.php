@@ -1,12 +1,10 @@
 <?php
 /**
  * LOGIN ADMINISTRATIVO - SISTEMA ADONIS
- * Versão: 1.8 - session_save_path fixo
+ * Versão: 1.9
  */
 
-// Força session_save_path para pasta do projeto (resolve conflito no cPanel)
 ini_set('session.save_path', dirname(__DIR__) . '/sessions');
-
 session_start();
 
 if (isset($_SESSION['admin_logado']) && $_SESSION['admin_logado'] === true) {
@@ -85,8 +83,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login — Adonis Admin</title>
-    <link rel="icon" type="image/png" href="/frontend/public/assets/img/favicon.png">
-    <link rel="shortcut icon" type="image/png" href="/frontend/public/assets/img/favicon.png">
+    <link rel="icon" type="image/png" href="/public/assets/img/favicon.png">
+    <link rel="shortcut icon" type="image/png" href="/public/assets/img/favicon.png">
+    <link rel="apple-touch-icon" href="/public/assets/img/favicon.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="/backend/admin/assets/css/admin.css">
@@ -96,7 +95,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <div class="login-page">
     <div class="login-card">
 
-        <img src="https://adns.luizpimentel.com/adonis-custom/frontend/public/assets/img/Logo-Adonis2.png"
+        <img src="/public/assets/img/Logo-Adonis2.png"
              alt="Adonis Custom" class="login-logo">
 
         <div class="login-title">Área Administrativa</div>
@@ -125,7 +124,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </form>
 
         <div style="margin-top:24px;font-size:13px;color:var(--g-text-3)">
-            <a href="/frontend/index.php" style="color:var(--g-text-3)">← Voltar para o site</a>
+            <a href="/" style="color:var(--g-text-3)">← Voltar para o site</a>
         </div>
 
     </div>
