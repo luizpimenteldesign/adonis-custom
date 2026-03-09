@@ -1,7 +1,6 @@
 /**
- * ANÁLISE DE INSUMOS V4.3
- * - Log COMPLETO de resposta
- * - Verifica existência de elementos DOM antes de manipular
+ * ANÁLISE DE INSUMOS V4.4
+ * - Fix: checkbox "cliente fornece" movido para dentro da linha principal
  */
 
 let _dadosAnalise        = null;
@@ -16,17 +15,14 @@ function abrirModalAnalise() {
 
     fetch('analise_insumos.php?pre_os_id=' + _pedidoId)
         .then(r => {
-            console.log('[Análise] HTTP status:', r.status, r.statusText);
             return r.text().then(txt => {
-                console.log('[Análise] Resposta RAW (primeiros 500 chars):', txt.substring(0, 500));
                 if (!r.ok) throw new Error('HTTP ' + r.status + ': ' + txt.substring(0, 200));
                 try { return JSON.parse(txt); }
                 catch (e) { throw new Error('Resposta não é JSON válido'); }
             });
         })
         .then(data => {
-            console.log('[Análise] Dados parseados:', data);
-            if (!data.sucesso) { console.error('[Análise] Erro:', data.erro); _toast(data.erro || 'Erro ao carregar'); fecharModal('modal-analise'); return; }
+            if (!data.sucesso) { _toast(data.erro || 'Erro ao carregar'); fecharModal('modal-analise'); return; }
             _dadosAnalise = data;
             _insumosSelecionados = (data.insumos_selecionados || []).map(ins => ({
                 insumo_id:      parseInt(ins.insumo_id),
@@ -41,7 +37,7 @@ function abrirModalAnalise() {
             }));
             _renderizarInterface();
         })
-        .catch(err => { console.error('[Análise] Exceção:', err); _toast('Erro: ' + err.message); fecharModal('modal-analise'); });
+        .catch(err => { _toast('Erro: ' + err.message); fecharModal('modal-analise'); });
 }
 
 function _renderizarInterface() {
@@ -64,8 +60,8 @@ function _renderizarInterface() {
              + '<span>' + _esc(nome) + '</span></button>';
     });
     if (!cats.length) {
-        html += '<button class="cat-btn" onclick="_selecionarCategoria(\'Todos\')">';
-        html += '<span class="material-symbols-outlined">grid_view</span><span>Todos</span></button>';
+        html += '<button class="cat-btn" onclick="_selecionarCategoria(\'Todos\')">'
+             + '<span class="material-symbols-outlined">grid_view</span><span>Todos</span></button>';
     }
     html += '</div>';
 
@@ -105,8 +101,8 @@ function _buscarInsumosCategoria() {
             '<div style="padding:12px;color:var(--g-text-3);font-size:13px">Buscando...</div>';
         fetch('analise_insumos.php?' + params)
             .then(r => r.text().then(txt => {
-                if (!r.ok) { console.error('[Busca] HTTP', r.status, txt.substring(0,300)); throw new Error('Erro HTTP ' + r.status); }
-                try { return JSON.parse(txt); } catch(e) { console.error('[Busca] JSON inválido:', txt.substring(0,300)); throw new Error('Resposta inválida'); }
+                if (!r.ok) throw new Error('Erro HTTP ' + r.status);
+                try { return JSON.parse(txt); } catch(e) { throw new Error('Resposta inválida'); }
             }))
             .then(data => {
                 if (!data.sucesso) {
@@ -223,19 +219,26 @@ function _renderizarInsumosSelecionados() {
         if (!cf) totalCobrar += tot;
         const tipoCls = ins.tipo_insumo === 'fixo' ? 'tipo-fixo' : 'tipo-variavel';
         const tipoTxt = ins.tipo_insumo === 'fixo' ? 'Fixo' : 'Variável';
+
         html += '<div class="insumo-sel-row" id="sel-row-' + idx + '">';
-        html += '<div class="insumo-sel-main"><div class="insumo-sel-info">';
+
+        // Linha 1: nome + meta
+        html += '<div class="insumo-sel-info">';
         html += '<div class="insumo-sel-nome">' + _esc(ins.nome)
              + ' <span style="font-size:10px;font-weight:600;padding:1px 5px;border-radius:6px" class="' + tipoCls + '">' + tipoTxt + '</span></div>';
         html += '<div class="insumo-sel-meta">' + _esc(ins.unidade) + ' · R$ ' + ins.valorunitario.toFixed(2) + ' cada';
         if (ins.categoria) html += ' · ' + _esc(ins.categoria);
         html += '</div></div>';
+
+        // Linha 2: controles na mesma linha (qtd + cliente fornece + valor + remover)
+        html += '<div class="insumo-sel-controles">';
         html += '<input type="number" class="insumo-sel-qtd" value="' + ins.quantidade + '" min="0.001" step="0.001" onchange="_alterarQuantidadeSel(' + idx + ',this.value)">';
+        html += '<label class="insumo-sel-cf"><input type="checkbox" ' + (cf ? 'checked' : '') + ' onchange="_toggleCFSel(' + idx + ',this.checked)"> Cliente fornece</label>';
         html += '<div class="insumo-sel-valor ' + (cf ? 'riscado' : '') + '" id="sel-val-' + idx + '">' + fmt(cf ? 0 : tot) + '</div>';
         html += '<button class="insumo-sel-remove" onclick="_removerInsumoSel(' + idx + ')" title="Remover"><span class="material-symbols-outlined">close</span></button>';
-        html += '</div><div class="insumo-sel-footer">';
-        html += '<label class="insumo-sel-cf"><input type="checkbox" ' + (cf?'checked':'') + ' onchange="_toggleCFSel(' + idx + ',this.checked)"> Cliente fornece</label>';
-        html += '</div></div>';
+        html += '</div>';
+
+        html += '</div>';
     });
     if (container) container.innerHTML = html;
     const totEl = document.getElementById('analise-total-ins');
@@ -251,19 +254,16 @@ function confirmarAnalise() {
         body:    JSON.stringify({ pre_os_id: _pedidoId, insumos: _insumosSelecionados })
     })
     .then(r => r.text().then(txt => {
-        if (!r.ok) { console.error('[Confirmar] HTTP', r.status, txt.substring(0,300)); throw new Error('HTTP ' + r.status); }
-        try { return JSON.parse(txt); } catch(e) { console.error('[Confirmar] JSON inválido:', txt.substring(0,300)); throw new Error('Resposta inválida'); }
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        try { return JSON.parse(txt); } catch(e) { throw new Error('Resposta inválida'); }
     }))
     .then(data => {
         if (!data.sucesso) {
-            console.error('[Confirmar] Erro:', data.erro);
             _toast(data.erro || 'Erro ao salvar');
             btn.disabled = false; btn.textContent = 'Confirmar e Orçar →';
             return;
         }
         fecharModal('modal-analise');
-
-        // Atualiza badge de status na página (tenta vários IDs possíveis)
         const statusEl = document.getElementById('status-label')
                       || document.getElementById('pedido-status')
                       || document.getElementById('status-badge')
@@ -273,11 +273,9 @@ function confirmarAnalise() {
             statusEl.textContent = 'Em Análise';
             if (statusEl.dataset) statusEl.dataset.status = 'Em analise';
         }
-
         _abrirOrcamentoComValor(data.total_orcamento, data.total_servicos, data.total_insumos);
     })
     .catch(err => {
-        console.error('[Confirmar] Exceção:', err);
         _toast('Erro: ' + err.message);
         btn.disabled = false; btn.textContent = 'Confirmar e Orçar →';
     });
@@ -287,4 +285,4 @@ function _esc(s) {
     return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/'/g,'&#39;').replace(/"/g,'&quot;');
 }
 
-console.log('[V4.3] analise_insumos_v3.js carregado.');
+console.log('[V4.4] analise_insumos_v3.js carregado.');
