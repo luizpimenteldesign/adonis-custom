@@ -97,10 +97,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             $categorias = $stmt_cat->fetchAll(PDO::FETCH_COLUMN);
         }
     } catch (Exception $e) {}
-    // Garante "Todos" sempre presente
     array_unshift($categorias, 'Todos');
 
-    // Insumos FIXOS pré-selecionados pelos serviços (tipo_vinculo = 'fixo')
+    // Insumos FIXOS pré-selecionados (tipo_vinculo = 'fixo')
     $insumos_fixos = [];
     try {
         $servico_ids = array_column($servicos, 'id');
@@ -120,7 +119,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         }
     } catch (Exception $e) {}
 
-    // Insumos já salvos para este pedido (se reabrindo análise)
+    // Insumos já salvos para este pedido
     $insumos_selecionados = [];
     try {
         $stmt_sel = $conn->prepare("
@@ -134,7 +133,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         $insumos_selecionados = $stmt_sel->fetchAll(PDO::FETCH_ASSOC);
     } catch (Exception $e) {}
 
-    // Se não há insumos salvos ainda, pré-carrega os fixos
+    // Se não há salvos, pré-carrega os fixos
     if (empty($insumos_selecionados)) {
         $insumos_selecionados = array_map(function($ins) {
             return [
@@ -167,12 +166,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $pre_os_id = (int)($body['pre_os_id'] ?? 0);
     $insumos   = $body['insumos'] ?? [];
 
-    if (!$pre_os_id) { echo json_encode(['erro'=>'ID inválido']); exit; }
+    if (!$pre_os_id) { echo json_encode(['sucesso'=>false,'erro'=>'ID inválido']); exit; }
 
     try {
         $conn->beginTransaction();
-        $conn->prepare("DELETE FROM pre_os_insumos WHERE pre_os_id=:id")->execute([':id'=>$pre_os_id]);
 
+        // Limpa insumos anteriores
+        $conn->prepare("DELETE FROM pre_os_insumos WHERE pre_os_id = :id")
+             ->execute([':id' => $pre_os_id]);
+
+        // Insere os confirmados
         $stmt_ins = $conn->prepare("
             INSERT INTO pre_os_insumos (pre_os_id, insumo_id, quantidade, valorunitario, cliente_fornece)
             VALUES (:pre_os_id, :insumo_id, :qtd, :valor, :cf)
@@ -192,34 +195,42 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!$cf) $total_insumos += $qtd * $valor;
         }
 
+        // Atualiza status
         $conn->prepare("UPDATE pre_os SET status='Em analise', atualizado_em=NOW() WHERE id=:id")
-             ->execute([':id'=>$pre_os_id]);
+             ->execute([':id' => $pre_os_id]);
 
+        // Auditoria (opcional)
         try {
             $conn->prepare("
                 INSERT INTO auditoria (usuario_id, entidade, entidade_id, acao, valor_novo)
-                VALUES (:uid,'pre_os',:eid,'edicao','Em analise')
-            ")->execute([':uid'=>$_SESSION['usuario_id']??null,':eid'=>$pre_os_id]);
+                VALUES (:uid, 'pre_os', :eid, 'edicao', 'Em analise')
+            ")->execute([':uid' => $_SESSION['usuario_id'] ?? null, ':eid' => $pre_os_id]);
         } catch (Exception $e) {}
 
         $conn->commit();
 
-        $total_servicos = (float)$conn->prepare("
-            SELECT COALESCE(SUM(s.valor_base),0) FROM pre_os_servicos ps
-            JOIN servicos s ON ps.servico_id=s.id WHERE ps.pre_os_id=:id
-        ")->execute([':id'=>$pre_os_id]) ? $conn->query("SELECT COALESCE(SUM(s.valor_base),0) FROM pre_os_servicos ps JOIN servicos s ON ps.servico_id=s.id WHERE ps.pre_os_id=$pre_os_id")->fetchColumn() : 0;
+        // Total dos serviços (query parametrizada)
+        $stmt_sv = $conn->prepare("
+            SELECT COALESCE(SUM(s.valor_base), 0)
+            FROM pre_os_servicos ps
+            JOIN servicos s ON ps.servico_id = s.id
+            WHERE ps.pre_os_id = :id
+        ");
+        $stmt_sv->execute([':id' => $pre_os_id]);
+        $total_servicos = (float)$stmt_sv->fetchColumn();
 
         echo json_encode([
-            'sucesso'        => true,
-            'total_servicos' => round($total_servicos, 2),
-            'total_insumos'  => round($total_insumos, 2),
-            'total_orcamento'=> round($total_servicos + $total_insumos, 2),
+            'sucesso'         => true,
+            'total_servicos'  => round($total_servicos, 2),
+            'total_insumos'   => round($total_insumos, 2),
+            'total_orcamento' => round($total_servicos + $total_insumos, 2),
         ]);
+
     } catch (PDOException $e) {
-        $conn->rollBack();
-        echo json_encode(['erro'=>$e->getMessage()]);
+        if ($conn->inTransaction()) $conn->rollBack();
+        echo json_encode(['sucesso'=>false,'erro'=>$e->getMessage()]);
     }
     exit;
 }
 
-echo json_encode(['erro'=>'Método não suportado']);
+echo json_encode(['sucesso'=>false,'erro'=>'Método não suportado']);
