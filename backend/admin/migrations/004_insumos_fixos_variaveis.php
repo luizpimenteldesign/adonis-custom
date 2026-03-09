@@ -2,12 +2,11 @@
 /**
  * Migration 004 — Insumos Fixos vs Variáveis
  *
- * Adiciona:
- *   - insumos.categoria           (varchar 80)  — agrupa por tipo de material
- *   - insumos.tipo_insumo         (enum)        — 'fixo' ou 'variavel'
- *   - insumos.quantidade_padrao   (decimal)     — qtd automática quando fixo
- *   - servicos_insumos.tipo_vinculo   (enum)    — fixo/variável POR serviço
- *   - servicos_insumos.quantidade_padrao        — qtd padrão POR serviço (já existe, será ignorada)
+ * O que faz:
+ *   1. Garante colunas novas em insumos (categoria, tipo_insumo, quantidade_padrao)
+ *   2. Cria a tabela servicos_insumos (padrão definitivo) se não existir
+ *   3. Adiciona coluna tipo_vinculo em servicos_insumos se faltar
+ *   4. Migra dados das tabelas legadas (insumos_servicos) se existirem
  *
  * COMO RODAR: acesse /backend/admin/migrations/004_insumos_fixos_variaveis.php
  */
@@ -22,49 +21,92 @@ $conn = $db->getConnection();
 
 $resultados = [];
 
-$migracoes = [
-    'insumos.categoria' => [
-        'check' => "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'insumos' AND COLUMN_NAME = 'categoria'",
-        'sql'   => "ALTER TABLE insumos ADD COLUMN categoria VARCHAR(80) DEFAULT NULL AFTER modelo",
-        'label' => 'Coluna insumos.categoria'
-    ],
-    'insumos.tipo_insumo' => [
-        'check' => "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'insumos' AND COLUMN_NAME = 'tipo_insumo'",
-        'sql'   => "ALTER TABLE insumos ADD COLUMN tipo_insumo ENUM('fixo','variavel') NOT NULL DEFAULT 'variavel' AFTER categoria",
-        'label' => 'Coluna insumos.tipo_insumo'
-    ],
-    'insumos.quantidade_padrao' => [
-        'check' => "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'insumos' AND COLUMN_NAME = 'quantidade_padrao'",
-        'sql'   => "ALTER TABLE insumos ADD COLUMN quantidade_padrao DECIMAL(10,3) NOT NULL DEFAULT 1.000 AFTER tipo_insumo",
-        'label' => 'Coluna insumos.quantidade_padrao'
-    ],
-    'servicos_insumos.tipo_vinculo' => [
-        'check' => "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'servicos_insumos' AND COLUMN_NAME = 'tipo_vinculo'",
-        'sql'   => "ALTER TABLE servicos_insumos ADD COLUMN tipo_vinculo ENUM('fixo','variavel') NOT NULL DEFAULT 'variavel' AFTER insumo_id",
-        'label' => 'Coluna servicos_insumos.tipo_vinculo'
-    ],
-];
+function col_existe($conn, $tabela, $coluna) {
+    return (int) $conn->query(
+        "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+         WHERE TABLE_SCHEMA = DATABASE()
+         AND TABLE_NAME = '{$tabela}'
+         AND COLUMN_NAME = '{$coluna}'"
+    )->fetchColumn() > 0;
+}
 
-foreach ($migracoes as $key => $m) {
+function tabela_existe($conn, $tabela) {
+    return (int) $conn->query(
+        "SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES
+         WHERE TABLE_SCHEMA = DATABASE()
+         AND TABLE_NAME = '{$tabela}'"
+    )->fetchColumn() > 0;
+}
+
+// ─── PASSO 1 — Colunas novas em `insumos` ───
+$colunas_insumos = [
+    ['col'=>'categoria',        'sql'=>"ALTER TABLE insumos ADD COLUMN categoria VARCHAR(80) DEFAULT NULL AFTER modelo",                                         'label'=>'insumos.categoria'],
+    ['col'=>'tipo_insumo',      'sql'=>"ALTER TABLE insumos ADD COLUMN tipo_insumo ENUM('fixo','variavel') NOT NULL DEFAULT 'variavel' AFTER categoria",        'label'=>'insumos.tipo_insumo'],
+    ['col'=>'quantidade_padrao','sql'=>"ALTER TABLE insumos ADD COLUMN quantidade_padrao DECIMAL(10,3) NOT NULL DEFAULT 1.000 AFTER tipo_insumo",               'label'=>'insumos.quantidade_padrao'],
+];
+foreach ($colunas_insumos as $c) {
     try {
-        $existe = (int) $conn->query($m['check'])->fetchColumn();
-        if ($existe) {
-            $resultados[] = ['status' => 'skip', 'label' => $m['label'], 'msg' => 'Já existe, pulado.'];
+        if (col_existe($conn, 'insumos', $c['col'])) {
+            $resultados[] = ['status'=>'skip','label'=>$c['label'],'msg'=>'Já existe, pulado.'];
         } else {
-            $conn->exec($m['sql']);
-            $resultados[] = ['status' => 'ok', 'label' => $m['label'], 'msg' => 'Criado com sucesso.'];
+            $conn->exec($c['sql']);
+            $resultados[] = ['status'=>'ok','label'=>$c['label'],'msg'=>'Criado com sucesso.'];
         }
     } catch (Exception $e) {
-        $resultados[] = ['status' => 'erro', 'label' => $m['label'], 'msg' => $e->getMessage()];
+        $resultados[] = ['status'=>'erro','label'=>$c['label'],'msg'=>$e->getMessage()];
     }
 }
 
-// Garante tipo_vinculo = variavel em todos os vínculos existentes que ainda não têm valor
+// ─── PASSO 2 — Cria `servicos_insumos` se não existir ───
 try {
-    $affected = $conn->exec("UPDATE servicos_insumos SET tipo_vinculo = 'variavel' WHERE tipo_vinculo IS NULL OR tipo_vinculo = ''");
-    $resultados[] = ['status' => 'ok', 'label' => 'Dados padrão servicos_insumos', 'msg' => 'tipo_vinculo=variavel aplicado nos vínculos existentes (' . $affected . ' linhas).' ];
+    if (tabela_existe($conn, 'servicos_insumos')) {
+        $resultados[] = ['status'=>'skip','label'=>'Tabela servicos_insumos','msg'=>'Já existe, pulado.'];
+    } else {
+        $conn->exec("
+            CREATE TABLE servicos_insumos (
+                id                INT AUTO_INCREMENT PRIMARY KEY,
+                servico_id        INT NOT NULL,
+                insumo_id         INT NOT NULL,
+                tipo_vinculo      ENUM('fixo','variavel') NOT NULL DEFAULT 'variavel',
+                quantidade_padrao DECIMAL(10,3) NOT NULL DEFAULT 1.000,
+                criado_em         TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE KEY unico (servico_id, insumo_id),
+                INDEX idx_servico (servico_id),
+                INDEX idx_insumo  (insumo_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+        ");
+        $resultados[] = ['status'=>'ok','label'=>'Tabela servicos_insumos','msg'=>'Criada com sucesso.'];
+    }
 } catch (Exception $e) {
-    $resultados[] = ['status' => 'skip', 'label' => 'Dados padrão servicos_insumos', 'msg' => $e->getMessage()];
+    $resultados[] = ['status'=>'erro','label'=>'Tabela servicos_insumos','msg'=>$e->getMessage()];
+}
+
+// ─── PASSO 3 — Garante tipo_vinculo na tabela (caso já existisse sem ela) ───
+try {
+    if (!col_existe($conn, 'servicos_insumos', 'tipo_vinculo')) {
+        $conn->exec("ALTER TABLE servicos_insumos ADD COLUMN tipo_vinculo ENUM('fixo','variavel') NOT NULL DEFAULT 'variavel' AFTER insumo_id");
+        $resultados[] = ['status'=>'ok','label'=>'servicos_insumos.tipo_vinculo','msg'=>'Coluna adicionada.'];
+    } else {
+        $resultados[] = ['status'=>'skip','label'=>'servicos_insumos.tipo_vinculo','msg'=>'Já existe, pulado.'];
+    }
+} catch (Exception $e) {
+    $resultados[] = ['status'=>'erro','label'=>'servicos_insumos.tipo_vinculo','msg'=>$e->getMessage()];
+}
+
+// ─── PASSO 4 — Migra dados legados de `insumos_servicos` se existir ───
+try {
+    if (tabela_existe($conn, 'insumos_servicos')) {
+        $migrados = $conn->exec("
+            INSERT IGNORE INTO servicos_insumos (servico_id, insumo_id, tipo_vinculo, quantidade_padrao)
+            SELECT servicoid, insumoid, 'variavel', 1.000
+            FROM insumos_servicos
+        ");
+        $resultados[] = ['status'=>'ok','label'=>'Migração legado insumos_servicos','msg'=> $migrados . ' vínculos migrados.'];
+    } else {
+        $resultados[] = ['status'=>'skip','label'=>'Migração legado insumos_servicos','msg'=>'Tabela legada não encontrada (OK, banco está limpo).'];
+    }
+} catch (Exception $e) {
+    $resultados[] = ['status'=>'erro','label'=>'Migração legado insumos_servicos','msg'=>$e->getMessage()];
 }
 ?>
 <!DOCTYPE html>
