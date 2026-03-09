@@ -1,6 +1,6 @@
 <?php
 /**
- * _sidebar.php — sidebar colapsável compartilhada
+ * _sidebar.php — sidebar colasável compartilhada
  * Requer: $sidebar_nav, $sidebar_stats, $filtro_status, $current_page
  * Ícones: Material Symbols Outlined (carregado via admin.css ou head)
  */
@@ -67,7 +67,7 @@
     <?php endforeach; ?>
     </nav>
 
-    <a href="perfil.php" class="sidebar-user" title="Editar perfil">
+    <a href="/backend/admin/perfil.php" class="sidebar-user" title="Editar perfil">
         <div class="sidebar-user-avatar"><?php echo strtoupper(substr($_SESSION['admin_nome']??'A',0,1)); ?></div>
         <div class="sidebar-user-info">
             <div class="sidebar-user-name"><?php echo htmlspecialchars($_SESSION['admin_nome']??'Admin'); ?></div>
@@ -75,7 +75,7 @@
         </div>
     </a>
     
-    <a href="logout.php" class="sidebar-logout-btn" title="Sair">
+    <a href="/backend/admin/logout.php" class="sidebar-logout-btn" title="Sair">
         <span class="material-symbols-outlined">logout</span>
         Sair
     </a>
