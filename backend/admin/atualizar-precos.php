@@ -5,41 +5,64 @@ require_once '../config/Database.php';
 $db   = new Database();
 $conn = $db->getConnection();
 
-// Cria tabela de histórico se não existir
-$conn->exec("
-    CREATE TABLE IF NOT EXISTS `insumos_precos_historico` (
-        `id`             INT(11) NOT NULL AUTO_INCREMENT,
-        `insumo_id`      INT(11) NOT NULL,
-        `preco_anterior` DECIMAL(10,2) NOT NULL DEFAULT 0.00,
-        `preco_novo`     DECIMAL(10,2) NOT NULL DEFAULT 0.00,
-        `variacao_pct`   DECIMAL(6,2) NOT NULL DEFAULT 0.00,
-        `fonte`          VARCHAR(50) NOT NULL DEFAULT 'mercadolivre',
-        `query_usada`    VARCHAR(200) DEFAULT NULL,
-        `atualizado_em`  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        PRIMARY KEY (`id`),
-        KEY `idx_insumo_id` (`insumo_id`)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-");
+// Cria tabela de histórico se não existir (com tratamento de erro)
+try {
+    $conn->exec("
+        CREATE TABLE IF NOT EXISTS `insumos_precos_historico` (
+            `id`             INT(11) NOT NULL AUTO_INCREMENT,
+            `insumo_id`      INT(11) NOT NULL,
+            `preco_anterior` DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+            `preco_novo`     DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+            `variacao_pct`   DECIMAL(6,2) NOT NULL DEFAULT 0.00,
+            `fonte`          VARCHAR(50) NOT NULL DEFAULT 'mercadolivre',
+            `query_usada`    VARCHAR(200) DEFAULT NULL,
+            `atualizado_em`  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (`id`),
+            KEY `idx_insumo_id` (`insumo_id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    ");
+} catch (Exception $e) {
+    // Sem permissão CREATE ou já existe com estrutura diferente — ignora e segue
+}
 
 // ── CONFIGURAÇÕES ───────────────────────────────────────────
-define('ML_SITE',       'MLB');          // Brasil
-define('ML_LIMIT',      5);              // Resultados por busca
-define('MIN_VARIACAO',  3.0);            // Só atualiza se variar > 3%
-define('ML_TIMEOUT',    8);              // Timeout da requisição (s)
+define('ML_SITE',      'MLB');
+define('ML_LIMIT',     5);
+define('MIN_VARIACAO', 3.0);
+define('ML_TIMEOUT',   8);
+
+// ── Verifica se a tabela de histórico existe de fato ─────────────────
+try {
+    $conn->query('SELECT 1 FROM insumos_precos_historico LIMIT 1');
+    $historico_existe = true;
+} catch (Exception $e) {
+    $historico_existe = false;
+}
 
 // ── API: executar atualização (AJAX) ────────────────────────
 if (isset($_POST['action']) && $_POST['action'] === 'atualizar') {
     header('Content-Type: application/json');
 
+    if (!$historico_existe) {
+        echo json_encode(['ok' => false, 'erro' => 'Tabela de histórico não foi criada. Verifique permissões do banco.']);
+        exit;
+    }
+
     $insumo_id = (int)($_POST['insumo_id'] ?? 0);
     if (!$insumo_id) { echo json_encode(['ok' => false, 'erro' => 'ID inválido']); exit; }
 
-    $insumo = $conn->prepare('SELECT id, nome, valorunitario FROM insumos WHERE id = ? AND ativo = 1');
-    $insumo->execute([$insumo_id]);
-    $ins = $insumo->fetch(PDO::FETCH_ASSOC);
+    try {
+        $insumo = $conn->prepare('SELECT id, nome, valorunitario FROM insumos WHERE id = ? AND ativo = 1');
+        $insumo->execute([$insumo_id]);
+        $ins = $insumo->fetch(PDO::FETCH_ASSOC);
+    } catch (Exception $e) {
+        echo json_encode(['ok' => false, 'erro' => 'Erro ao buscar insumo: ' . $e->getMessage()]);
+        exit;
+    }
+
     if (!$ins) { echo json_encode(['ok' => false, 'erro' => 'Insumo não encontrado']); exit; }
 
-    $query   = trim($_POST['query'] ?? $ins['nome']);
+    $query       = trim($_POST['query'] ?? $ins['nome']);
     $preco_atual = (float)$ins['valorunitario'];
 
     // Busca na API do Mercado Livre
@@ -67,38 +90,37 @@ if (isset($_POST['action']) && $_POST['action'] === 'atualizar') {
         exit;
     }
 
-    // Coleta preços e calcula mediana
     $precos = array_filter(array_column($data['results'], 'price'), fn($p) => $p > 0);
     if (empty($precos)) {
         echo json_encode(['ok' => false, 'erro' => 'Resultados sem preço válido']);
         exit;
     }
     sort($precos);
-    $n      = count($precos);
+    $n       = count($precos);
     $mediana = $n % 2 === 0
         ? ($precos[$n/2 - 1] + $precos[$n/2]) / 2
         : $precos[intval($n/2)];
     $mediana = round($mediana, 2);
 
-    // Verifica variação mínima
     $variacao_pct = $preco_atual > 0
         ? round((($mediana - $preco_atual) / $preco_atual) * 100, 2)
         : 100.0;
 
     $atualizado = false;
     if (abs($variacao_pct) >= MIN_VARIACAO || $preco_atual == 0) {
-        // Atualiza preço no insumo
-        $conn->prepare('UPDATE insumos SET valorunitario = ? WHERE id = ?')
-             ->execute([$mediana, $insumo_id]);
-
-        // Grava histórico
-        $conn->prepare('
-            INSERT INTO insumos_precos_historico
-                (insumo_id, preco_anterior, preco_novo, variacao_pct, fonte, query_usada)
-            VALUES (?, ?, ?, ?, "mercadolivre", ?)
-        ')->execute([$insumo_id, $preco_atual, $mediana, $variacao_pct, $query]);
-
-        $atualizado = true;
+        try {
+            $conn->prepare('UPDATE insumos SET valorunitario = ? WHERE id = ?')
+                 ->execute([$mediana, $insumo_id]);
+            $conn->prepare('
+                INSERT INTO insumos_precos_historico
+                    (insumo_id, preco_anterior, preco_novo, variacao_pct, fonte, query_usada)
+                VALUES (?, ?, ?, ?, "mercadolivre", ?)
+            ')->execute([$insumo_id, $preco_atual, $mediana, $variacao_pct, $query]);
+            $atualizado = true;
+        } catch (Exception $e) {
+            echo json_encode(['ok' => false, 'erro' => 'Erro ao salvar: ' . $e->getMessage()]);
+            exit;
+        }
     }
 
     echo json_encode([
@@ -120,29 +142,48 @@ if (isset($_POST['action']) && $_POST['action'] === 'atualizar') {
 // ── API: buscar histórico de um insumo ───────────────────────
 if (isset($_GET['action']) && $_GET['action'] === 'historico') {
     header('Content-Type: application/json');
+    if (!$historico_existe) { echo json_encode([]); exit; }
     $id = (int)($_GET['id'] ?? 0);
-    $rows = $conn->prepare('
-        SELECT preco_anterior, preco_novo, variacao_pct, fonte, query_usada, atualizado_em
-        FROM insumos_precos_historico
-        WHERE insumo_id = ?
-        ORDER BY atualizado_em DESC
-        LIMIT 20
-    ');
-    $rows->execute([$id]);
-    echo json_encode($rows->fetchAll(PDO::FETCH_ASSOC));
+    try {
+        $rows = $conn->prepare('
+            SELECT preco_anterior, preco_novo, variacao_pct, fonte, query_usada, atualizado_em
+            FROM insumos_precos_historico
+            WHERE insumo_id = ?
+            ORDER BY atualizado_em DESC
+            LIMIT 20
+        ');
+        $rows->execute([$id]);
+        echo json_encode($rows->fetchAll(PDO::FETCH_ASSOC));
+    } catch (Exception $e) {
+        echo json_encode([]);
+    }
     exit;
 }
 
 // ── CARREGA INSUMOS PARA A PÁGINA ───────────────────────────
-$insumos = $conn->query('
-    SELECT i.id, i.nome, i.unidade, i.valorunitario,
-           MAX(h.atualizado_em) as ultima_atualizacao
-    FROM insumos i
-    LEFT JOIN insumos_precos_historico h ON h.insumo_id = i.id AND h.fonte = "mercadolivre"
-    WHERE i.ativo = 1
-    GROUP BY i.id
-    ORDER BY i.nome
-')->fetchAll(PDO::FETCH_ASSOC);
+try {
+    if ($historico_existe) {
+        $insumos = $conn->query('
+            SELECT i.id, i.nome, i.unidade, i.valorunitario,
+                   MAX(h.atualizado_em) as ultima_atualizacao
+            FROM insumos i
+            LEFT JOIN insumos_precos_historico h ON h.insumo_id = i.id AND h.fonte = "mercadolivre"
+            WHERE i.ativo = 1
+            GROUP BY i.id
+            ORDER BY i.nome
+        ')->fetchAll(PDO::FETCH_ASSOC);
+    } else {
+        $insumos = $conn->query('
+            SELECT id, nome, unidade, valorunitario, NULL as ultima_atualizacao
+            FROM insumos
+            WHERE ativo = 1
+            ORDER BY nome
+        ')->fetchAll(PDO::FETCH_ASSOC);
+    }
+} catch (Exception $e) {
+    $insumos = [];
+    $erro_carregamento = $e->getMessage();
+}
 
 $current_page = 'atualizar-precos.php';
 $v = time();
@@ -210,9 +251,7 @@ include '_sidebar_data.php';
         border-radius:4px; transition:width .4s;
         width:0%;
     }
-    .stats-row {
-        display:flex; gap:12px; flex-wrap:wrap; margin-bottom:20px;
-    }
+    .stats-row { display:flex; gap:12px; flex-wrap:wrap; margin-bottom:20px; }
     .stat-box {
         flex:1; min-width:120px; padding:14px 16px;
         background:var(--g-surface); border:1px solid var(--g-border);
@@ -229,6 +268,10 @@ include '_sidebar_data.php';
         background:#1e1e2e; color:#cdd6f4; font-family:monospace;
         padding:16px; border-radius:8px; font-size:13px;
         white-space:pre; overflow-x:auto;
+    }
+    .aviso-tabela {
+        background:#fef9c3; border:1px solid #fcd34d; border-radius:8px;
+        padding:12px 16px; font-size:13px; color:#92400e; margin-bottom:16px;
     }
     </style>
 </head>
@@ -252,10 +295,35 @@ include '_sidebar_data.php';
                 </h1>
                 <div class="page-subtitle">Busca preços de referência no Mercado Livre e atualiza automaticamente</div>
             </div>
-            <button class="btn btn-primary" id="btn-atualizar-todos" onclick="atualizarTodos()">
+            <button class="btn btn-primary" id="btn-atualizar-todos" onclick="atualizarTodos()" <?php echo !$historico_existe ? 'disabled title="Crie a tabela de histórico primeiro"' : ''; ?>>
                 <span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle">sync</span> Atualizar Todos
             </button>
         </div>
+
+        <?php if (!$historico_existe): ?>
+        <div class="aviso-tabela">
+            <strong>⚠️ Tabela de histórico não encontrada.</strong> O usuário do banco não tem permissão para criar tabelas automaticamente.
+            Execute o SQL abaixo manualmente no phpMyAdmin:
+            <pre style="margin:8px 0 0;font-size:12px;background:#fff8;padding:8px;border-radius:4px;overflow-x:auto">CREATE TABLE IF NOT EXISTS `insumos_precos_historico` (
+  `id` INT(11) NOT NULL AUTO_INCREMENT,
+  `insumo_id` INT(11) NOT NULL,
+  `preco_anterior` DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+  `preco_novo` DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+  `variacao_pct` DECIMAL(6,2) NOT NULL DEFAULT 0.00,
+  `fonte` VARCHAR(50) NOT NULL DEFAULT 'mercadolivre',
+  `query_usada` VARCHAR(200) DEFAULT NULL,
+  `atualizado_em` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_insumo_id` (`insumo_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;</pre>
+        </div>
+        <?php endif; ?>
+
+        <?php if (isset($erro_carregamento)): ?>
+        <div class="aviso-tabela">
+            <strong>Erro ao carregar insumos:</strong> <?php echo htmlspecialchars($erro_carregamento); ?>
+        </div>
+        <?php endif; ?>
 
         <!-- Estatísticas -->
         <div class="stats-row">
@@ -290,9 +358,7 @@ include '_sidebar_data.php';
         <!-- Lista de insumos -->
         <div id="lista-insumos">
         <?php foreach ($insumos as $ins): ?>
-        <?php
-            $ultima = $ins['ultima_atualizacao'] ? date('d/m/Y H:i', strtotime($ins['ultima_atualizacao'])) : null;
-        ?>
+        <?php $ultima = !empty($ins['ultima_atualizacao']) ? date('d/m/Y H:i', strtotime($ins['ultima_atualizacao'])) : null; ?>
         <div class="preco-card" id="card-<?php echo $ins['id']; ?>" data-id="<?php echo $ins['id']; ?>">
             <div>
                 <div class="preco-nome"><?php echo htmlspecialchars($ins['nome']); ?></div>
@@ -306,11 +372,17 @@ include '_sidebar_data.php';
             </div>
             <span class="preco-status aguardando" id="status-<?php echo $ins['id']; ?>">Aguardando</span>
             <button class="btn-hist" onclick="verHistorico(<?php echo $ins['id']; ?>, '<?php echo htmlspecialchars(addslashes($ins['nome'])); ?>')"
-                title="Ver histórico de preços">
+                title="Ver histórico de preços" <?php echo !$historico_existe ? 'disabled' : ''; ?>>
                 <span class="material-symbols-outlined" style="font-size:14px">history</span>
             </button>
         </div>
         <?php endforeach; ?>
+        <?php if (empty($insumos) && !isset($erro_carregamento)): ?>
+        <div style="text-align:center;padding:40px;color:var(--g-text-3)">
+            <span class="material-symbols-outlined" style="font-size:40px">inventory_2</span>
+            <div style="margin-top:8px">Nenhum insumo ativo encontrado.</div>
+        </div>
+        <?php endif; ?>
         </div>
 
         <!-- CRON JOB -->
@@ -323,7 +395,6 @@ include '_sidebar_data.php';
                 Para rodar automaticamente todo domingo às 02h00, adicione este Cron Job no cPanel:
             </p>
             <div class="cron-box"><?php
-$dominio = $_SERVER['HTTP_HOST'] ?? 'seudominio.com.br';
 echo "# Toda domingo às 02:00\n";
 echo "0 2 * * 0   /usr/bin/php /home/luizpi39/public_html/backend/admin/cron-atualizar-precos.php >> /home/luizpi39/logs/precos.log 2>&1";
 ?></div>
@@ -359,53 +430,44 @@ echo "0 2 * * 0   /usr/bin/php /home/luizpi39/public_html/backend/admin/cron-atu
 let statAtualizados = 0;
 let statSemVariacao = 0;
 let statErros       = 0;
-const total         = <?php echo count($insumos); ?>;
-const ids           = [<?php echo implode(',', array_column($insumos, 'id')); ?>];
+const ids = [<?php echo implode(',', array_column($insumos, 'id')); ?>];
 
 async function atualizarInsumo(id) {
     const card   = document.getElementById('card-' + id);
     const status = document.getElementById('status-' + id);
     const val    = document.getElementById('val-' + id);
-
-    status.className = 'preco-status buscando';
+    status.className   = 'preco-status buscando';
     status.textContent = 'Buscando...';
-
     try {
         const fd = new FormData();
         fd.append('action',    'atualizar');
         fd.append('insumo_id', id);
-
         const r    = await fetch('atualizar-precos.php', { method: 'POST', body: fd });
         const data = await r.json();
-
         if (!data.ok) {
-            status.className = 'preco-status falhou';
+            status.className   = 'preco-status falhou';
             status.textContent = 'Erro';
             card.classList.add('erro');
             card.title = data.erro;
             statErros++;
-            return;
-        }
-
-        if (data.atualizado) {
+        } else if (data.atualizado) {
             const sinal = data.variacao_pct > 0 ? '+' : '';
-            val.textContent = 'R$ ' + _fmt(data.preco_novo);
-            status.className = 'preco-status ok';
+            val.textContent    = 'R$ ' + _fmt(data.preco_novo);
+            status.className   = 'preco-status ok';
             status.textContent = sinal + data.variacao_pct.toFixed(1) + '%';
             card.classList.add('atualizado');
             statAtualizados++;
         } else {
-            status.className = 'preco-status unchanged';
+            status.className   = 'preco-status unchanged';
             status.textContent = '= estável';
             card.classList.add('sem-variacao');
             statSemVariacao++;
         }
     } catch (e) {
-        status.className = 'preco-status falhou';
+        status.className   = 'preco-status falhou';
         status.textContent = 'Erro';
         statErros++;
     }
-
     document.getElementById('stat-atualizados').textContent  = statAtualizados;
     document.getElementById('stat-sem-variacao').textContent = statSemVariacao;
     document.getElementById('stat-erros').textContent        = statErros;
@@ -413,21 +475,18 @@ async function atualizarInsumo(id) {
 
 async function atualizarTodos() {
     const btn = document.getElementById('btn-atualizar-todos');
-    btn.disabled = true;
+    btn.disabled  = true;
     btn.innerHTML = '<span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle">hourglass_empty</span> Atualizando...';
-
     statAtualizados = 0; statSemVariacao = 0; statErros = 0;
     document.getElementById('progress-wrap').style.display = 'block';
     document.getElementById('prog-total').textContent = ids.length;
-
     for (let i = 0; i < ids.length; i++) {
         document.getElementById('prog-atual').textContent = i + 1;
         document.getElementById('progress-bar').style.width = ((i + 1) / ids.length * 100) + '%';
         await atualizarInsumo(ids[i]);
-        await _sleep(600); // delay entre requisições
+        await _sleep(600);
     }
-
-    btn.disabled = false;
+    btn.disabled  = false;
     btn.innerHTML = '<span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle">check_circle</span> Concluído!';
     setTimeout(() => {
         btn.innerHTML = '<span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle">sync</span> Atualizar Todos';
@@ -438,41 +497,25 @@ async function verHistorico(id, nome) {
     document.getElementById('hist-titulo').textContent = 'Histórico — ' + nome;
     document.getElementById('hist-conteudo').innerHTML = '<div style="text-align:center;padding:30px;color:var(--g-text-3)">Carregando...</div>';
     document.getElementById('modal-historico').classList.add('aberto');
-
     const r    = await fetch('atualizar-precos.php?action=historico&id=' + id);
     const rows = await r.json();
-
     if (!rows.length) {
         document.getElementById('hist-conteudo').innerHTML =
-            '<div style="text-align:center;padding:30px;color:var(--g-text-3)">Nenhum histórico ainda.<br>Execute uma atualização primeiro.</div>';
+            '<div style="text-align:center;padding:30px;color:var(--g-text-3)">Nenhum histórico ainda.</div>';
         return;
     }
-
-    let html = '<table class="hist-table"><thead><tr>';
-    html += '<th>Data</th><th>Antes</th><th>Depois</th><th>Variação</th><th>Fonte</th>';
-    html += '</tr></thead><tbody>';
+    let html = '<table class="hist-table"><thead><tr><th>Data</th><th>Antes</th><th>Depois</th><th>Variação</th><th>Fonte</th></tr></thead><tbody>';
     rows.forEach(r => {
-        const cls = r.variacao_pct > 0 ? 'variacao-pos' : (r.variacao_pct < 0 ? 'variacao-neg' : '');
+        const cls   = r.variacao_pct > 0 ? 'variacao-pos' : (r.variacao_pct < 0 ? 'variacao-neg' : '');
         const sinal = r.variacao_pct > 0 ? '+' : '';
-        html += `<tr>
-            <td>${r.atualizado_em}</td>
-            <td>R$ ${_fmt(parseFloat(r.preco_anterior))}</td>
-            <td><strong>R$ ${_fmt(parseFloat(r.preco_novo))}</strong></td>
-            <td class="${cls}">${sinal}${parseFloat(r.variacao_pct).toFixed(2)}%</td>
-            <td>${r.fonte}</td>
-        </tr>`;
+        html += `<tr><td>${r.atualizado_em}</td><td>R$ ${_fmt(parseFloat(r.preco_anterior))}</td><td><strong>R$ ${_fmt(parseFloat(r.preco_novo))}</strong></td><td class="${cls}">${sinal}${parseFloat(r.variacao_pct).toFixed(2)}%</td><td>${r.fonte}</td></tr>`;
     });
     html += '</tbody></table>';
     document.getElementById('hist-conteudo').innerHTML = html;
 }
 
-function fecharHistorico() {
-    document.getElementById('modal-historico').classList.remove('aberto');
-}
-document.getElementById('modal-historico').addEventListener('click', function(e) {
-    if (e.target === this) fecharHistorico();
-});
-
+function fecharHistorico() { document.getElementById('modal-historico').classList.remove('aberto'); }
+document.getElementById('modal-historico').addEventListener('click', function(e) { if (e.target === this) fecharHistorico(); });
 function _fmt(v) { return v.toFixed(2).replace('.', ','); }
 function _sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 </script>
