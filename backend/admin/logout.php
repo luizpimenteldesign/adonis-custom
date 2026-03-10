@@ -3,23 +3,21 @@
  * LOGOUT - SISTEMA ADONIS
  */
 
+// Mesmo session_save_path do auth.php para garantir que a sessão seja encontrada
+ini_set('session.save_path', dirname(__DIR__) . '/sessions');
 session_start();
 
-// Destruir todas as variáveis de sessão
 $_SESSION = [];
 
-// Destruir sessão
-if (ini_get("session.use_cookies")) {
+if (ini_get('session.use_cookies')) {
     $params = session_get_cookie_params();
     setcookie(session_name(), '', time() - 42000,
-        $params["path"], $params["domain"],
-        $params["secure"], $params["httponly"]
+        $params['path'], $params['domain'],
+        $params['secure'], $params['httponly']
     );
 }
 
 session_destroy();
 
-// Redirecionar para login
-header('Location: login.php?logout=1');
+header('Location: /backend/admin/login.php?logout=1');
 exit;
-?>
