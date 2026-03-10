@@ -7,20 +7,18 @@
  */
 define('CRON_MODE', true);
 @session_start();
-$_SESSION['usuario_id'] = 0;
+$_SESSION['admin_logado'] = true;
 
 require_once __DIR__ . '/../config/Database.php';
-require_once __DIR__ . '/../config/ml-config.php';
-require_once __DIR__ . '/../config/ml-token.php';
 
 $db   = new Database();
 $conn = $db->getConnection();
 
 define('ML_SITE',      'MLB');
-define('ML_LIMIT',     20);
+define('ML_LIMIT',     50);
 define('MIN_VARIACAO', 3.0);
 define('MAX_VARIACAO', 50.0);
-define('ML_TIMEOUT',   8);
+define('ML_TIMEOUT',   10);
 
 function medianaIQR(array $precos): ?float {
     if (empty($precos)) return null;
@@ -37,17 +35,40 @@ function medianaIQR(array $precos): ?float {
         : $filtrados[intval($nf/2)], 2);
 }
 
-$inicio = date('Y-m-d H:i:s');
-echo "\n[{$inicio}] === Iniciando atualização de preços ===\n";
+function mlBuscarPrecos(string $query): array {
+    $params = http_build_query([
+        'q'           => $query,
+        'limit'       => ML_LIMIT,
+        'buying_mode' => 'buy_it_now',
+        'condition'   => 'new',
+    ]);
+    $url = 'https://api.mercadolibre.com/sites/' . ML_SITE . '/search?' . $params;
 
-// Obtém token antes do loop
-try {
-    $token = mlGetToken();
-    echo "[AUTH] Token ML obtido com sucesso\n";
-} catch (Exception $e) {
-    echo "[FATAL] " . $e->getMessage() . "\n";
-    exit(1);
+    $ch = curl_init($url);
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT        => ML_TIMEOUT,
+        CURLOPT_SSL_VERIFYPEER => false,
+        CURLOPT_USERAGENT      => 'Mozilla/5.0',
+        CURLOPT_HTTPHEADER     => ['Accept: application/json'],
+    ]);
+    $resp = curl_exec($ch);
+    $err  = curl_error($ch);
+    curl_close($ch);
+
+    if ($err || !$resp) return ['error' => 'Falha na API ML: ' . $err];
+
+    $data = json_decode($resp, true);
+    if (empty($data['results'])) return ['error' => 'Nenhum resultado'];
+
+    $precos = array_values(array_filter(array_column($data['results'], 'price'), fn($p) => $p > 0));
+    if (empty($precos)) return ['error' => 'Sem preços válidos'];
+
+    return ['precos' => $precos, 'total' => $data['paging']['total'] ?? count($precos)];
 }
+
+$inicio = date('Y-m-d H:i:s');
+echo "\n[{$inicio}] === Iniciando atualização de preços (API pública MLB/search) ===\n";
 
 $insumos = $conn->query(
     'SELECT id, nome, valorunitario FROM insumos WHERE ativo = 1 ORDER BY nome'
@@ -60,28 +81,13 @@ foreach ($insumos as $ins) {
     $query       = $ins['nome'];
     $preco_atual = (float)$ins['valorunitario'];
 
-    $url = 'https://api.mercadolibre.com/sites/' . ML_SITE . '/search?q=' . urlencode($query) . '&limit=' . ML_LIMIT;
-    $ch  = curl_init($url);
-    curl_setopt_array($ch, [
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_TIMEOUT        => ML_TIMEOUT,
-        CURLOPT_SSL_VERIFYPEER => false,
-        CURLOPT_HTTPHEADER     => [
-            'Authorization: Bearer ' . $token,
-            'Accept: application/json',
-        ],
-    ]);
-    $resp = curl_exec($ch);
-    curl_close($ch);
+    $resultado = mlBuscarPrecos($query);
+    if (isset($resultado['error'])) {
+        echo "  [SKIP] {$ins['nome']} — {$resultado['error']}\n";
+        $erros++; sleep(1); continue;
+    }
 
-    if (!$resp) { echo "  [ERRO] {$ins['nome']} — sem resposta\n"; $erros++; sleep(1); continue; }
-
-    $data = json_decode($resp, true);
-    if (empty($data['results'])) { echo "  [SKIP] {$ins['nome']} — sem resultados\n"; $erros++; sleep(1); continue; }
-
-    $precos = array_values(array_filter(array_column($data['results'], 'price'), fn($p) => $p > 0));
-    if (empty($precos)) { echo "  [SKIP] {$ins['nome']} — sem preços válidos\n"; $erros++; sleep(1); continue; }
-
+    $precos       = $resultado['precos'];
     $mediana      = medianaIQR($precos);
     $n            = count($precos);
     $variacao_pct = $preco_atual > 0

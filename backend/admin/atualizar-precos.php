@@ -1,8 +1,6 @@
 <?php
 require_once 'auth.php';
 require_once '../config/Database.php';
-require_once '../config/ml-config.php';
-require_once '../config/ml-token.php';
 
 $db   = new Database();
 $conn = $db->getConnection();
@@ -26,10 +24,10 @@ try {
 } catch (Exception $e) { /* ignora */ }
 
 define('ML_SITE',      'MLB');
-define('ML_LIMIT',     20);
+define('ML_LIMIT',     50);
 define('MIN_VARIACAO', 3.0);
 define('MAX_VARIACAO', 50.0);
-define('ML_TIMEOUT',   8);
+define('ML_TIMEOUT',   10);
 
 try {
     $conn->query('SELECT 1 FROM insumos_precos_historico LIMIT 1');
@@ -53,6 +51,44 @@ function medianaIQR(array $precos): ?float {
         : $filtrados[intval($nf/2)], 2);
 }
 
+/**
+ * Busca preços no ML usando a API pública de anúncios.
+ * Sem token — endpoint público /sites/MLB/search.
+ * Parâmetros: buying_mode=buy_it_now (apenas preço fixo, sem leilão)
+ *             condition=new (apenas itens novos)
+ */
+function mlBuscarPrecos(string $query): array {
+    $params = http_build_query([
+        'q'           => $query,
+        'limit'       => ML_LIMIT,
+        'buying_mode' => 'buy_it_now',
+        'condition'   => 'new',
+    ]);
+    $url = 'https://api.mercadolibre.com/sites/' . ML_SITE . '/search?' . $params;
+
+    $ch = curl_init($url);
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT        => ML_TIMEOUT,
+        CURLOPT_SSL_VERIFYPEER => false,
+        CURLOPT_USERAGENT      => 'Mozilla/5.0',
+        CURLOPT_HTTPHEADER     => ['Accept: application/json'],
+    ]);
+    $resp = curl_exec($ch);
+    $err  = curl_error($ch);
+    curl_close($ch);
+
+    if ($err || !$resp) return ['error' => 'Falha na API ML: ' . $err];
+
+    $data = json_decode($resp, true);
+    if (empty($data['results'])) return ['error' => 'Nenhum resultado para: ' . $query];
+
+    $precos = array_values(array_filter(array_column($data['results'], 'price'), fn($p) => $p > 0));
+    if (empty($precos)) return ['error' => 'Resultados sem preço válido'];
+
+    return ['precos' => $precos, 'total' => $data['paging']['total'] ?? count($precos)];
+}
+
 // ── API: atualizar (AJAX) ──────────────────────────────────────────────────
 if (isset($_POST['action']) && $_POST['action'] === 'atualizar') {
     header('Content-Type: application/json');
@@ -73,46 +109,13 @@ if (isset($_POST['action']) && $_POST['action'] === 'atualizar') {
     $query       = trim($_POST['query'] ?? $ins['nome']);
     $preco_atual = (float)$ins['valorunitario'];
 
-    // Obtém token
-    try {
-        $token = mlGetToken();
-    } catch (Exception $e) {
-        echo json_encode(['ok' => false, 'erro' => 'Erro de autenticação ML: ' . $e->getMessage()]);
+    $resultado = mlBuscarPrecos($query);
+    if (isset($resultado['error'])) {
+        echo json_encode(['ok' => false, 'erro' => $resultado['error']]);
         exit;
     }
 
-    $url = 'https://api.mercadolibre.com/sites/' . ML_SITE . '/search?q=' . urlencode($query) . '&limit=' . ML_LIMIT;
-    $ch  = curl_init($url);
-    curl_setopt_array($ch, [
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_TIMEOUT        => ML_TIMEOUT,
-        CURLOPT_SSL_VERIFYPEER => false,
-        CURLOPT_HTTPHEADER     => [
-            'Authorization: Bearer ' . $token,
-            'Accept: application/json',
-        ],
-    ]);
-    $resp = curl_exec($ch);
-    $err  = curl_error($ch);
-    curl_close($ch);
-
-    if ($err || !$resp) {
-        echo json_encode(['ok' => false, 'erro' => 'Falha na API ML: ' . $err]);
-        exit;
-    }
-
-    $data = json_decode($resp, true);
-    if (empty($data['results'])) {
-        echo json_encode(['ok' => false, 'erro' => 'Nenhum resultado para: ' . $query]);
-        exit;
-    }
-
-    $precos = array_values(array_filter(array_column($data['results'], 'price'), fn($p) => $p > 0));
-    if (empty($precos)) {
-        echo json_encode(['ok' => false, 'erro' => 'Resultados sem preço válido']);
-        exit;
-    }
-
+    $precos       = $resultado['precos'];
     $mediana      = medianaIQR($precos);
     $n            = count($precos);
     $variacao_pct = $preco_atual > 0
@@ -472,7 +475,7 @@ async function atualizarTodos() {
         document.getElementById('prog-atual').textContent = i + 1;
         document.getElementById('progress-bar').style.width = ((i+1)/ids.length*100) + '%';
         await atualizarInsumo(ids[i]);
-        await _sleep(700);
+        await _sleep(800);
     }
     btn.disabled = false;
     btn.innerHTML = '<span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle">check_circle</span> Concluído!';
