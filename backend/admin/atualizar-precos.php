@@ -1,6 +1,8 @@
 <?php
 require_once 'auth.php';
 require_once '../config/Database.php';
+require_once '../config/ml-config.php';
+require_once '../config/ml-token.php';
 
 $db   = new Database();
 $conn = $db->getConnection();
@@ -23,14 +25,12 @@ try {
     ");
 } catch (Exception $e) { /* ignora */ }
 
-// ── CONFIGURAÇÕES ────────────────────────────────────────────
 define('ML_SITE',      'MLB');
 define('ML_LIMIT',     20);
 define('MIN_VARIACAO', 3.0);
 define('MAX_VARIACAO', 50.0);
 define('ML_TIMEOUT',   8);
 
-// Verifica se tabela de histórico existe
 try {
     $conn->query('SELECT 1 FROM insumos_precos_historico LIMIT 1');
     $historico_existe = true;
@@ -38,7 +38,6 @@ try {
     $historico_existe = false;
 }
 
-// ── HELPER: mediana com filtro IQR ────────────────────────────
 function medianaIQR(array $precos): ?float {
     if (empty($precos)) return null;
     sort($precos);
@@ -54,41 +53,44 @@ function medianaIQR(array $precos): ?float {
         : $filtrados[intval($nf/2)], 2);
 }
 
-// ── API: executar atualização (AJAX) ─────────────────────────
+// ── API: atualizar (AJAX) ──────────────────────────────────────────────────
 if (isset($_POST['action']) && $_POST['action'] === 'atualizar') {
     header('Content-Type: application/json');
 
     if (!$historico_existe) {
-        echo json_encode(['ok' => false, 'erro' => 'Tabela de histórico não encontrada. Crie manualmente via phpMyAdmin.']);
+        echo json_encode(['ok' => false, 'erro' => 'Tabela de histórico não encontrada. Crie via phpMyAdmin.']);
         exit;
     }
 
     $insumo_id = (int)($_POST['insumo_id'] ?? 0);
     if (!$insumo_id) { echo json_encode(['ok' => false, 'erro' => 'ID inválido']); exit; }
 
-    try {
-        $stmt = $conn->prepare('SELECT id, nome, valorunitario FROM insumos WHERE id = ? AND ativo = 1');
-        $stmt->execute([$insumo_id]);
-        $ins = $stmt->fetch(PDO::FETCH_ASSOC);
-    } catch (Exception $e) {
-        echo json_encode(['ok' => false, 'erro' => 'Erro ao buscar insumo: ' . $e->getMessage()]);
-        exit;
-    }
-
+    $stmt = $conn->prepare('SELECT id, nome, valorunitario FROM insumos WHERE id = ? AND ativo = 1');
+    $stmt->execute([$insumo_id]);
+    $ins = $stmt->fetch(PDO::FETCH_ASSOC);
     if (!$ins) { echo json_encode(['ok' => false, 'erro' => 'Insumo não encontrado']); exit; }
 
     $query       = trim($_POST['query'] ?? $ins['nome']);
     $preco_atual = (float)$ins['valorunitario'];
 
-    // Busca na API ML
+    // Obtém token
+    try {
+        $token = mlGetToken();
+    } catch (Exception $e) {
+        echo json_encode(['ok' => false, 'erro' => 'Erro de autenticação ML: ' . $e->getMessage()]);
+        exit;
+    }
+
     $url = 'https://api.mercadolibre.com/sites/' . ML_SITE . '/search?q=' . urlencode($query) . '&limit=' . ML_LIMIT;
     $ch  = curl_init($url);
     curl_setopt_array($ch, [
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_TIMEOUT        => ML_TIMEOUT,
-        CURLOPT_USERAGENT      => 'AdonisCustom/1.0',
         CURLOPT_SSL_VERIFYPEER => false,
-        CURLOPT_HTTPHEADER     => ['Accept: application/json'],
+        CURLOPT_HTTPHEADER     => [
+            'Authorization: Bearer ' . $token,
+            'Accept: application/json',
+        ],
     ]);
     $resp = curl_exec($ch);
     $err  = curl_error($ch);
@@ -111,34 +113,26 @@ if (isset($_POST['action']) && $_POST['action'] === 'atualizar') {
         exit;
     }
 
-    $mediana = medianaIQR($precos);
-    $n       = count($precos);
-
+    $mediana      = medianaIQR($precos);
+    $n            = count($precos);
     $variacao_pct = $preco_atual > 0
         ? round((($mediana - $preco_atual) / $preco_atual) * 100, 2)
         : 100.0;
 
-    // Variação suspeita — pede confirmação
     $suspeito   = abs($variacao_pct) > MAX_VARIACAO && $preco_atual > 0;
     $confirmado = isset($_POST['confirmado']) && $_POST['confirmado'] === '1';
-
     $atualizado = false;
 
     if (!$suspeito || $confirmado) {
         if (abs($variacao_pct) >= MIN_VARIACAO || $preco_atual == 0) {
-            try {
-                $conn->prepare('UPDATE insumos SET valorunitario = ? WHERE id = ?')
-                     ->execute([$mediana, $insumo_id]);
-                $conn->prepare('
-                    INSERT INTO insumos_precos_historico
-                        (insumo_id, preco_anterior, preco_novo, variacao_pct, fonte, query_usada)
-                    VALUES (?, ?, ?, ?, "mercadolivre", ?)
-                ')->execute([$insumo_id, $preco_atual, $mediana, $variacao_pct, $query]);
-                $atualizado = true;
-            } catch (Exception $e) {
-                echo json_encode(['ok' => false, 'erro' => 'Erro ao salvar: ' . $e->getMessage()]);
-                exit;
-            }
+            $conn->prepare('UPDATE insumos SET valorunitario = ? WHERE id = ?')
+                 ->execute([$mediana, $insumo_id]);
+            $conn->prepare('
+                INSERT INTO insumos_precos_historico
+                    (insumo_id, preco_anterior, preco_novo, variacao_pct, fonte, query_usada)
+                VALUES (?, ?, ?, ?, "mercadolivre", ?)
+            ')->execute([$insumo_id, $preco_atual, $mediana, $variacao_pct, $query]);
+            $atualizado = true;
         }
     }
 
@@ -155,34 +149,30 @@ if (isset($_POST['action']) && $_POST['action'] === 'atualizar') {
         'msg'          => $suspeito && !$confirmado
             ? "⚠️ Variação suspeita ({$variacao_pct}%). Confirme manualmente."
             : ($atualizado
-                ? "Atualizado: R\$ " . number_format($preco_atual,2,',','.') . " → R\$ " . number_format($mediana,2,',','.')
+                ? "Atualizado: R$ " . number_format($preco_atual,2,',','.') . " → R$ " . number_format($mediana,2,',','.')
                 : "Sem variação relevante ({$variacao_pct}%)"),
     ]);
     exit;
 }
 
-// ── API: buscar histórico ─────────────────────────────────────
+// ── API: histórico ─────────────────────────────────────────────────────────
 if (isset($_GET['action']) && $_GET['action'] === 'historico') {
     header('Content-Type: application/json');
     if (!$historico_existe) { echo json_encode([]); exit; }
-    $id = (int)($_GET['id'] ?? 0);
-    try {
-        $rows = $conn->prepare('
-            SELECT preco_anterior, preco_novo, variacao_pct, fonte, query_usada, atualizado_em
-            FROM insumos_precos_historico
-            WHERE insumo_id = ?
-            ORDER BY atualizado_em DESC
-            LIMIT 20
-        ');
-        $rows->execute([$id]);
-        echo json_encode($rows->fetchAll(PDO::FETCH_ASSOC));
-    } catch (Exception $e) {
-        echo json_encode([]);
-    }
+    $id   = (int)($_GET['id'] ?? 0);
+    $rows = $conn->prepare('
+        SELECT preco_anterior, preco_novo, variacao_pct, fonte, query_usada, atualizado_em
+        FROM insumos_precos_historico
+        WHERE insumo_id = ?
+        ORDER BY atualizado_em DESC
+        LIMIT 20
+    ');
+    $rows->execute([$id]);
+    echo json_encode($rows->fetchAll(PDO::FETCH_ASSOC));
     exit;
 }
 
-// ── CARREGA INSUMOS ───────────────────────────────────────────
+// ── Carrega insumos ────────────────────────────────────────────────────────
 try {
     if ($historico_existe) {
         $insumos = $conn->query('
@@ -322,7 +312,6 @@ include '_sidebar_data.php';
         <div class="aviso-tabela"><strong>Erro ao carregar insumos:</strong> <?php echo htmlspecialchars($erro_carregamento); ?></div>
         <?php endif; ?>
 
-        <!-- Estatísticas -->
         <div class="stats-row">
             <div class="stat-box"><div class="val" id="stat-total"><?php echo count($insumos); ?></div><div class="lbl">Total de Insumos</div></div>
             <div class="stat-box"><div class="val" id="stat-atualizados">0</div><div class="lbl">Atualizados agora</div></div>
@@ -330,7 +319,6 @@ include '_sidebar_data.php';
             <div class="stat-box"><div class="val" id="stat-erros">0</div><div class="lbl">Erros / Suspeitos</div></div>
         </div>
 
-        <!-- Barra de progresso -->
         <div id="progress-wrap" style="display:none">
             <div style="font-size:12px;color:var(--g-text-2);margin-bottom:4px">
                 Processando <span id="prog-atual">0</span> de <span id="prog-total">0</span> insumos...
@@ -338,7 +326,6 @@ include '_sidebar_data.php';
             <div class="progress-bar-wrap"><div class="progress-bar" id="progress-bar"></div></div>
         </div>
 
-        <!-- Lista de insumos -->
         <div id="lista-insumos">
         <?php foreach ($insumos as $ins):
             $ultima = !empty($ins['ultima_atualizacao']) ? date('d/m/Y H:i', strtotime($ins['ultima_atualizacao'])) : null;
@@ -369,7 +356,6 @@ include '_sidebar_data.php';
         <?php endif; ?>
         </div>
 
-        <!-- CRON JOB -->
         <div style="margin-top:32px">
             <h2 style="font-size:16px;font-weight:700;margin-bottom:8px">
                 <span class="material-symbols-outlined" style="vertical-align:middle;font-size:18px">schedule</span>
@@ -385,7 +371,7 @@ echo "0 2 * * 0   /usr/bin/php /home/luizpi39/public_html/backend/admin/cron-atu
 </main>
 </div>
 
-<!-- MODAL: Confirmar variação suspeita -->
+<!-- MODAL: Variação Suspeita -->
 <div class="modal-overlay" id="modal-confirmar">
     <div class="modal-box" style="max-width:420px">
         <div class="modal-drag"></div>
@@ -403,7 +389,7 @@ echo "0 2 * * 0   /usr/bin/php /home/luizpi39/public_html/backend/admin/cron-atu
     <div class="modal-box" style="max-width:560px">
         <div class="modal-drag"></div>
         <div class="modal-title" id="hist-titulo">Histórico de Preços</div>
-        <div id="hist-conteudo"><div style="text-align:center;padding:30px;color:var(--g-text-3)">Carregando...</div></div>
+        <div id="hist-conteudo"></div>
         <div class="modal-actions">
             <button class="btn btn-secondary" onclick="fecharHistorico()">Fechar</button>
         </div>
@@ -419,9 +405,7 @@ echo "0 2 * * 0   /usr/bin/php /home/luizpi39/public_html/backend/admin/cron-atu
 
 <script src="assets/js/sidebar.js?v=<?php echo $v; ?>"></script>
 <script>
-let statAtualizados = 0;
-let statSemVariacao = 0;
-let statErros       = 0;
+let statAtualizados = 0, statSemVariacao = 0, statErros = 0;
 const ids = [<?php echo implode(',', array_column($insumos, 'id')); ?>];
 let _pendingConfirm = null;
 
@@ -429,24 +413,18 @@ async function atualizarInsumo(id, confirmado = false) {
     const card   = document.getElementById('card-' + id);
     const status = document.getElementById('status-' + id);
     const val    = document.getElementById('val-' + id);
-    status.className   = 'preco-status buscando';
-    status.textContent = 'Buscando...';
+    status.className = 'preco-status buscando'; status.textContent = 'Buscando...';
     try {
         const fd = new FormData();
-        fd.append('action',    'atualizar');
-        fd.append('insumo_id', id);
+        fd.append('action', 'atualizar'); fd.append('insumo_id', id);
         if (confirmado) fd.append('confirmado', '1');
         const r    = await fetch('atualizar-precos.php', { method: 'POST', body: fd });
         const data = await r.json();
         if (!data.ok) {
-            status.className   = 'preco-status falhou';
-            status.textContent = 'Erro';
-            card.classList.add('erro');
-            card.title = data.erro;
-            statErros++;
+            status.className = 'preco-status falhou'; status.textContent = 'Erro';
+            card.classList.add('erro'); card.title = data.erro; statErros++;
         } else if (data.suspeito) {
-            status.className   = 'preco-status alerta';
-            status.textContent = '⚠️ Suspeito';
+            status.className = 'preco-status alerta'; status.textContent = '⚠️ Suspeito';
             card.classList.add('suspeito');
             _pendingConfirm = { id, data };
             const sinal = data.variacao_pct > 0 ? '+' : '';
@@ -454,27 +432,21 @@ async function atualizarInsumo(id, confirmado = false) {
                 `<strong>${data.insumo}</strong><br>` +
                 `Preço atual: <strong>R$ ${_fmt(data.preco_antes)}</strong><br>` +
                 `ML sugere: <strong>R$ ${_fmt(data.preco_novo)}</strong><br>` +
-                `Variação: <strong class="${data.variacao_pct > 0 ? 'variacao-pos' : 'variacao-neg'}">${sinal}${data.variacao_pct.toFixed(1)}%</strong><br>` +
+                `Variação: <strong class="${data.variacao_pct>0?'variacao-pos':'variacao-neg'}">${sinal}${data.variacao_pct.toFixed(1)}%</strong><br>` +
                 `<span style="font-size:11px;color:#94a3b8">${data.n_resultados} resultados analisados</span>`;
             document.getElementById('modal-confirmar').classList.add('aberto');
             statErros++;
         } else if (data.atualizado) {
             const sinal = data.variacao_pct > 0 ? '+' : '';
-            val.textContent    = 'R$ ' + _fmt(data.preco_novo);
-            status.className   = 'preco-status ok';
-            status.textContent = sinal + data.variacao_pct.toFixed(1) + '%';
-            card.classList.add('atualizado');
-            statAtualizados++;
+            val.textContent = 'R$ ' + _fmt(data.preco_novo);
+            status.className = 'preco-status ok'; status.textContent = sinal + data.variacao_pct.toFixed(1) + '%';
+            card.classList.add('atualizado'); statAtualizados++;
         } else {
-            status.className   = 'preco-status unchanged';
-            status.textContent = '= estável';
-            card.classList.add('sem-variacao');
-            statSemVariacao++;
+            status.className = 'preco-status unchanged'; status.textContent = '= estável';
+            card.classList.add('sem-variacao'); statSemVariacao++;
         }
-    } catch (e) {
-        status.className   = 'preco-status falhou';
-        status.textContent = 'Erro';
-        statErros++;
+    } catch(e) {
+        status.className = 'preco-status falhou'; status.textContent = 'Erro'; statErros++;
     }
     document.getElementById('stat-atualizados').textContent  = statAtualizados;
     document.getElementById('stat-sem-variacao').textContent = statSemVariacao;
@@ -484,30 +456,27 @@ async function atualizarInsumo(id, confirmado = false) {
 async function confirmarAtualizacao() {
     fecharConfirmar();
     if (!_pendingConfirm) return;
-    const { id } = _pendingConfirm;
-    _pendingConfirm = null;
+    const { id } = _pendingConfirm; _pendingConfirm = null;
     await atualizarInsumo(id, true);
 }
 function fecharConfirmar() { document.getElementById('modal-confirmar').classList.remove('aberto'); }
 
 async function atualizarTodos() {
     const btn = document.getElementById('btn-atualizar-todos');
-    btn.disabled  = true;
+    btn.disabled = true;
     btn.innerHTML = '<span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle">hourglass_empty</span> Atualizando...';
     statAtualizados = 0; statSemVariacao = 0; statErros = 0;
     document.getElementById('progress-wrap').style.display = 'block';
     document.getElementById('prog-total').textContent = ids.length;
     for (let i = 0; i < ids.length; i++) {
         document.getElementById('prog-atual').textContent = i + 1;
-        document.getElementById('progress-bar').style.width = ((i + 1) / ids.length * 100) + '%';
+        document.getElementById('progress-bar').style.width = ((i+1)/ids.length*100) + '%';
         await atualizarInsumo(ids[i]);
         await _sleep(700);
     }
-    btn.disabled  = false;
+    btn.disabled = false;
     btn.innerHTML = '<span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle">check_circle</span> Concluído!';
-    setTimeout(() => {
-        btn.innerHTML = '<span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle">sync</span> Atualizar Todos';
-    }, 4000);
+    setTimeout(() => { btn.innerHTML = '<span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle">sync</span> Atualizar Todos'; }, 4000);
 }
 
 async function verHistorico(id, nome) {
@@ -522,7 +491,7 @@ async function verHistorico(id, nome) {
     }
     let html = '<table class="hist-table"><thead><tr><th>Data</th><th>Antes</th><th>Depois</th><th>Variação</th></tr></thead><tbody>';
     rows.forEach(r => {
-        const cls   = r.variacao_pct > 0 ? 'variacao-pos' : (r.variacao_pct < 0 ? 'variacao-neg' : '');
+        const cls = r.variacao_pct > 0 ? 'variacao-pos' : (r.variacao_pct < 0 ? 'variacao-neg' : '');
         const sinal = r.variacao_pct > 0 ? '+' : '';
         html += `<tr><td>${r.atualizado_em}</td><td>R$ ${_fmt(parseFloat(r.preco_anterior))}</td><td><strong>R$ ${_fmt(parseFloat(r.preco_novo))}</strong></td><td class="${cls}">${sinal}${parseFloat(r.variacao_pct).toFixed(2)}%</td></tr>`;
     });

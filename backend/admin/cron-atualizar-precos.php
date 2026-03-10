@@ -3,18 +3,15 @@
  * CRON JOB — Atualização automática de preços via Mercado Livre
  * Adonis Custom — executar semanalmente (toda domingo 02:00)
  *
- * Configurar no cPanel > Cron Jobs:
  * 0 2 * * 0   /usr/bin/php /home/luizpi39/public_html/backend/admin/cron-atualizar-precos.php >> /home/luizpi39/logs/precos.log 2>&1
- *
- * Melhorias: ML_LIMIT=20, filtro IQR, bloqueio de variações > 50%.
  */
-
 define('CRON_MODE', true);
-
 @session_start();
 $_SESSION['usuario_id'] = 0;
 
 require_once __DIR__ . '/../config/Database.php';
+require_once __DIR__ . '/../config/ml-config.php';
+require_once __DIR__ . '/../config/ml-token.php';
 
 $db   = new Database();
 $conn = $db->getConnection();
@@ -43,15 +40,21 @@ function medianaIQR(array $precos): ?float {
 $inicio = date('Y-m-d H:i:s');
 echo "\n[{$inicio}] === Iniciando atualização de preços ===\n";
 
+// Obtém token antes do loop
+try {
+    $token = mlGetToken();
+    echo "[AUTH] Token ML obtido com sucesso\n";
+} catch (Exception $e) {
+    echo "[FATAL] " . $e->getMessage() . "\n";
+    exit(1);
+}
+
 $insumos = $conn->query(
     'SELECT id, nome, valorunitario FROM insumos WHERE ativo = 1 ORDER BY nome'
 )->fetchAll(PDO::FETCH_ASSOC);
 
-$total        = count($insumos);
-$atualizados  = 0;
-$sem_variacao = 0;
-$bloqueados   = 0;
-$erros        = 0;
+$total = count($insumos);
+$atualizados = $sem_variacao = $bloqueados = $erros = 0;
 
 foreach ($insumos as $ins) {
     $query       = $ins['nome'];
@@ -62,13 +65,16 @@ foreach ($insumos as $ins) {
     curl_setopt_array($ch, [
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_TIMEOUT        => ML_TIMEOUT,
-        CURLOPT_USERAGENT      => 'AdonisCustom-Cron/1.0',
         CURLOPT_SSL_VERIFYPEER => false,
+        CURLOPT_HTTPHEADER     => [
+            'Authorization: Bearer ' . $token,
+            'Accept: application/json',
+        ],
     ]);
     $resp = curl_exec($ch);
     curl_close($ch);
 
-    if (!$resp) { echo "  [ERRO] {$ins['nome']} — sem resposta da API\n"; $erros++; sleep(1); continue; }
+    if (!$resp) { echo "  [ERRO] {$ins['nome']} — sem resposta\n"; $erros++; sleep(1); continue; }
 
     $data = json_decode($resp, true);
     if (empty($data['results'])) { echo "  [SKIP] {$ins['nome']} — sem resultados\n"; $erros++; sleep(1); continue; }
@@ -76,20 +82,16 @@ foreach ($insumos as $ins) {
     $precos = array_values(array_filter(array_column($data['results'], 'price'), fn($p) => $p > 0));
     if (empty($precos)) { echo "  [SKIP] {$ins['nome']} — sem preços válidos\n"; $erros++; sleep(1); continue; }
 
-    $mediana = medianaIQR($precos);
-    $n       = count($precos);
-
+    $mediana      = medianaIQR($precos);
+    $n            = count($precos);
     $variacao_pct = $preco_atual > 0
         ? round((($mediana - $preco_atual) / $preco_atual) * 100, 2)
         : 100.0;
 
-    // Bloqueia variações suspeitas — requer confirmação manual na tela
     if (abs($variacao_pct) > MAX_VARIACAO && $preco_atual > 0) {
         $sinal = $variacao_pct > 0 ? '+' : '';
         echo "  [BLOQUEADO] {$ins['nome']}: {$sinal}{$variacao_pct}% — revise manualmente\n";
-        $bloqueados++;
-        sleep(1);
-        continue;
+        $bloqueados++; sleep(1); continue;
     }
 
     if (abs($variacao_pct) >= MIN_VARIACAO || $preco_atual == 0) {
@@ -104,14 +106,12 @@ foreach ($insumos as $ins) {
             echo "  [OK]   {$ins['nome']}: R$ {$preco_atual} → R$ {$mediana} ({$sinal}{$variacao_pct}%) [{$n} resultados]\n";
             $atualizados++;
         } catch (Exception $e) {
-            echo "  [ERRO] {$ins['nome']}: " . $e->getMessage() . "\n";
-            $erros++;
+            echo "  [ERRO] {$ins['nome']}: " . $e->getMessage() . "\n"; $erros++;
         }
     } else {
         echo "  [=]    {$ins['nome']}: estável ({$variacao_pct}%)\n";
         $sem_variacao++;
     }
-
     sleep(1);
 }
 
