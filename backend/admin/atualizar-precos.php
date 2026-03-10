@@ -2,6 +2,7 @@
 require_once 'auth.php';
 require_once '../config/Database.php';
 require_once '../config/ml-config.php';
+require_once '../config/ml-token.php';
 
 $db   = new Database();
 $conn = $db->getConnection();
@@ -24,13 +25,8 @@ try {
 } catch (Exception $e) { /* ignora */ }
 
 define('ML_SITE',      'MLB');
-define('ML_LIMIT',     50);
 define('MIN_VARIACAO', 3.0);
 define('MAX_VARIACAO', 50.0);
-define('ML_TIMEOUT',   12);
-
-// Arquivo de cache do App Token (distinto do token de usuário)
-define('ML_APP_TOKEN_FILE', __DIR__ . '/../../logs/ml_app_token.json');
 
 try {
     $conn->query('SELECT 1 FROM insumos_precos_historico LIMIT 1');
@@ -54,122 +50,22 @@ function medianaIQR(array $precos): ?float {
         : $filtrados[intval($nf/2)], 2);
 }
 
-/**
- * Obtém App Access Token via Client Credentials (sem login de usuário).
- * Cacheia em arquivo por ~5h50min (token expira em 6h).
- */
-function mlGetAppToken(): string {
-    $cache_file = ML_APP_TOKEN_FILE;
-
-    // Verifica cache
-    if (file_exists($cache_file)) {
-        $cache = json_decode(file_get_contents($cache_file), true);
-        if (!empty($cache['access_token']) && !empty($cache['expires_at']) && time() < $cache['expires_at']) {
-            return $cache['access_token'];
-        }
-    }
-
-    // Solicita novo token
-    $ch = curl_init('https://api.mercadolibre.com/oauth/token');
-    curl_setopt_array($ch, [
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_POST           => true,
-        CURLOPT_TIMEOUT        => 10,
-        CURLOPT_SSL_VERIFYPEER => false,
-        CURLOPT_HTTPHEADER     => [
-            'Accept: application/json',
-            'Content-Type: application/x-www-form-urlencoded',
-        ],
-        CURLOPT_POSTFIELDS => http_build_query([
-            'grant_type'    => 'client_credentials',
-            'client_id'     => ML_APP_ID,
-            'client_secret' => ML_SECRET_KEY,
-        ]),
-    ]);
-    $resp = curl_exec($ch);
-    $err  = curl_error($ch);
-    curl_close($ch);
-
-    if ($err || !$resp) throw new Exception('Erro ao obter App Token: ' . $err);
-
-    $data = json_decode($resp, true);
-    if (empty($data['access_token'])) {
-        throw new Exception('App Token inválido: ' . ($data['message'] ?? $resp));
-    }
-
-    // Salva cache (expira 10min antes do prazo real)
-    $cache = [
-        'access_token' => $data['access_token'],
-        'expires_at'   => time() + ($data['expires_in'] ?? 21600) - 600,
-    ];
-    @file_put_contents($cache_file, json_encode($cache));
-
-    return $data['access_token'];
-}
-
-/**
- * Busca preços no ML usando App Token (client_credentials).
- * Resolve o 403 que servidores de hospedagem recebem sem autenticação.
- */
-function mlBuscarPrecos(string $query): array {
+// ── API: token para uso no JS ───────────────────────────────────────────────
+// O JS precisa do token para fazer a busca diretamente no ML (contorna bloqueio de IP do servidor)
+if (isset($_GET['action']) && $_GET['action'] === 'get_token') {
+    header('Content-Type: application/json');
     try {
-        $token = mlGetAppToken();
+        $token = mlGetToken();
+        echo json_encode(['ok' => true, 'token' => $token]);
     } catch (Exception $e) {
-        return ['error' => 'Falha ao autenticar: ' . $e->getMessage()];
+        echo json_encode(['ok' => false, 'erro' => $e->getMessage()]);
     }
-
-    $params = http_build_query([
-        'q'           => $query,
-        'limit'       => ML_LIMIT,
-        'buying_mode' => 'buy_it_now',
-        'condition'   => 'new',
-    ]);
-    $url = 'https://api.mercadolibre.com/sites/' . ML_SITE . '/search?' . $params;
-
-    $ch = curl_init($url);
-    curl_setopt_array($ch, [
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_TIMEOUT        => ML_TIMEOUT,
-        CURLOPT_SSL_VERIFYPEER => false,
-        CURLOPT_USERAGENT      => 'Mozilla/5.0',
-        CURLOPT_HTTPHEADER     => [
-            'Accept: application/json',
-            'Authorization: Bearer ' . $token,
-        ],
-    ]);
-    $resp = curl_exec($ch);
-    $http = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    $err  = curl_error($ch);
-    curl_close($ch);
-
-    if ($err || !$resp) {
-        return ['error' => 'Falha na conexão: ' . $err, 'debug' => "http={$http}"];
-    }
-
-    $data = json_decode($resp, true);
-    if ($http !== 200) {
-        // Token expirou/inválido? Limpa cache e reporta
-        if ($http === 401 || $http === 403) {
-            @unlink(ML_APP_TOKEN_FILE);
-        }
-        return ['error' => "API retornou HTTP {$http}: " . ($data['message'] ?? ''), 'debug' => substr($resp, 0, 200)];
-    }
-
-    if (empty($data['results'])) {
-        $total = $data['paging']['total'] ?? 0;
-        return ['error' => "Nenhum resultado (total={$total}) para: {$query}"];
-    }
-
-    $precos = array_values(array_filter(array_column($data['results'], 'price'), fn($p) => $p > 0));
-    if (empty($precos)) {
-        return ['error' => 'Resultados sem preço válido'];
-    }
-
-    return ['precos' => $precos, 'total' => $data['paging']['total'] ?? count($precos)];
+    exit;
 }
 
-// ── API: atualizar (AJAX) ─────────────────────────────────────────────
-if (isset($_POST['action']) && $_POST['action'] === 'atualizar') {
+// ── API: salvar preço calculado pelo JS ──────────────────────────────────────────
+// O JS faz a busca no ML, calcula a mediana e envia aqui apenas os números finais para salvar
+if (isset($_POST['action']) && $_POST['action'] === 'salvar') {
     header('Content-Type: application/json');
 
     if (!$historico_existe) {
@@ -177,47 +73,39 @@ if (isset($_POST['action']) && $_POST['action'] === 'atualizar') {
         exit;
     }
 
-    $insumo_id = (int)($_POST['insumo_id'] ?? 0);
-    if (!$insumo_id) { echo json_encode(['ok' => false, 'erro' => 'ID inválido']); exit; }
+    $insumo_id  = (int)($_POST['insumo_id']  ?? 0);
+    $preco_novo = (float)($_POST['preco_novo'] ?? 0);
+    $n_res      = (int)($_POST['n_resultados'] ?? 0);
+    $query_usada= trim($_POST['query'] ?? '');
+    $confirmado = ($_POST['confirmado'] ?? '') === '1';
+
+    if (!$insumo_id || $preco_novo <= 0) {
+        echo json_encode(['ok' => false, 'erro' => 'Dados inválidos']);
+        exit;
+    }
 
     $stmt = $conn->prepare('SELECT id, nome, valorunitario FROM insumos WHERE id = ? AND ativo = 1');
     $stmt->execute([$insumo_id]);
     $ins = $stmt->fetch(PDO::FETCH_ASSOC);
     if (!$ins) { echo json_encode(['ok' => false, 'erro' => 'Insumo não encontrado']); exit; }
 
-    $query       = trim($_POST['query'] ?? $ins['nome']);
-    $preco_atual = (float)$ins['valorunitario'];
-
-    $resultado = mlBuscarPrecos($query);
-    if (isset($resultado['error'])) {
-        echo json_encode([
-            'ok'    => false,
-            'erro'  => $resultado['error'],
-            'debug' => $resultado['debug'] ?? '',
-        ]);
-        exit;
-    }
-
-    $precos       = $resultado['precos'];
-    $mediana      = medianaIQR($precos);
-    $n            = count($precos);
+    $preco_atual  = (float)$ins['valorunitario'];
     $variacao_pct = $preco_atual > 0
-        ? round((($mediana - $preco_atual) / $preco_atual) * 100, 2)
+        ? round((($preco_novo - $preco_atual) / $preco_atual) * 100, 2)
         : 100.0;
 
     $suspeito   = abs($variacao_pct) > MAX_VARIACAO && $preco_atual > 0;
-    $confirmado = isset($_POST['confirmado']) && $_POST['confirmado'] === '1';
     $atualizado = false;
 
     if (!$suspeito || $confirmado) {
         if (abs($variacao_pct) >= MIN_VARIACAO || $preco_atual == 0) {
             $conn->prepare('UPDATE insumos SET valorunitario = ? WHERE id = ?')
-                 ->execute([$mediana, $insumo_id]);
+                 ->execute([$preco_novo, $insumo_id]);
             $conn->prepare('
                 INSERT INTO insumos_precos_historico
                     (insumo_id, preco_anterior, preco_novo, variacao_pct, fonte, query_usada)
                 VALUES (?, ?, ?, ?, "mercadolivre", ?)
-            ')->execute([$insumo_id, $preco_atual, $mediana, $variacao_pct, $query]);
+            ')->execute([$insumo_id, $preco_atual, $preco_novo, $variacao_pct, $query_usada]);
             $atualizado = true;
         }
     }
@@ -228,15 +116,10 @@ if (isset($_POST['action']) && $_POST['action'] === 'atualizar') {
         'suspeito'     => $suspeito && !$confirmado,
         'insumo'       => $ins['nome'],
         'preco_antes'  => $preco_atual,
-        'preco_novo'   => $mediana,
+        'preco_novo'   => $preco_novo,
         'variacao_pct' => $variacao_pct,
-        'n_resultados' => $n,
-        'query'        => $query,
-        'msg'          => $suspeito && !$confirmado
-            ? "⚠️ Variação suspeita ({$variacao_pct}%). Confirme manualmente."
-            : ($atualizado
-                ? "Atualizado: R$ " . number_format($preco_atual,2,',','.') . " → R$ " . number_format($mediana,2,',','.')
-                : "Sem variação relevante ({$variacao_pct}%)"),
+        'n_resultados' => $n_res,
+        'query'        => $query_usada,
     ]);
     exit;
 }
@@ -258,7 +141,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'historico') {
     exit;
 }
 
-// ── Carrega insumos ─────────────────────────────────────────────────
+// ── Carrega insumos e token ───────────────────────────────────────────────
 try {
     if ($historico_existe) {
         $insumos = $conn->query('
@@ -280,6 +163,13 @@ try {
     $erro_carregamento = $e->getMessage();
 }
 
+// Token para uso no JS (a busca é feita pelo browser, não pelo servidor)
+try {
+    $ml_token_js = mlGetToken();
+} catch (Exception $e) {
+    $ml_token_js = '';
+}
+
 $current_page = 'atualizar-precos.php';
 $v = time();
 include '_sidebar_data.php';
@@ -296,48 +186,26 @@ include '_sidebar_data.php';
     <link rel="stylesheet" href="assets/css/sidebar.css?v=<?php echo $v; ?>">
     <link rel="stylesheet" href="assets/css/pages.css?v=<?php echo $v; ?>">
     <style>
-    .preco-card {
-        display:grid;
-        grid-template-columns: 1fr auto auto auto;
-        align-items:center;
-        gap:12px;
-        padding:12px 16px;
-        border:1px solid var(--g-border);
-        border-radius:10px;
-        background:var(--g-surface);
-        margin-bottom:8px;
-        transition:border-color .2s;
-    }
-    .preco-card:hover       { border-color:var(--color-primary,#7c3aed); }
-    .preco-card.atualizado  { border-color:#22c55e; background:#f0fdf4; }
-    .preco-card.erro        { border-color:#ef4444; background:#fef2f2; }
-    .preco-card.suspeito    { border-color:#f59e0b; background:#fffbeb; }
+    .preco-card { display:grid; grid-template-columns:1fr auto auto auto; align-items:center; gap:12px; padding:12px 16px; border:1px solid var(--g-border); border-radius:10px; background:var(--g-surface); margin-bottom:8px; transition:border-color .2s; }
+    .preco-card:hover        { border-color:var(--color-primary,#7c3aed); }
+    .preco-card.atualizado   { border-color:#22c55e; background:#f0fdf4; }
+    .preco-card.erro         { border-color:#ef4444; background:#fef2f2; }
+    .preco-card.suspeito     { border-color:#f59e0b; background:#fffbeb; }
     .preco-card.sem-variacao { opacity:.7; }
     .preco-nome  { font-size:13px; font-weight:600; }
     .preco-meta  { font-size:11px; color:var(--g-text-3); margin-top:2px; }
-    .preco-valor {
-        font-size:15px; font-weight:700;
-        color:var(--color-primary,#7c3aed);
-        white-space:nowrap; min-width:90px; text-align:right;
-    }
-    .preco-status {
-        font-size:11px; padding:3px 8px; border-radius:12px;
-        white-space:nowrap; min-width:80px; text-align:center;
-    }
+    .preco-valor { font-size:15px; font-weight:700; color:var(--color-primary,#7c3aed); white-space:nowrap; min-width:90px; text-align:right; }
+    .preco-status { font-size:11px; padding:3px 8px; border-radius:12px; white-space:nowrap; min-width:80px; text-align:center; }
     .preco-status.aguardando { background:var(--g-border); color:var(--g-text-2); }
     .preco-status.buscando   { background:#fef9c3; color:#854d0e; }
     .preco-status.ok         { background:#dcfce7; color:#166534; }
     .preco-status.unchanged  { background:#f1f5f9; color:#64748b; }
     .preco-status.falhou     { background:#fee2e2; color:#991b1b; }
     .preco-status.alerta     { background:#fef3c7; color:#92400e; }
-    .btn-hist {
-        padding:4px 8px; border-radius:6px; border:1px solid var(--g-border);
-        background:transparent; cursor:pointer; font-size:12px;
-        color:var(--g-text-2); display:flex; align-items:center; gap:3px;
-    }
+    .btn-hist { padding:4px 8px; border-radius:6px; border:1px solid var(--g-border); background:transparent; cursor:pointer; font-size:12px; color:var(--g-text-2); display:flex; align-items:center; gap:3px; }
     .btn-hist:hover { background:var(--g-hover); }
     .progress-bar-wrap { height:6px; background:var(--g-border); border-radius:4px; overflow:hidden; margin:8px 0; }
-    .progress-bar      { height:100%; background:var(--color-primary,#7c3aed); border-radius:4px; transition:width .4s; width:0%; }
+    .progress-bar { height:100%; background:var(--color-primary,#7c3aed); border-radius:4px; transition:width .4s; width:0%; }
     .stats-row { display:flex; gap:12px; flex-wrap:wrap; margin-bottom:20px; }
     .stat-box  { flex:1; min-width:120px; padding:14px 16px; background:var(--g-surface); border:1px solid var(--g-border); border-radius:10px; text-align:center; }
     .stat-box .val { font-size:22px; font-weight:700; color:var(--color-primary,#7c3aed); }
@@ -349,7 +217,7 @@ include '_sidebar_data.php';
     .variacao-neg { color:#dc2626; font-weight:600; }
     .cron-box { background:#1e1e2e; color:#cdd6f4; font-family:monospace; padding:16px; border-radius:8px; font-size:13px; white-space:pre; overflow-x:auto; }
     .aviso-tabela { background:#fef9c3; border:1px solid #fcd34d; border-radius:8px; padding:12px 16px; font-size:13px; color:#92400e; margin-bottom:16px; }
-    .debug-info { font-size:10px; color:#94a3b8; font-family:monospace; margin-top:2px; }
+    .aviso-token  { background:#fee2e2; border:1px solid #fca5a5; border-radius:8px; padding:12px 16px; font-size:13px; color:#991b1b; margin-bottom:16px; }
     </style>
 </head>
 <body>
@@ -372,7 +240,7 @@ include '_sidebar_data.php';
                 </h1>
                 <div class="page-subtitle">Busca preços de referência no Mercado Livre e atualiza automaticamente</div>
             </div>
-            <button class="btn btn-primary" id="btn-atualizar-todos" onclick="atualizarTodos()" <?php echo !$historico_existe ? 'disabled title="Crie a tabela de histórico primeiro"' : ''; ?>>
+            <button class="btn btn-primary" id="btn-atualizar-todos" onclick="atualizarTodos()" <?php echo (!$historico_existe || empty($ml_token_js)) ? 'disabled' : ''; ?>>
                 <span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle">sync</span> Atualizar Todos
             </button>
         </div>
@@ -392,6 +260,12 @@ include '_sidebar_data.php';
   PRIMARY KEY (`id`),
   KEY `idx_insumo_id` (`insumo_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;</pre>
+        </div>
+        <?php endif; ?>
+
+        <?php if (empty($ml_token_js)): ?>
+        <div class="aviso-token">
+            <strong>❌ Token do Mercado Livre não disponível.</strong> Verifique as configurações em <code>ml-config.php</code>.
         </div>
         <?php endif; ?>
 
@@ -417,14 +291,13 @@ include '_sidebar_data.php';
         <?php foreach ($insumos as $ins):
             $ultima = !empty($ins['ultima_atualizacao']) ? date('d/m/Y H:i', strtotime($ins['ultima_atualizacao'])) : null;
         ?>
-        <div class="preco-card" id="card-<?php echo $ins['id']; ?>" data-id="<?php echo $ins['id']; ?>">
+        <div class="preco-card" id="card-<?php echo $ins['id']; ?>" data-id="<?php echo $ins['id']; ?>" data-nome="<?php echo htmlspecialchars($ins['nome'], ENT_QUOTES); ?>">
             <div>
                 <div class="preco-nome"><?php echo htmlspecialchars($ins['nome']); ?></div>
                 <div class="preco-meta">
                     <?php echo htmlspecialchars($ins['unidade']); ?>
                     <?php if ($ultima): ?> • <span style="color:var(--g-blue)">Última ML: <?php echo $ultima; ?></span><?php endif; ?>
                 </div>
-                <div class="debug-info" id="debug-<?php echo $ins['id']; ?>"></div>
             </div>
             <div class="preco-valor" id="val-<?php echo $ins['id']; ?>">
                 R$ <?php echo number_format((float)$ins['valorunitario'], 2, ',', '.'); ?>
@@ -493,28 +366,112 @@ echo "0 2 * * 0   /usr/bin/php /home/luizpi39/public_html/backend/admin/cron-atu
 
 <script src="assets/js/sidebar.js?v=<?php echo $v; ?>"></script>
 <script>
+// ── Token e dados injetados pelo PHP ─────────────────────────────────────────────
+const ML_TOKEN = <?php echo json_encode($ml_token_js); ?>;
+const ML_SITE  = 'MLB';
+const ML_LIMIT = 50;
+const IDS      = [<?php echo implode(',', array_column($insumos, 'id')); ?>];
+const MIN_VAR  = 3.0;
+const MAX_VAR  = 50.0;
+
 let statAtualizados = 0, statSemVariacao = 0, statErros = 0;
-const ids = [<?php echo implode(',', array_column($insumos, 'id')); ?>];
 let _pendingConfirm = null;
 
+// ── Mediana com filtro IQR (espelha o PHP) ──────────────────────────────────────
+function medianaIQR(arr) {
+    if (!arr.length) return null;
+    const s  = [...arr].sort((a, b) => a - b);
+    const n  = s.length;
+    const q1 = s[Math.floor(n * 0.25)];
+    const q3 = s[Math.floor(n * 0.75)];
+    const iqr = q3 - q1;
+    let f = s.filter(p => p >= q1 - 1.5 * iqr && p <= q3 + 1.5 * iqr);
+    if (!f.length) f = s;
+    const nf = f.length;
+    return nf % 2 === 0
+        ? (f[nf/2 - 1] + f[nf/2]) / 2
+        : f[Math.floor(nf/2)];
+}
+
+// ── Busca preços direto no ML (client-side, sem passar pelo servidor) ────────────
+function renovarToken() {
+    // Busca token fresco do servidor quando necessario
+    return fetch('atualizar-precos.php?action=get_token')
+        .then(r => r.json())
+        .then(d => d.ok ? d.token : null);
+}
+
+async function mlBuscarPrecos(query) {
+    let token = ML_TOKEN;
+
+    const params = new URLSearchParams({
+        q: query, limit: ML_LIMIT,
+        buying_mode: 'buy_it_now', condition: 'new',
+    });
+    const url = `https://api.mercadolibre.com/sites/${ML_SITE}/search?${params}`;
+
+    let resp = await fetch(url, {
+        headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/json' }
+    });
+
+    // Token expirado? Renova e tenta de novo
+    if (resp.status === 401) {
+        token = await renovarToken();
+        if (!token) throw new Error('Não foi possível renovar o token ML');
+        resp = await fetch(url, {
+            headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/json' }
+        });
+    }
+
+    if (!resp.ok) {
+        const err = await resp.json().catch(() => ({}));
+        throw new Error(`ML API: HTTP ${resp.status} — ${err.message || ''}`);
+    }
+
+    const data   = await resp.json();
+    const precos = (data.results || []).map(r => r.price).filter(p => p > 0);
+    if (!precos.length) throw new Error('Sem resultados para: ' + query);
+
+    return { precos, total: data.paging?.total ?? precos.length };
+}
+
+// ── Fluxo principal por insumo ────────────────────────────────────────────────
 async function atualizarInsumo(id, confirmado = false) {
     const card   = document.getElementById('card-' + id);
     const status = document.getElementById('status-' + id);
     const val    = document.getElementById('val-' + id);
-    const dbg    = document.getElementById('debug-' + id);
-    status.className = 'preco-status buscando'; status.textContent = 'Buscando...';
+    const nome   = card.dataset.nome;
+
+    status.className = 'preco-status buscando';
+    status.textContent = 'Buscando...';
+
     try {
+        // 1. Busca no ML direto do browser
+        const { precos, total } = await mlBuscarPrecos(nome);
+        const mediana = medianaIQR(precos);
+        const n = precos.length;
+
+        // 2. Envia apenas o resultado ao PHP para salvar
         const fd = new FormData();
-        fd.append('action', 'atualizar'); fd.append('insumo_id', id);
+        fd.append('action',       'salvar');
+        fd.append('insumo_id',    id);
+        fd.append('preco_novo',   mediana.toFixed(2));
+        fd.append('n_resultados', n);
+        fd.append('query',        nome);
         if (confirmado) fd.append('confirmado', '1');
+
         const r    = await fetch('atualizar-precos.php', { method: 'POST', body: fd });
         const data = await r.json();
-        if (data.debug) dbg.textContent = data.debug;
+
         if (!data.ok) {
-            status.className = 'preco-status falhou'; status.textContent = 'Erro';
-            card.classList.add('erro'); card.title = data.erro; statErros++;
+            status.className = 'preco-status falhou';
+            status.textContent = 'Erro';
+            card.classList.add('erro');
+            card.title = data.erro;
+            statErros++;
         } else if (data.suspeito) {
-            status.className = 'preco-status alerta'; status.textContent = '⚠️ Suspeito';
+            status.className = 'preco-status alerta';
+            status.textContent = '⚠️ Suspeito';
             card.classList.add('suspeito');
             _pendingConfirm = { id, data };
             const sinal = data.variacao_pct > 0 ? '+' : '';
@@ -522,22 +479,31 @@ async function atualizarInsumo(id, confirmado = false) {
                 `<strong>${data.insumo}</strong><br>` +
                 `Preço atual: <strong>R$ ${_fmt(data.preco_antes)}</strong><br>` +
                 `ML sugere: <strong>R$ ${_fmt(data.preco_novo)}</strong><br>` +
-                `Variação: <strong class="${data.variacao_pct>0?'variacao-pos':'variacao-neg'}">${sinal}${data.variacao_pct.toFixed(1)}%</strong><br>` +
+                `Variação: <strong class="${data.variacao_pct > 0 ? 'variacao-pos' : 'variacao-neg'}">${sinal}${data.variacao_pct.toFixed(1)}%</strong><br>` +
                 `<span style="font-size:11px;color:#94a3b8">${data.n_resultados} resultados analisados</span>`;
             document.getElementById('modal-confirmar').classList.add('aberto');
             statErros++;
         } else if (data.atualizado) {
             const sinal = data.variacao_pct > 0 ? '+' : '';
             val.textContent = 'R$ ' + _fmt(data.preco_novo);
-            status.className = 'preco-status ok'; status.textContent = sinal + data.variacao_pct.toFixed(1) + '%';
-            card.classList.add('atualizado'); statAtualizados++;
+            status.className = 'preco-status ok';
+            status.textContent = sinal + data.variacao_pct.toFixed(1) + '%';
+            card.classList.add('atualizado');
+            statAtualizados++;
         } else {
-            status.className = 'preco-status unchanged'; status.textContent = '= estável';
-            card.classList.add('sem-variacao'); statSemVariacao++;
+            status.className = 'preco-status unchanged';
+            status.textContent = '= estável';
+            card.classList.add('sem-variacao');
+            statSemVariacao++;
         }
-    } catch(e) {
-        status.className = 'preco-status falhou'; status.textContent = 'Erro'; statErros++;
+    } catch (e) {
+        status.className = 'preco-status falhou';
+        status.textContent = 'Erro';
+        card.classList.add('erro');
+        card.title = e.message;
+        statErros++;
     }
+
     document.getElementById('stat-atualizados').textContent  = statAtualizados;
     document.getElementById('stat-sem-variacao').textContent = statSemVariacao;
     document.getElementById('stat-erros').textContent        = statErros;
@@ -546,7 +512,8 @@ async function atualizarInsumo(id, confirmado = false) {
 async function confirmarAtualizacao() {
     fecharConfirmar();
     if (!_pendingConfirm) return;
-    const { id } = _pendingConfirm; _pendingConfirm = null;
+    const { id } = _pendingConfirm;
+    _pendingConfirm = null;
     await atualizarInsumo(id, true);
 }
 function fecharConfirmar() { document.getElementById('modal-confirmar').classList.remove('aberto'); }
@@ -557,16 +524,19 @@ async function atualizarTodos() {
     btn.innerHTML = '<span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle">hourglass_empty</span> Atualizando...';
     statAtualizados = 0; statSemVariacao = 0; statErros = 0;
     document.getElementById('progress-wrap').style.display = 'block';
-    document.getElementById('prog-total').textContent = ids.length;
-    for (let i = 0; i < ids.length; i++) {
+    document.getElementById('prog-total').textContent = IDS.length;
+
+    for (let i = 0; i < IDS.length; i++) {
         document.getElementById('prog-atual').textContent = i + 1;
-        document.getElementById('progress-bar').style.width = ((i+1)/ids.length*100) + '%';
-        await atualizarInsumo(ids[i]);
-        await _sleep(800);
+        document.getElementById('progress-bar').style.width = ((i + 1) / IDS.length * 100) + '%';
+        await atualizarInsumo(IDS[i]);
+        await _sleep(600);
     }
     btn.disabled = false;
     btn.innerHTML = '<span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle">check_circle</span> Concluído!';
-    setTimeout(() => { btn.innerHTML = '<span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle">sync</span> Atualizar Todos'; }, 4000);
+    setTimeout(() => {
+        btn.innerHTML = '<span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle">sync</span> Atualizar Todos';
+    }, 4000);
 }
 
 async function verHistorico(id, nome) {
@@ -581,7 +551,7 @@ async function verHistorico(id, nome) {
     }
     let html = '<table class="hist-table"><thead><tr><th>Data</th><th>Antes</th><th>Depois</th><th>Variação</th></tr></thead><tbody>';
     rows.forEach(r => {
-        const cls = r.variacao_pct > 0 ? 'variacao-pos' : (r.variacao_pct < 0 ? 'variacao-neg' : '');
+        const cls  = r.variacao_pct > 0 ? 'variacao-pos' : (r.variacao_pct < 0 ? 'variacao-neg' : '');
         const sinal = r.variacao_pct > 0 ? '+' : '';
         html += `<tr><td>${r.atualizado_em}</td><td>R$ ${_fmt(parseFloat(r.preco_anterior))}</td><td><strong>R$ ${_fmt(parseFloat(r.preco_novo))}</strong></td><td class="${cls}">${sinal}${parseFloat(r.variacao_pct).toFixed(2)}%</td></tr>`;
     });
@@ -591,7 +561,7 @@ async function verHistorico(id, nome) {
 function fecharHistorico() { document.getElementById('modal-historico').classList.remove('aberto'); }
 document.getElementById('modal-historico').addEventListener('click', function(e) { if (e.target === this) fecharHistorico(); });
 
-function _fmt(v) { return v.toFixed(2).replace('.', ','); }
+function _fmt(v) { return Number(v).toFixed(2).replace('.', ','); }
 function _sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 </script>
 </body>
