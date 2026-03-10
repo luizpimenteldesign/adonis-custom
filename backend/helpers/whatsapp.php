@@ -1,7 +1,7 @@
 <?php
 /**
  * HELPER DE WHATSAPP — Adonis Custom
- * Versão: 3.0 — sem emojis (evita losangos com ?), formatação pura WA
+ * Versão: 3.1 — sem emojis (evita losangos com ?), formatação pura WA
  */
 
 require_once __DIR__ . '/../config/Database.php';
@@ -23,7 +23,7 @@ function _wa_cfg(string $chave, string $padrao = ''): string {
     return $cache[$chave];
 }
 
-define('WA_ACOMPANHA_URL', 'https://adns.luizpimentel.com/adonis-custom/frontend/public/acompanhar.php');
+define('WA_ACOMPANHA_URL', 'https://adns.luizpimentel.com/frontend/public/acompanhar.php');
 
 function wa_notificar_adonis(string $mensagem): bool
 {
@@ -58,9 +58,9 @@ function wa_link_para_cliente(string $telefone_cliente, string $mensagem = ''): 
     return $base;
 }
 
-// ─────────────────────────────────────────────────────────────────
+// ───────────────────────────────────────────────────────────────
 // MENSAGENS ADONIS → CLIENTE (sem emojis)
-// ─────────────────────────────────────────────────────────────────
+// ───────────────────────────────────────────────────────────────
 
 function wa_msg_status_para_cliente(array $pedido, string $status, array $extras = []): string
 {
@@ -149,9 +149,9 @@ function wa_msg_status_para_cliente(array $pedido, string $status, array $extras
     }
 }
 
-// ─────────────────────────────────────────────────────────────────
+// ───────────────────────────────────────────────────────────────
 // MENSAGENS CLIENTE → ADONIS (notificacoes automaticas)
-// ─────────────────────────────────────────────────────────────────
+// ───────────────────────────────────────────────────────────────
 
 function wa_msg_aprovacao(array $pedido, array $pgto): string
 {
