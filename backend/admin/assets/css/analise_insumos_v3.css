@@ -1,9 +1,111 @@
 /**
- * ESTILOS PARA ANÁLISE DE INSUMOS V3.2
- * Fix: .insumo-sel-controles + lista com scroll próprio
+ * ANALISE_INSUMOS_V3.CSS — Fonte única de estilos do modal de análise de insumos
+ * Versão: 4.0 — Neutraliza conflitos de admin.css (.modal-box input/label)
+ *
+ * REGRA: nenhum outro CSS deve definir estilos para as classes abaixo.
+ * dashboard.css NÃO deve conter nenhuma dessas classes.
  */
 
-/* ── LOADING E VAZIOS ─────────────────────────────────────────────────────── */
+/* ══ NEUTRALIZA CONTAMINAÇÃO DO admin.css ═══════════════════════════════════
+   admin.css define .modal-box input e .modal-box label com padding/margin
+   grandes para formulários genéricos. Aqui resetamos esses estilos
+   especificamente dentro do modal de análise de insumos.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Input de quantidade — reseta o padding 12px 16px do admin.css */
+#modal-analise .insumo-sel-qtd,
+#modal-analise input[type="number"].insumo-sel-qtd {
+    width: 70px !important;
+    padding: 6px 8px !important;
+    border: 1.5px solid var(--g-border) !important;
+    border-radius: 6px !important;
+    text-align: center !important;
+    font-size: 13px !important;
+    font-weight: 500 !important;
+    color: var(--g-text) !important;
+    background: var(--g-bg) !important;
+    box-shadow: none !important;
+    margin: 0 !important;
+    transition: border-color 0.15s !important;
+    flex: 0 0 auto !important;
+    min-height: unset !important;
+}
+
+#modal-analise .insumo-sel-qtd:focus {
+    outline: none !important;
+    border-color: var(--g-blue) !important;
+    box-shadow: none !important;
+    background: var(--g-surface) !important;
+}
+
+/* Checkbox "cliente fornece" — reseta o margin-top 16px do admin.css em label */
+#modal-analise .insumo-sel-cf,
+#modal-analise label.insumo-sel-cf {
+    display: flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    font-size: 12px !important;
+    font-weight: 400 !important;
+    color: var(--g-text-2) !important;
+    cursor: pointer !important;
+    flex: 1 1 auto !important;
+    white-space: nowrap !important;
+    text-transform: none !important;
+    letter-spacing: normal !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+/* Checkbox dentro do label — reseta padding 12px 16px do admin.css */
+#modal-analise .insumo-sel-cf input[type="checkbox"] {
+    width: 15px !important;
+    height: 15px !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: none !important;
+    border-radius: 3px !important;
+    box-shadow: none !important;
+    background: none !important;
+    cursor: pointer !important;
+    flex-shrink: 0 !important;
+    accent-color: var(--g-blue) !important;
+}
+
+/* Busca de insumos — reseta padding do admin.css */
+#modal-analise .analise-busca,
+#modal-analise input.analise-busca {
+    width: calc(100% - 40px) !important;
+    margin: 0 20px 12px !important;
+    padding: 10px 14px !important;
+    border: 1px solid var(--g-border) !important;
+    border-radius: 10px !important;
+    font-size: 13px !important;
+    font-family: inherit !important;
+    background: var(--g-bg) !important;
+    box-shadow: none !important;
+    outline: none !important;
+    display: block !important;
+}
+
+#modal-analise .analise-busca:focus {
+    border-color: var(--g-blue) !important;
+    background: var(--g-surface) !important;
+    box-shadow: none !important;
+}
+
+/* Labels genéricos dentro do modal — reseta margin-top do admin.css */
+#modal-analise label {
+    display: inline !important;
+    font-size: inherit !important;
+    font-weight: inherit !important;
+    color: inherit !important;
+    text-transform: none !important;
+    letter-spacing: normal !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+/* ══ LOADING E VAZIOS ═══════════════════════════════════════════════════════ */
 .analise-loading {
     padding: 40px 20px;
     text-align: center;
@@ -21,10 +123,8 @@
     margin: 12px 0;
 }
 
-/* ── RESUMO DO PEDIDO ──────────────────────────────────────────────────── */
-.analise-resumo {
-    padding: 16px 0;
-}
+/* ══ RESUMO DO PEDIDO ═══════════════════════════════════════════════════════ */
+.analise-resumo        { padding: 12px 20px 0; }
 
 .analise-resumo-title {
     font-size: 11px;
@@ -39,43 +139,44 @@
     display: flex;
     flex-wrap: wrap;
     gap: 6px;
+    margin-bottom: 14px;
 }
 
 .analise-tag {
     display: inline-block;
-    padding: 5px 12px;
-    background: var(--g-blue-light);
-    color: var(--g-blue);
-    border-radius: 6px;
+    padding: 4px 12px;
+    background: var(--g-bg);
+    border: 1px solid var(--g-border);
+    color: var(--g-text-2);
+    border-radius: 20px;
     font-size: 12px;
-    font-weight: 500;
 }
 
 .analise-sep {
     border: none;
     border-top: 1px solid var(--g-border);
-    margin: 16px 0;
+    margin: 0 0 14px;
 }
 
-/* ── GRID DE CATEGORIAS ──────────────────────────────────────────────── */
+/* ══ GRID DE CATEGORIAS ═════════════════════════════════════════════════════ */
 .analise-cats-titulo {
-    font-size: 13px;
-    font-weight: 500;
-    color: var(--g-text);
-    margin-bottom: 12px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--g-text-3);
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    padding: 0 20px 10px;
 }
 
 .analise-cats-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
     gap: 8px;
-    margin-bottom: 16px;
+    padding: 0 20px 14px;
 }
 
 @media (max-width: 480px) {
-    .analise-cats-grid {
-        grid-template-columns: repeat(2, 1fr);
-    }
+    .analise-cats-grid { grid-template-columns: repeat(2, 1fr); }
 }
 
 .cat-btn {
@@ -92,53 +193,30 @@
     color: var(--g-text);
     cursor: pointer;
     transition: all 0.15s;
+    font-family: inherit;
 }
 
-.cat-btn:hover {
-    background: var(--g-hover);
-    border-color: var(--g-blue);
-}
+.cat-btn:hover                       { background: var(--g-hover); border-color: var(--g-blue); }
+.cat-btn.ativo                       { background: var(--g-blue-light); border-color: var(--g-blue); color: var(--g-blue); }
+.cat-btn .material-symbols-outlined  { font-size: 24px; }
 
-.cat-btn.ativo {
-    background: var(--g-blue-light);
-    border-color: var(--g-blue);
-    color: var(--g-blue);
-}
-
-.cat-btn .material-symbols-outlined {
-    font-size: 24px;
-}
-
-/* ── ÁREA DE BUSCA E INSUMOS DISPONÍVEIS ──────────────────────────────────── */
+/* ══ ÁREA DE BUSCA + INSUMOS DISPONÍVEIS ════════════════════════════════════ */
 .analise-cat-atual {
     font-size: 12px;
     font-weight: 600;
-    color: var(--g-text-2);
-    margin: 16px 0 8px;
-}
-
-.analise-busca {
-    width: 100%;
-    padding: 10px 14px;
-    border: 1.5px solid var(--g-border);
-    border-radius: 8px;
-    font-size: 13px;
-    margin-bottom: 12px;
-    transition: border-color 0.15s;
-}
-
-.analise-busca:focus {
-    outline: none;
-    border-color: var(--g-blue);
+    color: var(--g-blue);
+    padding: 0 20px 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
 }
 
 .analise-insumos-disponiveis {
-    max-height: 240px;
+    max-height: 220px;
     overflow-y: auto;
+    margin: 0 20px 14px;
     border: 1px solid var(--g-border);
-    border-radius: 8px;
-    background: var(--g-bg);
-    margin-bottom: 16px;
+    border-radius: 10px;
+    background: var(--g-surface);
 }
 
 .insumo-disp-row {
@@ -150,23 +228,11 @@
     transition: background 0.15s;
 }
 
-.insumo-disp-row:last-child {
-    border-bottom: none;
-}
+.insumo-disp-row:last-child                  { border-bottom: none; }
+.insumo-disp-row:hover:not(.ja-adicionado)   { background: var(--g-hover); }
+.insumo-disp-row.ja-adicionado               { opacity: 0.5; background: var(--g-bg); }
 
-.insumo-disp-row:hover:not(.ja-adicionado) {
-    background: var(--g-hover);
-}
-
-.insumo-disp-row.ja-adicionado {
-    opacity: 0.5;
-    background: var(--g-bg);
-}
-
-.insumo-disp-info {
-    flex: 1;
-    min-width: 0;
-}
+.insumo-disp-info  { flex: 1; min-width: 0; }
 
 .insumo-disp-nome {
     font-size: 13px;
@@ -175,20 +241,9 @@
     margin-bottom: 2px;
 }
 
-.insumo-disp-meta {
-    font-size: 11px;
-    color: var(--g-text-3);
-}
-
-.insumo-disp-meta .estoque-zero {
-    color: var(--g-red);
-    font-weight: 600;
-}
-
-.insumo-disp-meta .estoque-baixo {
-    color: var(--g-orange);
-    font-weight: 600;
-}
+.insumo-disp-meta             { font-size: 11px; color: var(--g-text-3); }
+.insumo-disp-meta .estoque-zero  { color: var(--g-red);    font-weight: 600; }
+.insumo-disp-meta .estoque-baixo { color: var(--g-orange); font-weight: 600; }
 
 .insumo-disp-add {
     width: 32px;
@@ -205,51 +260,50 @@
     transition: opacity 0.15s;
 }
 
-.insumo-disp-add:hover {
-    opacity: 0.85;
-}
-
-.insumo-disp-add .material-symbols-outlined {
-    font-size: 18px;
-}
+.insumo-disp-add:hover                      { opacity: 0.85; }
+.insumo-disp-add .material-symbols-outlined { font-size: 18px; }
 
 .insumo-disp-adicionado {
     font-size: 11px;
     color: var(--g-green);
     font-weight: 600;
-    padding: 4px 8px;
-    background: var(--g-green-light);
-    border-radius: 4px;
+    white-space: nowrap;
 }
 
-/* ── INSUMOS SELECIONADOS ────────────────────────────────────────────────── */
+/* ══ INSUMOS SELECIONADOS ═══════════════════════════════════════════════════
+   Esta seção é a ÚNICA fonte de estilos para os cards de insumos selecionados.
+   dashboard.css não deve redefinir nenhum seletor abaixo.
+   ═══════════════════════════════════════════════════════════════════════════ */
 .analise-selecionados-titulo {
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 600;
-    color: var(--g-text);
-    margin-bottom: 10px;
+    color: var(--g-text-3);
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    padding: 0 20px 8px;
 }
 
-/* Lista com scroll próprio — cresce até 320px, depois rola */
+/* Lista com scroll — cada card ocupa sua altura natural */
 .analise-selecionados-lista {
     display: flex;
     flex-direction: column;
     gap: 8px;
-    margin-bottom: 16px;
-    max-height: 320px;
+    padding: 0 20px;
+    max-height: 400px;
     overflow-y: auto;
+    margin-bottom: 4px;
 }
 
-/* Cada card de insumo selecionado — altura livre, sem overflow:hidden */
+/* Card individual */
 .insumo-sel-row {
     background: var(--g-surface);
     border: 1px solid var(--g-border);
     border-radius: 8px;
-    /* overflow: hidden removido — estava cortando o conteúdo */
-    flex-shrink: 0; /* impede o card de ser comprimido pelo flex pai */
+    flex-shrink: 0;       /* não comprime no flex pai */
+    overflow: visible;    /* nada é cortado */
 }
 
-/* Linha 1: nome + descrição */
+/* Linha 1: nome + meta */
 .insumo-sel-info {
     padding: 10px 14px 4px;
     min-width: 0;
@@ -270,56 +324,16 @@
     color: var(--g-text-3);
 }
 
-/* Linha 2: controles (qtd + cliente fornece + valor + remover) */
+/* Linha 2: qtd + cliente fornece + valor + remover */
 .insumo-sel-controles {
     display: flex;
     align-items: center;
     gap: 10px;
-    padding: 8px 14px 10px;
-    flex-wrap: wrap;
+    padding: 6px 14px 10px;
+    flex-wrap: nowrap;
 }
 
-/* INPUT QUANTIDADE */
-.insumo-sel-qtd {
-    flex: 0 0 auto;
-    width: 70px;
-    padding: 6px 8px;
-    border: 1.5px solid var(--g-border);
-    border-radius: 6px;
-    text-align: center;
-    font-size: 13px;
-    font-weight: 500;
-    color: var(--g-text);
-    background: var(--g-bg);
-    transition: border-color 0.15s;
-}
-
-.insumo-sel-qtd:focus {
-    outline: none;
-    border-color: var(--g-blue);
-    background: white;
-}
-
-/* CHECKBOX CLIENTE FORNECE */
-.insumo-sel-cf {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 12px;
-    color: var(--g-text-2);
-    cursor: pointer;
-    flex: 1 1 auto; /* ocupa espaço sobrando entre qtd e valor */
-    white-space: nowrap;
-}
-
-.insumo-sel-cf input[type="checkbox"] {
-    cursor: pointer;
-    width: 15px;
-    height: 15px;
-    flex-shrink: 0;
-}
-
-/* VALOR */
+/* Valor cobrado */
 .insumo-sel-valor {
     flex: 0 0 auto;
     min-width: 70px;
@@ -333,9 +347,10 @@
 .insumo-sel-valor.riscado {
     text-decoration: line-through;
     color: var(--g-text-3);
+    font-weight: 400;
 }
 
-/* BOTÃO REMOVER */
+/* Botão remover */
 .insumo-sel-remove {
     flex: 0 0 auto;
     width: 28px;
@@ -351,56 +366,53 @@
     transition: all 0.15s;
 }
 
-.insumo-sel-remove:hover {
-    background: var(--g-red-light);
-    color: var(--g-red);
-}
+.insumo-sel-remove:hover                      { background: #fce8e6; color: var(--g-red); }
+.insumo-sel-remove .material-symbols-outlined { font-size: 18px; }
 
-.insumo-sel-remove .material-symbols-outlined {
-    font-size: 18px;
-}
-
-/* Legacy: .insumo-sel-footer (mantido caso haja páginas antigas) */
-.insumo-sel-footer {
-    padding: 8px 14px 10px;
-    background: var(--g-bg);
-    border-top: 1px solid var(--g-border);
-}
-
-/* ── FOOTER COM TOTAL ─────────────────────────────────────────────────────── */
+/* ══ FOOTER COM TOTAL ═══════════════════════════════════════════════════════ */
 .analise-footer {
-    padding: 14px 0;
+    padding: 14px 20px 0;
     border-top: 2px solid var(--g-border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
     margin-top: 8px;
 }
 
 .analise-total-bloco {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    font-size: 14px;
+    font-size: 13px;
     color: var(--g-text-2);
 }
 
 .analise-total-bloco strong {
     font-size: 17px;
-    font-weight: 600;
+    font-weight: 700;
     color: var(--g-green);
 }
 
-/* ── RESPONSIVE ──────────────────────────────────────────────────────────── */
+/* ══ BADGES TIPO INSUMO ═════════════════════════════════════════════════════ */
+.tipo-fixo {
+    background: #e8f0fe;
+    color: var(--g-blue);
+    padding: 1px 5px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 600;
+}
+
+.tipo-variavel {
+    background: #e6f4ea;
+    color: var(--g-green);
+    padding: 1px 5px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 600;
+}
+
+/* ══ RESPONSIVE ═════════════════════════════════════════════════════════════ */
 @media (max-width: 480px) {
-    .insumo-sel-controles {
-        gap: 8px;
-    }
-    .insumo-sel-qtd {
-        width: 60px;
-    }
-    .insumo-sel-valor {
-        font-size: 12px;
-        min-width: 60px;
-    }
-    .insumo-sel-cf {
-        font-size: 11px;
-    }
+    .insumo-sel-controles { gap: 8px; }
+    .insumo-sel-valor     { font-size: 12px; min-width: 60px; }
 }
