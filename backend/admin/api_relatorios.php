@@ -14,7 +14,6 @@ $tipo  = $_GET['tipo']  ?? '';
 $de    = $_GET['de']    ?? date('Y-m-01');
 $ate   = $_GET['ate']   ?? date('Y-m-d');
 
-// Garante formato Y-m-d
 $de  = preg_match('/^\d{4}-\d{2}-\d{2}$/', $de)  ? $de  : date('Y-m-01');
 $ate = preg_match('/^\d{4}-\d{2}-\d{2}$/', $ate) ? $ate : date('Y-m-d');
 $ateHora = $ate . ' 23:59:59';
@@ -24,7 +23,7 @@ try {
 
         // ── 1. FINANCEIRO ─────────────────────────────────────────
         case 'financeiro':
-            // Receita por mês (pedidos entregues com valor_orcamento)
+            // Receita por mês (pedidos entregues)
             $stmt = $conn->prepare("
                 SELECT
                     DATE_FORMAT(atualizado_em,'%Y-%m') as mes,
@@ -39,19 +38,25 @@ try {
             $stmt->execute([':de'=>$de, ':ate'=>$ateHora]);
             $porMes = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-            // Formas de pagamento
+            // Receita por faixa de valor
             $stmt2 = $conn->prepare("
-                SELECT forma_pagamento, COUNT(*) as qtd, SUM(valor_final) as total
-                FROM status_historico sh
-                JOIN pre_os p ON sh.pre_os_id = p.id
-                WHERE sh.status = 'Aprovada'
-                  AND p.status  = 'Entregue'
-                  AND sh.criado_em BETWEEN :de AND :ate
-                  AND sh.forma_pagamento IS NOT NULL
-                GROUP BY forma_pagamento ORDER BY total DESC
+                SELECT
+                    CASE
+                        WHEN valor_orcamento < 100              THEN 'Até R$ 100'
+                        WHEN valor_orcamento BETWEEN 100 AND 300 THEN 'R$ 100–300'
+                        WHEN valor_orcamento BETWEEN 300 AND 600 THEN 'R$ 300–600'
+                        WHEN valor_orcamento BETWEEN 600 AND 1000 THEN 'R$ 600–1000'
+                        ELSE 'Acima de R$ 1000'
+                    END AS faixa,
+                    COUNT(*) as qtd,
+                    SUM(valor_orcamento) as total
+                FROM pre_os
+                WHERE status = 'Entregue'
+                  AND atualizado_em BETWEEN :de AND :ate
+                GROUP BY faixa ORDER BY MIN(valor_orcamento) ASC
             ");
             $stmt2->execute([':de'=>$de, ':ate'=>$ateHora]);
-            $formas = $stmt2->fetchAll(PDO::FETCH_ASSOC);
+            $faixas = $stmt2->fetchAll(PDO::FETCH_ASSOC);
 
             // Totalizador
             $stmt3 = $conn->prepare("
@@ -62,7 +67,7 @@ try {
             $stmt3->execute([':de'=>$de, ':ate'=>$ateHora]);
             $totais = $stmt3->fetch(PDO::FETCH_ASSOC);
 
-            echo json_encode(['ok'=>true,'porMes'=>$porMes,'formas'=>$formas,'totais'=>$totais]);
+            echo json_encode(['ok'=>true,'porMes'=>$porMes,'faixas'=>$faixas,'totais'=>$totais]);
             break;
 
         // ── 2. PEDIDOS POR STATUS ──────────────────────────────────
@@ -76,9 +81,11 @@ try {
             $stmt->execute([':de'=>$de, ':ate'=>$ateHora]);
             $porStatus = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-            // Tempo médio até entrega (dias)
             $stmt2 = $conn->prepare("
-                SELECT AVG(DATEDIFF(atualizado_em, criado_em)) as media_dias
+                SELECT
+                    AVG(DATEDIFF(atualizado_em, criado_em)) as media_dias,
+                    MIN(DATEDIFF(atualizado_em, criado_em)) as minimo,
+                    MAX(DATEDIFF(atualizado_em, criado_em)) as maximo
                 FROM pre_os
                 WHERE status = 'Entregue' AND criado_em BETWEEN :de AND :ate
             ");
@@ -103,7 +110,6 @@ try {
             $stmt->execute([':de'=>$de, ':ate'=>$ateHora]);
             $clientes = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-            // Total de clientes únicos no período
             $stmt2 = $conn->prepare("
                 SELECT COUNT(DISTINCT cliente_id) as total
                 FROM pre_os WHERE criado_em BETWEEN :de AND :ate
@@ -118,8 +124,8 @@ try {
         case 'servicos':
             $stmt = $conn->prepare("
                 SELECT s.nome, s.valor_base,
-                       COUNT(ps.id)           as qtd,
-                       SUM(s.valor_base)      as receita_base
+                       COUNT(ps.id)      as qtd,
+                       SUM(s.valor_base) as receita_base
                 FROM pre_os_servicos ps
                 JOIN servicos s ON ps.servico_id = s.id
                 JOIN pre_os   p ON ps.pre_os_id  = p.id
@@ -142,8 +148,8 @@ try {
             ");
             $insumos = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-            $zerados   = array_filter($insumos, fn($i)=> (float)$i['estoque'] <= 0);
-            $criticos  = array_filter($insumos, fn($i)=> (float)$i['estoque'] > 0 && (float)$i['estoque'] < 5);
+            $zerados  = array_filter($insumos, fn($i)=> (float)$i['estoque'] <= 0);
+            $criticos = array_filter($insumos, fn($i)=> (float)$i['estoque'] > 0 && (float)$i['estoque'] < 5);
             $valorTotal = array_sum(array_column($insumos, 'valor_total'));
 
             echo json_encode([
@@ -169,7 +175,6 @@ try {
             $stmt->execute([':de'=>$de, ':ate'=>$ateHora]);
             $geral = $stmt->fetch(PDO::FETCH_ASSOC);
 
-            // Por status: tempo médio até chegar nesse status
             $stmt2 = $conn->prepare("
                 SELECT h.status,
                        AVG(DATEDIFF(h.criado_em, p.criado_em)) as media_dias,
@@ -199,7 +204,6 @@ try {
             $stmt->execute([':de'=>$de, ':ate'=>$ateHora]);
             $instrs = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-            // Por tipo
             $stmt2 = $conn->prepare("
                 SELECT i.tipo, COUNT(p.id) as pedidos
                 FROM pre_os p JOIN instrumentos i ON p.instrumento_id = i.id
