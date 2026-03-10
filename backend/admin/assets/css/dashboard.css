@@ -1,9 +1,9 @@
 /**
  * DASHBOARD.CSS — Estilos específicos do Dashboard
- * Versão: 10.1 — Interface de categorias + busca V3
+ * Versão: 10.2 — Fix insumos selecionados
  */
 
-/* ══ MAIN ════════════════════════════════════════════════════ */
+/* ══ MAIN ════════════════════════════════════════════════════════════ */
 .page-content {
     flex: 1;
     padding: 20px;
@@ -19,7 +19,7 @@
     }
 }
 
-/* ══ STATS ═══════════════════════════════════════════════════ */
+/* ══ STATS ═════════════════════════════════════════════════════════════ */
 .stats-row {
     display: flex;
     gap: 12px;
@@ -60,21 +60,10 @@
     font-weight: 500;
 }
 
-.stat-chip.blue .stat-chip-val {
-    color: var(--g-blue);
-}
-
-.stat-chip.yellow .stat-chip-val {
-    color: var(--g-yellow);
-}
-
-.stat-chip.orange .stat-chip-val {
-    color: #e37400;
-}
-
-.stat-chip.green .stat-chip-val {
-    color: var(--g-green);
-}
+.stat-chip.blue .stat-chip-val  { color: var(--g-blue); }
+.stat-chip.yellow .stat-chip-val { color: var(--g-yellow); }
+.stat-chip.orange .stat-chip-val { color: #e37400; }
+.stat-chip.green .stat-chip-val  { color: var(--g-green); }
 
 .stat-chip-icon {
     font-size: 28px;
@@ -82,7 +71,7 @@
     opacity: 0.7;
 }
 
-/* ══ LISTA + PAINEL ═════════════════════════════════════════════ */
+/* ══ LISTA + PAINEL ═════════════════════════════════════════════════════════ */
 .dashboard-grid {
     display: flex;
     gap: 0;
@@ -159,9 +148,7 @@
     flex-shrink: 0;
 }
 
-.acao-panel-close:hover {
-    background: var(--g-border);
-}
+.acao-panel-close:hover { background: var(--g-border); }
 
 .acao-panel-status {
     padding: 12px 20px;
@@ -245,7 +232,7 @@
 .acao-sheet-overlay {
     position: absolute;
     inset: 0;
-    background: rgba(0, 0, 0, 0.4);
+    background: rgba(0,0,0,0.4);
 }
 
 .acao-sheet-box {
@@ -265,13 +252,9 @@
     margin: 12px auto 0;
 }
 
-.pedido-item.selected {
-    background: var(--g-blue-light);
-}
+.pedido-item.selected { background: var(--g-blue-light); }
 
-.orc-inline {
-    padding: 0 20px 16px;
-}
+.orc-inline { padding: 0 20px 16px; }
 
 .orc-inline label {
     font-size: 11px;
@@ -318,9 +301,7 @@
     background: var(--g-surface);
 }
 
-.sim-mini:hover {
-    border-color: var(--g-blue);
-}
+.sim-mini:hover { border-color: var(--g-blue); }
 
 .sim-mini.ativo {
     border-color: var(--g-blue);
@@ -343,9 +324,7 @@
     color: var(--g-green);
 }
 
-.sim-mini.maq .sim-mini-valor {
-    color: #e65100;
-}
+.sim-mini.maq .sim-mini-valor { color: #e65100; }
 
 .sim-mini-sub {
     font-size: 10px;
@@ -364,9 +343,7 @@
     margin: 8px 0;
 }
 
-.rep-inline {
-    padding: 0 20px 12px;
-}
+.rep-inline { padding: 0 20px 12px; }
 
 .rep-inline textarea {
     width: 100%;
@@ -386,7 +363,7 @@
     background: var(--g-surface);
 }
 
-/* ══ BUSCA ══════════════════════════════════════════════════ */
+/* ══ BUSCA ════════════════════════════════════════════════════════════ */
 .search-loading {
     display: none;
     width: 16px;
@@ -398,20 +375,14 @@
     flex-shrink: 0;
 }
 
-.search-loading.active {
-    display: block;
-}
+.search-loading.active { display: block; }
 
 @keyframes spin {
-    to {
-        transform: rotate(360deg);
-    }
+    to { transform: rotate(360deg); }
 }
 
-/* ══ MODAL ANÁLISE V3 — CATEGORIAS + BUSCA ════════════════════════ */
-.analise-resumo {
-    padding: 12px 20px 0;
-}
+/* ══ MODAL ANÁLISE V3 — CATEGORIAS + BUSCA ═════════════════════════════ */
+.analise-resumo       { padding: 12px 20px 0; }
 
 .analise-resumo-title {
     font-size: 12px;
@@ -444,7 +415,6 @@
     margin: 0 0 14px;
 }
 
-/* Botões de categorias */
 .analise-cats-titulo {
     font-size: 12px;
     font-weight: 600;
@@ -478,22 +448,10 @@
     color: var(--g-text);
 }
 
-.cat-btn:hover {
-    border-color: var(--g-blue);
-    background: var(--g-blue-light);
-}
+.cat-btn:hover               { border-color: var(--g-blue); background: var(--g-blue-light); }
+.cat-btn.ativo               { border-color: var(--g-blue); background: var(--g-blue-light); color: var(--g-blue); }
+.cat-btn .material-symbols-outlined { font-size: 28px; }
 
-.cat-btn.ativo {
-    border-color: var(--g-blue);
-    background: var(--g-blue-light);
-    color: var(--g-blue);
-}
-
-.cat-btn .material-symbols-outlined {
-    font-size: 28px;
-}
-
-/* Área de insumos da categoria selecionada */
 .analise-cat-atual {
     font-size: 12px;
     font-weight: 600;
@@ -538,23 +496,11 @@
     transition: background 0.15s;
 }
 
-.insumo-disp-row:last-child {
-    border-bottom: none;
-}
+.insumo-disp-row:last-child           { border-bottom: none; }
+.insumo-disp-row:hover:not(.ja-adicionado) { background: var(--g-hover); }
+.insumo-disp-row.ja-adicionado        { opacity: 0.5; cursor: not-allowed; }
 
-.insumo-disp-row:hover:not(.ja-adicionado) {
-    background: var(--g-hover);
-}
-
-.insumo-disp-row.ja-adicionado {
-    opacity: 0.5;
-    cursor: not-allowed;
-}
-
-.insumo-disp-info {
-    flex: 1;
-    min-width: 0;
-}
+.insumo-disp-info  { flex: 1; min-width: 0; }
 
 .insumo-disp-nome {
     font-size: 13px;
@@ -565,28 +511,10 @@
     text-overflow: ellipsis;
 }
 
-.insumo-disp-meta {
-    font-size: 11px;
-    color: var(--g-text-3);
-    margin-top: 2px;
-}
-
-.insumo-disp-meta .estoque-zero {
-    color: var(--g-red);
-    font-weight: 600;
-}
-
-.insumo-disp-meta .estoque-baixo {
-    color: var(--g-orange);
-    font-weight: 600;
-}
-
-.insumo-disp-adicionado {
-    font-size: 11px;
-    color: var(--g-green);
-    font-weight: 600;
-    white-space: nowrap;
-}
+.insumo-disp-meta             { font-size: 11px; color: var(--g-text-3); margin-top: 2px; }
+.insumo-disp-meta .estoque-zero  { color: var(--g-red);    font-weight: 600; }
+.insumo-disp-meta .estoque-baixo { color: var(--g-orange); font-weight: 600; }
+.insumo-disp-adicionado       { font-size: 11px; color: var(--g-green); font-weight: 600; white-space: nowrap; }
 
 .insumo-disp-add {
     width: 32px;
@@ -603,15 +531,10 @@
     flex-shrink: 0;
 }
 
-.insumo-disp-add:hover {
-    transform: scale(1.1);
-}
+.insumo-disp-add:hover                        { transform: scale(1.1); }
+.insumo-disp-add .material-symbols-outlined   { font-size: 20px; }
 
-.insumo-disp-add .material-symbols-outlined {
-    font-size: 20px;
-}
-
-/* Insumos selecionados */
+/* ── INSUMOS SELECIONADOS — versão definitiva (estrutura JS v4.4) ──────── */
 .analise-selecionados-titulo {
     font-size: 12px;
     font-weight: 600;
@@ -621,29 +544,28 @@
     padding: 0 20px 8px;
 }
 
+/* Lista com scroll próprio — cada card ocupa sua altura natural */
 .analise-selecionados-lista {
     padding: 0 20px;
-    max-height: 220px;
+    max-height: 400px;      /* era 220px — comprimia com 3+ insumos */
     overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
 }
 
+/* Card individual — NÃO pode comprimir nem cortar conteúdo */
 .insumo-sel-row {
     border: 1px solid var(--g-border);
     border-radius: 10px;
-    margin-bottom: 8px;
-    padding: 10px 12px;
     background: var(--g-surface);
+    flex-shrink: 0;         /* impede compressão pelo flex pai */
+    overflow: visible;      /* garante que nada seja cortado */
 }
 
-.insumo-sel-main {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-bottom: 8px;
-}
-
+/* Linha 1: nome + descrição */
 .insumo-sel-info {
-    flex: 1;
+    padding: 10px 12px 4px;
     min-width: 0;
 }
 
@@ -662,6 +584,15 @@
     margin-top: 2px;
 }
 
+/* Linha 2: qtd + checkbox + valor + remover */
+.insumo-sel-controles {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px 10px;
+    flex-wrap: nowrap;
+}
+
 .insumo-sel-qtd {
     width: 60px;
     padding: 6px 8px;
@@ -670,11 +601,35 @@
     font-size: 12px;
     text-align: center;
     flex-shrink: 0;
+    background: var(--g-bg);
+    color: var(--g-text);
 }
 
 .insumo-sel-qtd:focus {
     outline: 2px solid var(--g-blue);
     border-color: transparent;
+}
+
+/* Checkbox "cliente fornece" — ocupa espaço sobrante */
+.insumo-sel-cf {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--g-text-2);
+    cursor: pointer;
+    user-select: none;
+    flex: 1 1 auto;
+    white-space: nowrap;
+}
+
+.insumo-sel-cf input,
+.insumo-sel-cf input[type="checkbox"] {
+    cursor: pointer;
+    accent-color: var(--g-blue);
+    width: 15px;
+    height: 15px;
+    flex-shrink: 0;
 }
 
 .insumo-sel-valor {
@@ -708,36 +663,14 @@
     flex-shrink: 0;
 }
 
-.insumo-sel-remove:hover {
-    background: #fce8e6;
-    color: var(--g-red);
-}
+.insumo-sel-remove:hover                      { background: #fce8e6; color: var(--g-red); }
+.insumo-sel-remove .material-symbols-outlined { font-size: 18px; }
 
-.insumo-sel-remove .material-symbols-outlined {
-    font-size: 18px;
-}
+/* Legacy — mantido para não quebrar código antigo */
+.insumo-sel-main   { display: flex; align-items: center; gap: 8px; padding: 0; }
+.insumo-sel-footer { display: flex; align-items: center; padding: 0; }
 
-.insumo-sel-footer {
-    display: flex;
-    align-items: center;
-}
-
-.insumo-sel-cf {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 12px;
-    color: var(--g-text-2);
-    cursor: pointer;
-    user-select: none;
-}
-
-.insumo-sel-cf input {
-    cursor: pointer;
-    accent-color: var(--g-blue);
-    width: 16px;
-    height: 16px;
-}
+/* ── FIM INSUMOS SELECIONADOS ─────────────────────────────────────────────── */
 
 .analise-vazio {
     padding: 20px;
@@ -757,10 +690,7 @@
     gap: 8px;
 }
 
-.analise-total-bloco {
-    font-size: 13px;
-    color: var(--g-text-2);
-}
+.analise-total-bloco { font-size: 13px; color: var(--g-text-2); }
 
 .analise-total-bloco strong {
     font-size: 17px;
