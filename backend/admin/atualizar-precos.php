@@ -1,6 +1,7 @@
 <?php
 require_once 'auth.php';
 require_once '../config/Database.php';
+require_once '../config/ml-config.php';
 
 $db   = new Database();
 $conn = $db->getConnection();
@@ -28,6 +29,9 @@ define('MIN_VARIACAO', 3.0);
 define('MAX_VARIACAO', 50.0);
 define('ML_TIMEOUT',   12);
 
+// Arquivo de cache do App Token (distinto do token de usuário)
+define('ML_APP_TOKEN_FILE', __DIR__ . '/../../logs/ml_app_token.json');
+
 try {
     $conn->query('SELECT 1 FROM insumos_precos_historico LIMIT 1');
     $historico_existe = true;
@@ -51,11 +55,69 @@ function medianaIQR(array $precos): ?float {
 }
 
 /**
- * Busca preços na API pública do ML (/sites/MLB/search).
- * Tenta primeiro cURL; se falhar (ex: HostGator bloqueado), tenta file_get_contents.
- * Retorna ['precos' => [...], 'total' => N] ou ['error' => 'mensagem', 'debug' => '...'].
+ * Obtém App Access Token via Client Credentials (sem login de usuário).
+ * Cacheia em arquivo por ~5h50min (token expira em 6h).
+ */
+function mlGetAppToken(): string {
+    $cache_file = ML_APP_TOKEN_FILE;
+
+    // Verifica cache
+    if (file_exists($cache_file)) {
+        $cache = json_decode(file_get_contents($cache_file), true);
+        if (!empty($cache['access_token']) && !empty($cache['expires_at']) && time() < $cache['expires_at']) {
+            return $cache['access_token'];
+        }
+    }
+
+    // Solicita novo token
+    $ch = curl_init('https://api.mercadolibre.com/oauth/token');
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_POST           => true,
+        CURLOPT_TIMEOUT        => 10,
+        CURLOPT_SSL_VERIFYPEER => false,
+        CURLOPT_HTTPHEADER     => [
+            'Accept: application/json',
+            'Content-Type: application/x-www-form-urlencoded',
+        ],
+        CURLOPT_POSTFIELDS => http_build_query([
+            'grant_type'    => 'client_credentials',
+            'client_id'     => ML_APP_ID,
+            'client_secret' => ML_SECRET_KEY,
+        ]),
+    ]);
+    $resp = curl_exec($ch);
+    $err  = curl_error($ch);
+    curl_close($ch);
+
+    if ($err || !$resp) throw new Exception('Erro ao obter App Token: ' . $err);
+
+    $data = json_decode($resp, true);
+    if (empty($data['access_token'])) {
+        throw new Exception('App Token inválido: ' . ($data['message'] ?? $resp));
+    }
+
+    // Salva cache (expira 10min antes do prazo real)
+    $cache = [
+        'access_token' => $data['access_token'],
+        'expires_at'   => time() + ($data['expires_in'] ?? 21600) - 600,
+    ];
+    @file_put_contents($cache_file, json_encode($cache));
+
+    return $data['access_token'];
+}
+
+/**
+ * Busca preços no ML usando App Token (client_credentials).
+ * Resolve o 403 que servidores de hospedagem recebem sem autenticação.
  */
 function mlBuscarPrecos(string $query): array {
+    try {
+        $token = mlGetAppToken();
+    } catch (Exception $e) {
+        return ['error' => 'Falha ao autenticar: ' . $e->getMessage()];
+    }
+
     $params = http_build_query([
         'q'           => $query,
         'limit'       => ML_LIMIT,
@@ -64,75 +126,43 @@ function mlBuscarPrecos(string $query): array {
     ]);
     $url = 'https://api.mercadolibre.com/sites/' . ML_SITE . '/search?' . $params;
 
-    $resp  = false;
-    $debug = [];
+    $ch = curl_init($url);
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT        => ML_TIMEOUT,
+        CURLOPT_SSL_VERIFYPEER => false,
+        CURLOPT_USERAGENT      => 'Mozilla/5.0',
+        CURLOPT_HTTPHEADER     => [
+            'Accept: application/json',
+            'Authorization: Bearer ' . $token,
+        ],
+    ]);
+    $resp = curl_exec($ch);
+    $http = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $err  = curl_error($ch);
+    curl_close($ch);
 
-    // --- Tentativa 1: cURL ---
-    if (function_exists('curl_init')) {
-        $ch = curl_init($url);
-        curl_setopt_array($ch, [
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT        => ML_TIMEOUT,
-            CURLOPT_SSL_VERIFYPEER => false,
-            CURLOPT_SSL_VERIFYHOST => false,
-            CURLOPT_USERAGENT      => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-            CURLOPT_FOLLOWLOCATION => true,
-            CURLOPT_MAXREDIRS      => 3,
-            CURLOPT_HTTPHEADER     => [
-                'Accept: application/json',
-                'Accept-Language: pt-BR,pt;q=0.9',
-            ],
-        ]);
-        $raw   = curl_exec($ch);
-        $errno = curl_errno($ch);
-        $err   = curl_error($ch);
-        $http  = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
-
-        $debug[] = "cURL: http={$http} errno={$errno} err={$err}";
-
-        if ($errno === 0 && $http === 200 && $raw) {
-            $resp = $raw;
-        }
-    }
-
-    // --- Tentativa 2: file_get_contents ---
-    if (!$resp && ini_get('allow_url_fopen')) {
-        $ctx = stream_context_create(['http' => [
-            'method'         => 'GET',
-            'header'         => "Accept: application/json\r\nUser-Agent: Mozilla/5.0\r\n",
-            'timeout'        => ML_TIMEOUT,
-            'ignore_errors'  => true,
-        ], 'ssl' => [
-            'verify_peer'       => false,
-            'verify_peer_name'  => false,
-        ]]);
-        $raw2  = @file_get_contents($url, false, $ctx);
-        $debug[] = 'file_get_contents: ' . ($raw2 !== false ? strlen($raw2) . ' bytes' : 'falhou');
-        if ($raw2 !== false && strlen($raw2) > 10) {
-            $resp = $raw2;
-        }
-    }
-
-    if (!$resp) {
-        return [
-            'error' => 'Sem acesso à API ML (cURL e file_get_contents falharam)',
-            'debug' => implode(' | ', $debug),
-        ];
+    if ($err || !$resp) {
+        return ['error' => 'Falha na conexão: ' . $err, 'debug' => "http={$http}"];
     }
 
     $data = json_decode($resp, true);
-    if (json_last_error() !== JSON_ERROR_NONE) {
-        return ['error' => 'JSON inválido: ' . json_last_error_msg(), 'debug' => substr($resp, 0, 200)];
+    if ($http !== 200) {
+        // Token expirou/inválido? Limpa cache e reporta
+        if ($http === 401 || $http === 403) {
+            @unlink(ML_APP_TOKEN_FILE);
+        }
+        return ['error' => "API retornou HTTP {$http}: " . ($data['message'] ?? ''), 'debug' => substr($resp, 0, 200)];
     }
+
     if (empty($data['results'])) {
         $total = $data['paging']['total'] ?? 0;
-        return ['error' => "Nenhum resultado (total={$total}) para: {$query}", 'debug' => implode(' | ', $debug)];
+        return ['error' => "Nenhum resultado (total={$total}) para: {$query}"];
     }
 
     $precos = array_values(array_filter(array_column($data['results'], 'price'), fn($p) => $p > 0));
     if (empty($precos)) {
-        return ['error' => 'Resultados sem preço válido', 'debug' => implode(' | ', $debug)];
+        return ['error' => 'Resultados sem preço válido'];
     }
 
     return ['precos' => $precos, 'total' => $data['paging']['total'] ?? count($precos)];
@@ -211,7 +241,7 @@ if (isset($_POST['action']) && $_POST['action'] === 'atualizar') {
     exit;
 }
 
-// ── API: histórico ────────────────────────────────────────────────────
+// ── API: histórico ───────────────────────────────────────────────────
 if (isset($_GET['action']) && $_GET['action'] === 'historico') {
     header('Content-Type: application/json');
     if (!$historico_existe) { echo json_encode([]); exit; }
@@ -228,7 +258,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'historico') {
     exit;
 }
 
-// ── Carrega insumos ───────────────────────────────────────────────────
+// ── Carrega insumos ─────────────────────────────────────────────────
 try {
     if ($historico_existe) {
         $insumos = $conn->query('
@@ -342,12 +372,9 @@ include '_sidebar_data.php';
                 </h1>
                 <div class="page-subtitle">Busca preços de referência no Mercado Livre e atualiza automaticamente</div>
             </div>
-            <div style="display:flex;gap:8px;align-items:center">
-                <a href="ml-diagnostico.php" class="btn btn-secondary" style="font-size:12px" target="_blank">🔍 Diagnóstico</a>
-                <button class="btn btn-primary" id="btn-atualizar-todos" onclick="atualizarTodos()" <?php echo !$historico_existe ? 'disabled title="Crie a tabela de histórico primeiro"' : ''; ?>>
-                    <span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle">sync</span> Atualizar Todos
-                </button>
-            </div>
+            <button class="btn btn-primary" id="btn-atualizar-todos" onclick="atualizarTodos()" <?php echo !$historico_existe ? 'disabled title="Crie a tabela de histórico primeiro"' : ''; ?>>
+                <span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle">sync</span> Atualizar Todos
+            </button>
         </div>
 
         <?php if (!$historico_existe): ?>
