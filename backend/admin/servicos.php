@@ -7,7 +7,7 @@ $conn = $db->getConnection();
 
 try { $conn->query("ALTER TABLE servicos ADD COLUMN prazo_padrao_dias INT DEFAULT NULL"); } catch (Exception $e) {}
 
-// ─── API: categorias ────────────────────────────────────────
+// ─── API: categorias ───────────────────────────────────────
 if (isset($_GET['action']) && $_GET['action'] === 'categorias') {
     header('Content-Type: application/json');
     $cats = $conn->query("SELECT id, nome FROM categorias_servico WHERE ativo=1 ORDER BY nome")->fetchAll(PDO::FETCH_ASSOC);
@@ -15,7 +15,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'categorias') {
     exit;
 }
 
-// ─── API: criar categoria ───────────────────────────────────
+// ─── API: criar categoria ────────────────────────────────
 if (isset($_POST['action']) && $_POST['action'] === 'criar_categoria') {
     header('Content-Type: application/json');
     $nome = trim($_POST['nome'] ?? '');
@@ -30,16 +30,10 @@ if (isset($_POST['action']) && $_POST['action'] === 'criar_categoria') {
     exit;
 }
 
-// ─── API: buscar insumos (nomes de colunas corretos) ────────
-if (isset($_GET['action']) && $_GET['action'] === 'buscar_insumos') {
+// ─── API: todos os insumos (para painel agrupado) ─────────────
+if (isset($_GET['action']) && $_GET['action'] === 'todos_insumos') {
     header('Content-Type: application/json');
-    $busca = trim($_GET['q'] ?? '');
-    $sql = "SELECT id, nome, unidade, valorunitario, categoria, tipo_insumo FROM insumos WHERE ativo=1";
-    if ($busca) $sql .= " AND (nome LIKE :q OR categoria LIKE :q)";
-    $sql .= " ORDER BY categoria, nome LIMIT 60";
-    $stmt = $conn->prepare($sql);
-    if ($busca) $stmt->execute([':q' => '%'.$busca.'%']);
-    else $stmt->execute();
+    $stmt = $conn->query("SELECT id, nome, unidade, valorunitario, categoria, tipo_insumo FROM insumos WHERE ativo=1 ORDER BY categoria, nome");
     echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
     exit;
 }
@@ -62,7 +56,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'insumos_servico') {
     exit;
 }
 
-// ─── API: dados completos de um serviço (para edição) ───────
+// ─── API: dados completos de um serviço (para edição) ─────────
 if (isset($_GET['action']) && $_GET['action'] === 'get_servico') {
     header('Content-Type: application/json');
     $id = (int)($_GET['id'] ?? 0);
@@ -71,11 +65,9 @@ if (isset($_GET['action']) && $_GET['action'] === 'get_servico') {
     $stmt->execute([$id]);
     $serv = $stmt->fetch(PDO::FETCH_ASSOC);
     if (!$serv) { echo json_encode(['ok' => false]); exit; }
-    // Categorias
     $stmtCat = $conn->prepare('SELECT categoria_id FROM servico_categorias WHERE servico_id=?');
     $stmtCat->execute([$id]);
     $serv['cat_ids'] = $stmtCat->fetchAll(PDO::FETCH_COLUMN);
-    // Insumos
     $stmtIns = $conn->prepare("
         SELECT si.insumo_id, si.quantidade_padrao, si.tipo_vinculo,
                i.nome, i.unidade, i.valorunitario, i.tipo_insumo, i.categoria
@@ -96,7 +88,6 @@ $msg   = $_GET['msg'] ?? '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $acao = $_POST['acao'] ?? '';
-
     if ($acao === 'criar' || $acao === 'editar') {
         $nome      = trim($_POST['nome'] ?? '');
         $descricao = trim($_POST['descricao'] ?? '');
@@ -105,9 +96,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $ativo     = isset($_POST['ativo']) ? 1 : 0;
         $cats      = array_map('intval', $_POST['categorias'] ?? []);
         $insumos   = json_decode($_POST['insumos_json'] ?? '[]', true) ?: [];
-
         if (!$nome) { header('Location: servicos.php?msg=erro:Nome obrigatório'); exit; }
-
         if ($acao === 'criar') {
             $conn->prepare('INSERT INTO servicos (nome, descricao, valor_base, prazo_padrao_dias, ativo) VALUES (?,?,?,?,?)')
                  ->execute([$nome, $descricao, $valor, $prazo, $ativo]);
@@ -117,14 +106,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $conn->prepare('UPDATE servicos SET nome=?, descricao=?, valor_base=?, prazo_padrao_dias=?, ativo=? WHERE id=?')
                  ->execute([$nome, $descricao, $valor, $prazo, $ativo, $sid]);
         }
-
-        // Categorias
         $conn->prepare('DELETE FROM servico_categorias WHERE servico_id=?')->execute([$sid]);
         foreach ($cats as $cid) {
             if ($cid > 0) $conn->prepare('INSERT IGNORE INTO servico_categorias (servico_id, categoria_id) VALUES (?,?)')->execute([$sid, $cid]);
         }
-
-        // Insumos com tipo_vinculo e quantidade_padrao
         $conn->prepare('DELETE FROM servicos_insumos WHERE servico_id=?')->execute([$sid]);
         foreach ($insumos as $ins) {
             $iid  = (int)($ins['id'] ?? 0);
@@ -135,11 +120,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                      ->execute([$sid, $iid, $qtd, $tipo]);
             }
         }
-
         $label = $acao === 'criar' ? 'criado' : 'atualizado';
         header("Location: servicos.php?msg=sucesso:Serviço {$label}!"); exit;
     }
-
     if ($acao === 'excluir') {
         $id = (int)$_POST['id'];
         try {
@@ -152,7 +135,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     header('Location: servicos.php'); exit;
 }
 
-// ─── Listagem ────────────────────────────────────────────────
+// ─── Listagem ───────────────────────────────────────────
 try {
     $sql = 'SELECT s.*, COUNT(DISTINCT ps.id) as total_uso FROM servicos s LEFT JOIN pre_os_servicos ps ON ps.servico_id = s.id'
          . ($busca ? ' WHERE s.nome LIKE :q OR s.descricao LIKE :q' : '')
@@ -199,6 +182,7 @@ include '_sidebar_data.php';
     <link rel="stylesheet" href="assets/css/sidebar.css?v=<?php echo $v; ?>">
     <link rel="stylesheet" href="assets/css/pages.css?v=<?php echo $v; ?>">
     <style>
+    /* chips de categoria */
     .chips-wrap{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
     .chip{display:inline-flex;align-items:center;gap:4px;padding:5px 14px;border-radius:20px;font-size:13px;font-weight:500;cursor:pointer;border:2px solid var(--g-border);background:var(--g-surface);color:var(--g-text-2);transition:all .15s;user-select:none}
     .chip.active{background:var(--color-primary,#7c3aed);border-color:var(--color-primary,#7c3aed);color:#fff}
@@ -206,68 +190,53 @@ include '_sidebar_data.php';
     .cat-label-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
     .btn-nova-cat{display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:6px;background:var(--color-primary,#7c3aed);color:#fff;font-size:12px;font-weight:600;border:none;cursor:pointer;transition:opacity .15s}
     .btn-nova-cat:hover{opacity:.85}
-    .btn-nova-cat .material-symbols-outlined{font-size:16px}
     .nova-cat-inline{display:none;padding:12px;background:var(--g-bg);border:1px solid var(--g-border);border-radius:8px;margin-bottom:10px;gap:8px;align-items:flex-start}
     .nova-cat-inline.show{display:flex}
     .nova-cat-inline input{flex:1;padding:8px 12px;border:1px solid var(--g-border);border-radius:6px;font-size:13px}
     .nova-cat-inline button{padding:8px 14px;border-radius:6px;border:none;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:4px}
     .nova-cat-inline .btn-salvar-cat{background:var(--color-primary,#7c3aed);color:#fff}
     .nova-cat-inline .btn-cancelar-cat{background:var(--g-surface);color:var(--g-text-2);border:1px solid var(--g-border)}
-    /* badge insumos na tabela */
+    /* badge insumos */
     .badge-insumos{display:inline-flex;align-items:center;gap:3px;padding:3px 8px;border-radius:12px;background:#dbeafe;color:#1d4ed8;font-size:11px;font-weight:600}
-    .badge-insumos .material-symbols-outlined{font-size:13px}
-    /* seção insumos no modal */
-    .insumos-search{position:relative;margin-bottom:10px}
-    .insumos-search input{width:100%;padding:9px 12px 9px 36px;border:1px solid var(--g-border);border-radius:8px;font-size:13px}
-    .insumos-search .material-symbols-outlined{position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:18px;color:var(--g-text-3);pointer-events:none}
-    .insumos-results{max-height:180px;overflow-y:auto;border:1px solid var(--g-border);border-radius:8px;margin-bottom:10px;background:var(--g-bg)}
-    .insumo-item{padding:9px 12px;border-bottom:1px solid var(--g-border);cursor:pointer;transition:background .15s;display:flex;justify-content:space-between;align-items:center}
-    .insumo-item:last-child{border-bottom:none}
-    .insumo-item:hover{background:var(--g-hover)}
-    .insumo-item-nome{font-size:13px;font-weight:500}
-    .insumo-item-meta{font-size:11px;color:var(--g-text-3);margin-top:1px}
-    .insumo-item-direita{text-align:right;flex-shrink:0}
-    .insumo-item-valor{font-size:12px;color:var(--g-text-2)}
-    .insumo-item-tipo{font-size:10px;font-weight:600;padding:1px 6px;border-radius:8px;margin-top:2px;display:inline-block}
-    .tipo-fixo{background:#dcfce7;color:#166534}
-    .tipo-variavel{background:#dbeafe;color:#1d4ed8}
-    /* card insumo selecionado */
-    .insumo-selecionado{display:grid;grid-template-columns:1fr auto auto auto;gap:8px;align-items:center;padding:9px 10px;background:var(--g-surface);border:1px solid var(--g-border);border-radius:8px;margin-bottom:6px}
-    .insumo-sel-nome{font-size:13px;font-weight:500}
-    .insumo-sel-meta{font-size:11px;color:var(--g-text-3)}
-    .insumo-sel-qtd{width:64px;padding:5px 6px;border:1px solid var(--g-border);border-radius:6px;text-align:center;font-size:12px}
-    .insumo-sel-qtd:disabled{opacity:.35;pointer-events:none}
+    /* painel insumos */
+    .insumos-painel{border:1px solid var(--g-border);border-radius:10px;overflow:hidden;background:var(--g-bg)}
+    .insumos-painel-header{display:flex;align-items:center;gap:8px;padding:10px 14px;background:var(--g-surface);border-bottom:1px solid var(--g-border)}
+    .insumos-painel-header input{flex:1;padding:7px 10px;border:1px solid var(--g-border);border-radius:7px;font-size:13px;background:var(--g-bg)}
+    .insumos-painel-header .material-symbols-outlined{font-size:18px;color:var(--g-text-3);flex-shrink:0}
+    .insumos-count-badge{font-size:12px;font-weight:700;padding:3px 9px;border-radius:12px;background:#dbeafe;color:#1d4ed8;white-space:nowrap}
+    /* grupos / lista */
+    .insumos-lista{max-height:260px;overflow-y:auto}
+    .ins-grupo-titulo{padding:6px 14px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--g-text-3);background:var(--g-hover);border-bottom:1px solid var(--g-border);position:sticky;top:0;z-index:1}
+    .ins-row{display:grid;grid-template-columns:26px 1fr auto auto auto;gap:8px;align-items:center;padding:8px 14px;border-bottom:1px solid var(--g-border);transition:background .1s}
+    .ins-row:last-child{border-bottom:none}
+    .ins-row:hover{background:var(--g-hover)}
+    .ins-row.selecionado{background:#f5f3ff}
+    .ins-row.oculto{display:none}
+    .ins-row input[type=checkbox]{width:16px;height:16px;cursor:pointer;accent-color:var(--color-primary,#7c3aed)}
+    .ins-nome{font-size:13px;font-weight:500;cursor:pointer}
+    .ins-meta{font-size:11px;color:var(--g-text-3)}
     .vinculo-toggle-sm{display:flex;border:1px solid var(--g-border);border-radius:6px;overflow:hidden;font-size:11px}
-    .vinculo-toggle-sm button{padding:3px 8px;border:none;background:transparent;cursor:pointer;color:var(--g-text-2);transition:background .1s,color .1s;font-size:11px}
+    .vinculo-toggle-sm button{padding:3px 8px;border:none;background:transparent;cursor:pointer;color:var(--g-text-2);transition:background .1s,color .1s}
     .vinculo-toggle-sm button.ativo-v{background:#dbeafe;color:#1d4ed8}
     .vinculo-toggle-sm button.ativo-f{background:#dcfce7;color:#166534}
-    .btn-remover-insumo{padding:4px;border:none;background:transparent;color:var(--g-red,#dc2626);cursor:pointer;display:flex;align-items:center;border-radius:4px;transition:background .15s}
-    .btn-remover-insumo:hover{background:#fee2e2}
-    .insumos-vazio{text-align:center;padding:18px;color:var(--g-text-3);font-size:13px}
-    .insumos-selecionados-titulo{font-size:11px;font-weight:600;color:var(--g-text-2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px}
+    .ins-qtd{width:58px;padding:4px 6px;border:1px solid var(--g-border);border-radius:6px;font-size:12px;text-align:center}
+    .ins-qtd:disabled{opacity:.3;pointer-events:none}
+    .insumos-vazio{text-align:center;padding:20px;color:var(--g-text-3);font-size:13px}
     </style>
 </head>
 <body>
-
 <div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebar()"></div>
-
 <div class="app-layout">
 <?php include '_sidebar.php'; ?>
-
 <main class="main-content">
     <div class="topbar">
-        <button class="btn-menu" onclick="toggleSidebar()">
-            <span class="material-symbols-outlined">menu</span>
-        </button>
+        <button class="btn-menu" onclick="toggleSidebar()"><span class="material-symbols-outlined">menu</span></button>
         <span class="topbar-title">Serviços</span>
     </div>
-
     <div class="page-content">
         <div class="page-header">
             <div>
-                <h1 class="page-title">
-                    <span class="material-symbols-outlined" style="vertical-align:middle;margin-right:6px">build</span>Serviços
-                </h1>
+                <h1 class="page-title"><span class="material-symbols-outlined" style="vertical-align:middle;margin-right:6px">build</span>Serviços</h1>
                 <div class="page-subtitle"><?php echo count($servicos); ?> serviço<?php echo count($servicos) !== 1 ? 's' : ''; ?> cadastrado<?php echo count($servicos) !== 1 ? 's' : ''; ?></div>
             </div>
             <button class="btn btn-primary" onclick="abrirModal()">
@@ -300,62 +269,39 @@ include '_sidebar_data.php';
             </div>
             <?php else: ?>
             <table class="data-table">
-                <thead>
-                    <tr>
-                        <th>Nome</th>
-                        <th>Categorias</th>
-                        <th>Insumos</th>
-                        <th class="text-right">Valor Base</th>
-                        <th class="text-center">Prazo (d.u.)</th>
-                        <th class="text-center">Uso</th>
-                        <th class="text-center">Status</th>
-                        <th class="text-center">Ações</th>
-                    </tr>
-                </thead>
+                <thead><tr>
+                    <th>Nome</th><th>Categorias</th><th>Insumos</th>
+                    <th class="text-right">Valor Base</th><th class="text-center">Prazo (d.u.)</th>
+                    <th class="text-center">Uso</th><th class="text-center">Status</th><th class="text-center">Ações</th>
+                </tr></thead>
                 <tbody>
-                <?php foreach ($servicos as $s): ?>
-                <?php
+                <?php foreach ($servicos as $s):
                     $sc     = $cats_por_servico[$s['id']] ?? [];
                     $sc_ids = $cat_ids_por_servico[$s['id']] ?? [];
                     $total_insumos = $insumos_por_servico[$s['id']] ?? 0;
                 ?>
                 <tr class="<?php echo !$s['ativo'] ? 'row-inactive' : ''; ?>">
                     <td><strong><?php echo htmlspecialchars($s['nome']); ?></strong>
-                        <?php if ($s['descricao']): ?><br><span style="font-size:12px;color:var(--g-text-3)"><?php echo htmlspecialchars($s['descricao']); ?></span><?php endif; ?>
-                    </td>
-                    <td>
-                        <?php if ($sc): foreach ($sc as $cn): ?>
+                        <?php if ($s['descricao']): ?><br><span style="font-size:12px;color:var(--g-text-3)"><?php echo htmlspecialchars($s['descricao']); ?></span><?php endif; ?></td>
+                    <td><?php if ($sc): foreach ($sc as $cn): ?>
                         <span class="badge badge-info" style="margin:1px 2px"><?php echo htmlspecialchars($cn); ?></span>
-                        <?php endforeach; else: ?><span class="text-muted">—</span><?php endif; ?>
-                    </td>
-                    <td>
-                        <?php if ($total_insumos > 0): ?>
+                        <?php endforeach; else: ?><span class="text-muted">—</span><?php endif; ?></td>
+                    <td><?php if ($total_insumos > 0): ?>
                         <span class="badge-insumos"><span class="material-symbols-outlined">inventory_2</span><?php echo $total_insumos; ?></span>
-                        <?php else: ?><span class="text-muted">—</span><?php endif; ?>
-                    </td>
+                        <?php else: ?><span class="text-muted">—</span><?php endif; ?></td>
                     <td class="text-right"><strong>R$&nbsp;<?php echo number_format((float)$s['valor_base'], 2, ',', '.'); ?></strong></td>
-                    <td class="text-center">
-                        <?php if ($s['prazo_padrao_dias']): ?>
+                    <td class="text-center"><?php if ($s['prazo_padrao_dias']): ?>
                         <span class="badge badge-info"><?php echo $s['prazo_padrao_dias']; ?> d.u.</span>
-                        <?php else: ?><span class="text-muted">—</span><?php endif; ?>
-                    </td>
-                    <td class="text-center">
-                        <?php if ($s['total_uso'] > 0): ?>
-                        <span class="badge badge-info"><?php echo $s['total_uso']; ?></span>
-                        <?php else: ?><span class="text-muted">0</span><?php endif; ?>
-                    </td>
-                    <td class="text-center">
-                        <?php if ($s['ativo']): ?>
+                        <?php else: ?><span class="text-muted">—</span><?php endif; ?></td>
+                    <td class="text-center"><?php echo $s['total_uso'] > 0 ? '<span class="badge badge-info">'.$s['total_uso'].'</span>' : '<span class="text-muted">0</span>'; ?></td>
+                    <td class="text-center"><?php if ($s['ativo']): ?>
                         <span class="badge badge-success"><span class="material-symbols-outlined" style="font-size:11px;vertical-align:middle">check_circle</span> Ativo</span>
                         <?php else: ?>
                         <span class="badge badge-dark"><span class="material-symbols-outlined" style="font-size:11px;vertical-align:middle">cancel</span> Inativo</span>
-                        <?php endif; ?>
-                    </td>
+                        <?php endif; ?></td>
                     <td class="text-center">
                         <div class="table-actions">
-                            <button class="btn-icon" title="Editar" onclick="editarServico(<?php echo $s['id']; ?>)">
-                                <span class="material-symbols-outlined">edit</span>
-                            </button>
+                            <button class="btn-icon" title="Editar" onclick="editarServico(<?php echo $s['id']; ?>)"><span class="material-symbols-outlined">edit</span></button>
                             <?php if ($s['total_uso'] == 0): ?>
                             <form method="POST" style="display:inline" onsubmit="return confirm('Excluir serviço &quot;<?php echo htmlspecialchars(addslashes($s['nome'])); ?>&quot;?')">
                                 <input type="hidden" name="acao" value="excluir">
@@ -386,7 +332,7 @@ include '_sidebar_data.php';
 
 <!-- MODAL CRIAR / EDITAR -->
 <div class="modal-overlay" id="modal-servico">
-    <div class="modal-box" style="max-width:600px;max-height:90vh;overflow-y:auto">
+    <div class="modal-box" style="max-width:640px;max-height:92vh;overflow-y:auto">
         <div class="modal-drag"></div>
         <div class="modal-title" id="modal-titulo">Novo Serviço</div>
         <form method="POST" id="form-servico" onsubmit="return prepararEnvio()">
@@ -427,21 +373,25 @@ include '_sidebar_data.php';
 
             <hr style="margin:16px 0;border:none;border-top:1px solid var(--g-border)">
 
-            <!-- ── INSUMOS DO SERVIÇO ── -->
-            <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
-                <span class="material-symbols-outlined" style="font-size:18px;color:var(--g-text-2)">inventory_2</span>
-                <span class="form-label" style="margin:0">INSUMOS DO SERVIÇO</span>
+            <!-- PAINEL DE INSUMOS -->
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+                <div style="display:flex;align-items:center;gap:6px">
+                    <span class="material-symbols-outlined" style="font-size:18px;color:var(--g-text-2)">inventory_2</span>
+                    <span class="form-label" style="margin:0">INSUMOS DO SERVIÇO</span>
+                </div>
+                <span class="insumos-count-badge" id="count-insumos-badge">0 selecionados</span>
             </div>
-            <p style="font-size:12px;color:var(--g-text-3);margin:0 0 10px">Fixo = incluso no preço (pré-marcado no pedido). Variável = selecionável conforme necessidade.</p>
+            <p style="font-size:12px;color:var(--g-text-3);margin:0 0 10px">Marque os insumos, defina o vínculo (Fixo = incluso no preço / Variável = opcional) e a quantidade padrão.</p>
 
-            <div class="insumos-search">
-                <span class="material-symbols-outlined">search</span>
-                <input type="text" id="busca-insumo" placeholder="Buscar insumo por nome ou categoria..." autocomplete="off" oninput="buscarInsumos()">
+            <div class="insumos-painel">
+                <div class="insumos-painel-header">
+                    <span class="material-symbols-outlined">search</span>
+                    <input type="text" id="filtro-insumo" placeholder="Filtrar insumos por nome ou categoria..." oninput="filtrarInsumos()">
+                </div>
+                <div class="insumos-lista" id="insumos-lista">
+                    <div class="insumos-vazio" id="insumos-loading">Carregando insumos...</div>
+                </div>
             </div>
-            <div class="insumos-results" id="resultados-insumos" style="display:none"></div>
-
-            <div class="insumos-selecionados-titulo">INSUMOS SELECIONADOS (<span id="count-insumos">0</span>)</div>
-            <div id="lista-insumos-selecionados"><div class="insumos-vazio">Nenhum insumo vinculado</div></div>
 
             <hr style="margin:16px 0;border:none;border-top:1px solid var(--g-border)">
 
@@ -462,18 +412,15 @@ include '_sidebar_data.php';
 <script>
 let todasCategorias  = [];
 let catsSelecionadas = new Set();
-// [{id, nome, unidade, valorunitario, categoria, tipo_insumo, quantidade, tipo_vinculo}]
-let insumosSelecionados = [];
-let timeoutBusca = null;
+// Map: insumo_id → { id, nome, unidade, valorunitario, categoria, tipo_insumo, quantidade, tipo_vinculo }
+let insumosSelecionados = new Map();
+let todosInsumos = []; // cache dos insumos
 
-// ═══════════════════════════════════════════════════════════
-//  CATEGORIAS
-// ═══════════════════════════════════════════════════════════
+// ══ CATEGORIAS ════════════════════════════════════════════
 async function carregarCategorias() {
     const r = await fetch('servicos.php?action=categorias');
     todasCategorias = await r.json();
 }
-
 function renderChips() {
     const wrap   = document.getElementById('chips-categorias');
     const hidden = document.getElementById('hidden-cats');
@@ -491,14 +438,12 @@ function renderChips() {
         hidden.appendChild(inp);
     });
 }
-
 function toggleNovaCatForm() {
     const f = document.getElementById('nova-cat-form');
     f.classList.toggle('show');
     if (f.classList.contains('show')) { document.getElementById('nova-cat-nome').value = ''; setTimeout(() => document.getElementById('nova-cat-nome').focus(), 100); }
 }
 function cancelarNovaCategoria() { document.getElementById('nova-cat-form').classList.remove('show'); document.getElementById('nova-cat-nome').value = ''; }
-
 async function salvarNovaCategoria() {
     const nome = document.getElementById('nova-cat-nome').value.trim();
     if (!nome) { alert('Digite o nome da categoria!'); return; }
@@ -512,124 +457,141 @@ async function salvarNovaCategoria() {
     } else { alert('Erro: ' + (data.erro || 'desconhecido')); }
 }
 
-// ═══════════════════════════════════════════════════════════
-//  INSUMOS — busca
-// ═══════════════════════════════════════════════════════════
-function buscarInsumos() {
-    clearTimeout(timeoutBusca);
-    const q = document.getElementById('busca-insumo').value.trim();
-    if (!q) { document.getElementById('resultados-insumos').style.display = 'none'; return; }
-    timeoutBusca = setTimeout(async () => {
-        const insumos = await (await fetch('servicos.php?action=buscar_insumos&q=' + encodeURIComponent(q))).json();
-        renderResultadosInsumos(insumos);
-    }, 280);
+// ══ PAINEL DE INSUMOS ═══════════════════════════════════
+async function carregarTodosInsumos() {
+    if (todosInsumos.length) return; // já em cache
+    const r = await fetch('servicos.php?action=todos_insumos');
+    todosInsumos = await r.json();
 }
 
-function renderResultadosInsumos(insumos) {
-    const div = document.getElementById('resultados-insumos');
-    if (!insumos.length) { div.innerHTML = '<div class="insumos-vazio">Nenhum insumo encontrado</div>'; div.style.display='block'; return; }
-    div.innerHTML = '';
-    insumos.forEach(ins => {
-        if (insumosSelecionados.find(i => i.id == ins.id)) return;
-        const d = document.createElement('div');
-        d.className = 'insumo-item';
-        d.onclick = () => adicionarInsumo(ins);
-        const tipoCls = ins.tipo_insumo === 'fixo' ? 'tipo-fixo' : 'tipo-variavel';
-        const tipoTxt = ins.tipo_insumo === 'fixo' ? 'Fixo' : 'Variável';
-        d.innerHTML = `
-            <div>
-                <div class="insumo-item-nome">${_esc(ins.nome)}</div>
-                <div class="insumo-item-meta">${_esc(ins.unidade)}${ins.categoria ? ' · ' + _esc(ins.categoria) : ''}</div>
-            </div>
-            <div class="insumo-item-direita">
-                <div class="insumo-item-valor">R$ ${_fmt(parseFloat(ins.valorunitario||0))}</div>
-                <div class="insumo-item-tipo ${tipoCls}">${tipoTxt}</div>
-            </div>`;
-        div.appendChild(d);
+function renderPainelInsumos() {
+    const lista = document.getElementById('insumos-lista');
+    if (!todosInsumos.length) {
+        lista.innerHTML = '<div class="insumos-vazio">Nenhum insumo cadastrado ainda.</div>';
+        return;
+    }
+    // agrupa por categoria
+    const grupos = {};
+    todosInsumos.forEach(ins => {
+        const cat = ins.categoria || 'Sem categoria';
+        if (!grupos[cat]) grupos[cat] = [];
+        grupos[cat].push(ins);
     });
-    div.style.display = 'block';
-}
-
-function adicionarInsumo(ins) {
-    const tipoVinculo = ins.tipo_insumo === 'fixo' ? 'fixo' : 'variavel';
-    insumosSelecionados.push({
-        id: parseInt(ins.id),
-        nome: ins.nome,
-        unidade: ins.unidade,
-        valorunitario: parseFloat(ins.valorunitario || 0),
-        categoria: ins.categoria || '',
-        tipo_insumo: ins.tipo_insumo || 'variavel',
-        quantidade: ins.quantidade_padrao ? parseFloat(ins.quantidade_padrao) : 1,
-        tipo_vinculo: tipoVinculo
+    lista.innerHTML = '';
+    Object.keys(grupos).sort().forEach(cat => {
+        const titulo = document.createElement('div');
+        titulo.className = 'ins-grupo-titulo';
+        titulo.textContent = cat;
+        lista.appendChild(titulo);
+        grupos[cat].forEach(ins => {
+            lista.appendChild(criarLinhaInsumo(ins));
+        });
     });
-    document.getElementById('busca-insumo').value = '';
-    document.getElementById('resultados-insumos').style.display = 'none';
-    renderInsumosSelecionados();
+    atualizarBadgeCount();
 }
 
-function removerInsumo(id) {
-    insumosSelecionados = insumosSelecionados.filter(i => i.id !== parseInt(id));
-    renderInsumosSelecionados();
+function criarLinhaInsumo(ins) {
+    const sel  = insumosSelecionados.get(parseInt(ins.id));
+    const isSel  = !!sel;
+    const tipo   = sel ? sel.tipo_vinculo : (ins.tipo_insumo === 'fixo' ? 'fixo' : 'variavel');
+    const qtd    = sel ? sel.quantidade : 1;
+    const isFixo = tipo === 'fixo';
+
+    const row = document.createElement('div');
+    row.className = 'ins-row' + (isSel ? ' selecionado' : '');
+    row.dataset.id   = ins.id;
+    row.dataset.nome = (ins.nome || '').toLowerCase();
+    row.dataset.cat  = (ins.categoria || '').toLowerCase();
+
+    row.innerHTML = `
+        <input type="checkbox" ${isSel ? 'checked' : ''} onchange="toggleInsumo(${ins.id}, this.checked)">
+        <div style="cursor:pointer" onclick="document.querySelector('.ins-row[data-id=\'${ins.id}\'] input[type=checkbox]').click()">
+            <div class="ins-nome">${_esc(ins.nome)}</div>
+            <div class="ins-meta">R$ ${_fmt(parseFloat(ins.valorunitario||0))} / ${_esc(ins.unidade)}</div>
+        </div>
+        <div class="vinculo-toggle-sm">
+            <button type="button" class="${!isFixo ? 'ativo-v' : ''}" onclick="setTipoVinculo(${ins.id},'variavel',this)">Var</button>
+            <button type="button" class="${isFixo  ? 'ativo-f' : ''}" onclick="setTipoVinculo(${ins.id},'fixo',this)">Fixo</button>
+        </div>
+        <input class="ins-qtd" type="number" min="0.001" step="0.001" value="${qtd}" ${!isFixo ? 'disabled' : ''}
+            onchange="atualizarQtd(${ins.id}, this.value)" title="Qtd padrão (apenas Fixo)">`;
+    return row;
+}
+
+function toggleInsumo(id, checked) {
+    id = parseInt(id);
+    const ins = todosInsumos.find(i => parseInt(i.id) === id);
+    if (!ins) return;
+    const row = document.querySelector('.ins-row[data-id="'+id+'"]');
+    if (checked) {
+        const tipoIni = ins.tipo_insumo === 'fixo' ? 'fixo' : 'variavel';
+        insumosSelecionados.set(id, { id, nome: ins.nome, unidade: ins.unidade, valorunitario: parseFloat(ins.valorunitario||0), categoria: ins.categoria||'', tipo_vinculo: tipoIni, quantidade: 1 });
+        if (row) row.classList.add('selecionado');
+    } else {
+        insumosSelecionados.delete(id);
+        if (row) row.classList.remove('selecionado');
+    }
+    atualizarBadgeCount();
 }
 
 function setTipoVinculo(id, tipo, btn) {
-    const ins = insumosSelecionados.find(i => i.id === parseInt(id));
-    if (ins) ins.tipo_vinculo = tipo;
+    id = parseInt(id);
+    const row = document.querySelector('.ins-row[data-id="'+id+'"]');
+    // auto-seleciona ao clicar no toggle
+    if (!insumosSelecionados.has(id)) {
+        const chk = row ? row.querySelector('input[type=checkbox]') : null;
+        if (chk) { chk.checked = true; toggleInsumo(id, true); }
+    }
+    const sel = insumosSelecionados.get(id);
+    if (sel) sel.tipo_vinculo = tipo;
     // atualiza botões
     const par = btn.parentElement;
     par.querySelectorAll('button').forEach(b => b.classList.remove('ativo-v','ativo-f'));
     btn.classList.add(tipo === 'fixo' ? 'ativo-f' : 'ativo-v');
     // habilita/desabilita qtd
-    const qtdEl = par.closest('.insumo-selecionado').querySelector('.insumo-sel-qtd');
+    const qtdEl = row ? row.querySelector('.ins-qtd') : null;
     if (qtdEl) qtdEl.disabled = (tipo === 'variavel');
 }
 
 function atualizarQtd(id, val) {
-    const ins = insumosSelecionados.find(i => i.id === parseInt(id));
-    if (ins) ins.quantidade = Math.max(0.001, parseFloat(val) || 1);
+    const sel = insumosSelecionados.get(parseInt(id));
+    if (sel) sel.quantidade = Math.max(0.001, parseFloat(val) || 1);
 }
 
-function renderInsumosSelecionados() {
-    const div = document.getElementById('lista-insumos-selecionados');
-    document.getElementById('count-insumos').textContent = insumosSelecionados.length;
-    if (!insumosSelecionados.length) { div.innerHTML = '<div class="insumos-vazio">Nenhum insumo vinculado</div>'; return; }
-    div.innerHTML = '';
-    insumosSelecionados.forEach(ins => {
-        const isFixo = ins.tipo_vinculo === 'fixo';
-        const card = document.createElement('div');
-        card.className = 'insumo-selecionado';
-        card.innerHTML = `
-            <div class="insumo-sel-info">
-                <div class="insumo-sel-nome">${_esc(ins.nome)}</div>
-                <div class="insumo-sel-meta">${_esc(ins.unidade)}${ins.categoria ? ' · ' + _esc(ins.categoria) : ''} · R$ ${_fmt(ins.valorunitario)}</div>
-            </div>
-            <div class="vinculo-toggle-sm">
-                <button type="button" class="${!isFixo?'ativo-v':''}" onclick="setTipoVinculo(${ins.id},'variavel',this)">Variável</button>
-                <button type="button" class="${isFixo?'ativo-f':''}" onclick="setTipoVinculo(${ins.id},'fixo',this)">Fixo</button>
-            </div>
-            <input class="insumo-sel-qtd" type="number" min="0.001" step="0.001"
-                value="${ins.quantidade}" ${!isFixo?'disabled':''}
-                onchange="atualizarQtd(${ins.id}, this.value)" title="Qtd padrão (apenas fixo)">
-            <button type="button" class="btn-remover-insumo" onclick="removerInsumo(${ins.id})" title="Remover">
-                <span class="material-symbols-outlined" style="font-size:18px">close</span>
-            </button>`;
-        div.appendChild(card);
+function filtrarInsumos() {
+    const q = document.getElementById('filtro-insumo').value.toLowerCase().trim();
+    document.querySelectorAll('#insumos-lista .ins-row').forEach(row => {
+        const match = !q || row.dataset.nome.includes(q) || row.dataset.cat.includes(q);
+        row.classList.toggle('oculto', !match);
+    });
+    // oculta títulos de grupos vazios
+    document.querySelectorAll('#insumos-lista .ins-grupo-titulo').forEach(titulo => {
+        let next = titulo.nextElementSibling;
+        let algumVisivel = false;
+        while (next && !next.classList.contains('ins-grupo-titulo')) {
+            if (!next.classList.contains('oculto')) algumVisivel = true;
+            next = next.nextElementSibling;
+        }
+        titulo.style.display = algumVisivel ? '' : 'none';
     });
 }
 
+function atualizarBadgeCount() {
+    const n = insumosSelecionados.size;
+    document.getElementById('count-insumos-badge').textContent = n + ' selecionado' + (n !== 1 ? 's' : '');
+}
+
+// ══ PREPARA ENVIO ══════════════════════════════════════
 function prepararEnvio() {
-    document.getElementById('f-insumos-json').value = JSON.stringify(
-        insumosSelecionados.map(i => ({id: i.id, quantidade: i.quantidade, tipo_vinculo: i.tipo_vinculo}))
-    );
+    const arr = Array.from(insumosSelecionados.values()).map(i => ({ id: i.id, quantidade: i.quantidade, tipo_vinculo: i.tipo_vinculo }));
+    document.getElementById('f-insumos-json').value = JSON.stringify(arr);
     return true;
 }
 
-// ═══════════════════════════════════════════════════════════
-//  MODAL PRINCIPAL
-// ═══════════════════════════════════════════════════════════
+// ══ MODAL PRINCIPAL ═════════════════════════════════════
 async function abrirModal() {
-    await carregarCategorias();
-    catsSelecionadas = new Set(); insumosSelecionados = [];
+    await Promise.all([carregarCategorias(), carregarTodosInsumos()]);
+    catsSelecionadas = new Set(); insumosSelecionados = new Map();
     document.getElementById('modal-titulo').textContent   = 'Novo Serviço';
     document.getElementById('f-acao').value               = 'criar';
     document.getElementById('f-id').value                 = '';
@@ -638,16 +600,16 @@ async function abrirModal() {
     document.getElementById('f-valor').value              = '';
     document.getElementById('f-prazo').value              = '';
     document.getElementById('f-ativo').checked            = true;
-    document.getElementById('busca-insumo').value         = '';
-    document.getElementById('resultados-insumos').style.display = 'none';
+    document.getElementById('filtro-insumo').value        = '';
     document.getElementById('nova-cat-form').classList.remove('show');
-    renderChips(); renderInsumosSelecionados();
+    renderChips();
+    renderPainelInsumos();
     document.getElementById('modal-servico').classList.add('aberto');
     setTimeout(() => document.getElementById('f-nome').focus(), 150);
 }
 
 async function editarServico(id) {
-    await carregarCategorias();
+    await Promise.all([carregarCategorias(), carregarTodosInsumos()]);
     const data = await (await fetch('servicos.php?action=get_servico&id=' + id)).json();
     if (!data.ok) { alert('Erro ao carregar serviço.'); return; }
     const s = data.servico;
@@ -659,23 +621,24 @@ async function editarServico(id) {
     document.getElementById('f-valor').value              = parseFloat(s.valor_base || 0).toFixed(2);
     document.getElementById('f-prazo').value              = s.prazo_padrao_dias || '';
     document.getElementById('f-ativo').checked            = s.ativo == 1;
-    document.getElementById('busca-insumo').value         = '';
-    document.getElementById('resultados-insumos').style.display = 'none';
+    document.getElementById('filtro-insumo').value        = '';
     document.getElementById('nova-cat-form').classList.remove('show');
-    // categorias
     catsSelecionadas = new Set((s.cat_ids || []).map(Number));
-    // insumos
-    insumosSelecionados = (s.insumos || []).map(i => ({
-        id:           parseInt(i.insumo_id),
-        nome:         i.nome,
-        unidade:      i.unidade,
-        valorunitario: parseFloat(i.valorunitario || 0),
-        categoria:    i.categoria || '',
-        tipo_insumo:  i.tipo_insumo || 'variavel',
-        quantidade:   parseFloat(i.quantidade_padrao || 1),
-        tipo_vinculo: i.tipo_vinculo || 'variavel'
-    }));
-    renderChips(); renderInsumosSelecionados();
+    // reconstrói o Map de selecionados
+    insumosSelecionados = new Map();
+    (s.insumos || []).forEach(i => {
+        insumosSelecionados.set(parseInt(i.insumo_id), {
+            id:           parseInt(i.insumo_id),
+            nome:         i.nome,
+            unidade:      i.unidade,
+            valorunitario: parseFloat(i.valorunitario||0),
+            categoria:    i.categoria||'',
+            tipo_vinculo: i.tipo_vinculo||'variavel',
+            quantidade:   parseFloat(i.quantidade_padrao||1)
+        });
+    });
+    renderChips();
+    renderPainelInsumos();
     document.getElementById('modal-servico').classList.add('aberto');
     setTimeout(() => document.getElementById('f-nome').focus(), 150);
 }
@@ -683,9 +646,7 @@ async function editarServico(id) {
 function fecharModalServico() { document.getElementById('modal-servico').classList.remove('aberto'); }
 document.getElementById('modal-servico').addEventListener('click', function(e) { if (e.target === this) fecharModalServico(); });
 
-// ═══════════════════════════════════════════════════════════
-//  UTILITÁRIOS
-// ═══════════════════════════════════════════════════════════
+// ══ UTILITÁRIOS ══════════════════════════════════════════
 function _esc(s) { const d = document.createElement('div'); d.textContent = s||''; return d.innerHTML; }
 function _fmt(v) { return (parseFloat(v)||0).toFixed(2).replace('.',','); }
 function _toast(msg) {
