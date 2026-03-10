@@ -10,7 +10,6 @@ if (!isset($conn)) {
         $db   = new Database();
         $conn = $db->getConnection();
     } catch (Exception $e) {
-        // Se falhar, redireciona para login ou exibe erro
         die('Erro de conexão: ' . htmlspecialchars($e->getMessage()));
     }
 }
@@ -22,7 +21,6 @@ try {
     $sidebar_stats = [];
     foreach ($rows as $r) $sidebar_stats[$r['status']] = (int)$r['total'];
 } catch (Exception $e) {
-    // Se a query falhar, deixa vazio (não quebra a página)
     $sidebar_stats = [];
 }
 
@@ -82,6 +80,13 @@ $sidebar_nav = [
             ['href'=>'servicos.php',     'label'=>'Serviços',     'status'=>null],
             ['href'=>'insumos.php',      'label'=>'Insumos',      'status'=>null],
         ],
+    ],
+    [
+        'id'    => 'nav-ajuda',
+        'icon'  => 'help',
+        'label' => 'Ajuda',
+        'href'  => 'ajuda.php',
+        'tipo'  => 'link',
     ],
     [
         'id'    => 'nav-cfg',
