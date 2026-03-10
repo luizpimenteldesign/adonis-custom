@@ -1,7 +1,7 @@
 # BACKEND ADMIN - CONFIGURAÇÃO DE ACESSO E SEGURANÇA
 
 # Injeta favicon em todas as páginas PHP do admin automaticamente
-php_value auto_prepend_file "/home1/luizpi39/adns.luizpimentel.com/backend/admin/includes/_favicon.php"
+php_value auto_prepend_file "includes/_favicon.php"
 
 # PERMITE ACESSO PÚBLICO (autenticação via auth.php em cada página)
 Require all granted
