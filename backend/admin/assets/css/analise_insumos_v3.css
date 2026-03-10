@@ -1,20 +1,17 @@
 /**
  * ANALISE_INSUMOS_V3.CSS — Fonte única de estilos do modal de análise de insumos
- * Versão: 4.0 — Neutraliza conflitos de admin.css (.modal-box input/label)
- *
- * REGRA: nenhum outro CSS deve definir estilos para as classes abaixo.
- * dashboard.css NÃO deve conter nenhuma dessas classes.
+ * Versão: 4.1 — Sem regra genérica sobre <label>, neutralização cirurúgica
  */
 
-/* ══ NEUTRALIZA CONTAMINAÇÃO DO admin.css ═══════════════════════════════════
-   admin.css define .modal-box input e .modal-box label com padding/margin
-   grandes para formulários genéricos. Aqui resetamos esses estilos
-   especificamente dentro do modal de análise de insumos.
-   ═══════════════════════════════════════════════════════════════════════════ */
+/* ══ NEUTRALIZA CONTAMINAÇÃO DO admin.css ════════════════════════════════
+   admin.css aplica padding:12px 16px em .modal-box input[type=number]
+   e margin-top:16px em .modal-box label.
+   Abaixo, neutralizamos SOMENTE nos elementos específicos dos insumos,
+   sem afetar nenhum outro elemento do modal.
+   ═══════════════════════════════════════════════════════════════ */
 
-/* Input de quantidade — reseta o padding 12px 16px do admin.css */
-#modal-analise .insumo-sel-qtd,
-#modal-analise input[type="number"].insumo-sel-qtd {
+/* Input de quantidade — corrige padding inflado do admin.css */
+#modal-analise .insumo-sel-qtd {
     width: 70px !important;
     padding: 6px 8px !important;
     border: 1.5px solid var(--g-border) !important;
@@ -29,6 +26,7 @@
     transition: border-color 0.15s !important;
     flex: 0 0 auto !important;
     min-height: unset !important;
+    display: block !important;
 }
 
 #modal-analise .insumo-sel-qtd:focus {
@@ -38,9 +36,10 @@
     background: var(--g-surface) !important;
 }
 
-/* Checkbox "cliente fornece" — reseta o margin-top 16px do admin.css em label */
-#modal-analise .insumo-sel-cf,
-#modal-analise label.insumo-sel-cf {
+/* Checkbox "cliente fornece" — ATENÇÃO: .insumo-sel-cf É um <label>
+   NÃO usar seletor genérico "label" pois destrói o flex deste elemento.
+   Corrige o margin-top:16px que o admin.css injeta via .modal-box label */
+#modal-analise .insumo-sel-cf {
     display: flex !important;
     align-items: center !important;
     gap: 6px !important;
@@ -54,28 +53,24 @@
     letter-spacing: normal !important;
     margin: 0 !important;
     padding: 0 !important;
+    min-width: 0 !important;
 }
 
-/* Checkbox dentro do label — reseta padding 12px 16px do admin.css */
+/* Checkbox dentro do label — corrige padding do admin.css */
 #modal-analise .insumo-sel-cf input[type="checkbox"] {
     width: 15px !important;
     height: 15px !important;
+    min-width: 15px !important;
     padding: 0 !important;
     margin: 0 !important;
-    border: none !important;
-    border-radius: 3px !important;
     box-shadow: none !important;
-    background: none !important;
-    cursor: pointer !important;
     flex-shrink: 0 !important;
     accent-color: var(--g-blue) !important;
+    cursor: pointer !important;
 }
 
-/* Busca de insumos — reseta padding do admin.css */
-#modal-analise .analise-busca,
-#modal-analise input.analise-busca {
-    width: calc(100% - 40px) !important;
-    margin: 0 20px 12px !important;
+/* Campo de busca — corrige padding do admin.css */
+#modal-analise .analise-busca {
     padding: 10px 14px !important;
     border: 1px solid var(--g-border) !important;
     border-radius: 10px !important;
@@ -84,6 +79,8 @@
     background: var(--g-bg) !important;
     box-shadow: none !important;
     outline: none !important;
+    width: calc(100% - 40px) !important;
+    margin: 0 20px 12px !important;
     display: block !important;
 }
 
@@ -91,18 +88,6 @@
     border-color: var(--g-blue) !important;
     background: var(--g-surface) !important;
     box-shadow: none !important;
-}
-
-/* Labels genéricos dentro do modal — reseta margin-top do admin.css */
-#modal-analise label {
-    display: inline !important;
-    font-size: inherit !important;
-    font-weight: inherit !important;
-    color: inherit !important;
-    text-transform: none !important;
-    letter-spacing: normal !important;
-    margin: 0 !important;
-    padding: 0 !important;
 }
 
 /* ══ LOADING E VAZIOS ═══════════════════════════════════════════════════════ */
@@ -270,10 +255,7 @@
     white-space: nowrap;
 }
 
-/* ══ INSUMOS SELECIONADOS ═══════════════════════════════════════════════════
-   Esta seção é a ÚNICA fonte de estilos para os cards de insumos selecionados.
-   dashboard.css não deve redefinir nenhum seletor abaixo.
-   ═══════════════════════════════════════════════════════════════════════════ */
+/* ══ INSUMOS SELECIONADOS ═══════════════════════════════════════════════════ */
 .analise-selecionados-titulo {
     font-size: 12px;
     font-weight: 600;
@@ -299,8 +281,8 @@
     background: var(--g-surface);
     border: 1px solid var(--g-border);
     border-radius: 8px;
-    flex-shrink: 0;       /* não comprime no flex pai */
-    overflow: visible;    /* nada é cortado */
+    flex-shrink: 0;
+    overflow: visible;
 }
 
 /* Linha 1: nome + meta */
