@@ -1,8 +1,8 @@
 <?php
 /**
  * PÁGINA PÚBLICA DE ACOMPANHAMENTO DO PEDIDO
- * Versão: 5.6 - Material Design sem emojis
- * Data: 06/03/2026
+ * Versão: 5.7 - fix BASE_URL
+ * Data: 09/03/2026
  */
 
 require_once '../../backend/config/Database.php';
@@ -18,7 +18,8 @@ $pagamento_aprovado = null;
 define('ADONIS_PIX',      'adonisjnr85@gmail.com');
 define('ADONIS_ENDERECO', 'Rua do Presépio, s/n – Chácara do Conde, Vila Velha – ES, 29114-608');
 define('ADONIS_MAPS',     'https://www.google.com/maps/place/Adonis+C+L/@-20.3292315,-40.3449407,21z');
-define('BASE_URL',        'https://adns.luizpimentel.com/adonis-custom');
+// BASE_URL aponta para a raiz do domínio (sem subpasta)
+define('BASE_URL', 'https://adns.luizpimentel.com');
 
 if (!empty($token)) {
     try {
@@ -67,7 +68,7 @@ if (!empty($token)) {
                 ");
                 $stmt_pag->execute([':id' => $pedido['id']]);
                 $pagamento_aprovado = $stmt_pag->fetch(PDO::FETCH_ASSOC);
-            } catch (PDOException $e) {}
+            } catch (PDOException $e) { $pagamento_aprovado = null; }
 
             try {
                 $hcols  = $conn->query("SHOW COLUMNS FROM status_historico")->fetchAll(PDO::FETCH_COLUMN);
@@ -223,15 +224,7 @@ $show_detalhe_pgto   = $show_pos_aprovacao && !empty($pagamento_aprovado);
         .erro-box{text-align:center;padding:60px 20px}
         .erro-box h2{font-size:22px;color:#c62828;margin-bottom:10px;font-weight:600}
         .erro-box p{font-size:14px;color:#999}
-        .wa-fab{
-            position:fixed;bottom:28px;right:28px;z-index:900;
-            display:flex;align-items:center;gap:12px;
-            background:#25d366;color:#fff;
-            padding:16px 24px;border-radius:50px;
-            text-decoration:none;font-size:14px;font-weight:700;
-            box-shadow:0 4px 20px rgba(37,211,102,.4);
-            transition:background .2s,transform .2s
-        }
+        .wa-fab{position:fixed;bottom:28px;right:28px;z-index:900;display:flex;align-items:center;gap:12px;background:#25d366;color:#fff;padding:16px 24px;border-radius:50px;text-decoration:none;font-size:14px;font-weight:700;box-shadow:0 4px 20px rgba(37,211,102,.4);transition:background .2s,transform .2s}
         .wa-fab:hover{background:#1ebe5d;transform:translateY(-2px)}
         .wa-fab svg{width:22px;height:22px;flex-shrink:0;fill:#fff}
         .footer{text-align:center;padding:32px 20px 48px;font-size:13px;color:#999}
@@ -269,7 +262,6 @@ $show_detalhe_pgto   = $show_pos_aprovacao && !empty($pagamento_aprovado);
     <?php elseif ($pedido):
         $si = $statusInfo[$pedido['status']] ?? ['label'=>$pedido['status'],'cor'=>'#666','bg'=>'#f5f5f5','desc'=>''];
     ?>
-
         <div class="status-card" style="background:<?php echo $si['bg']; ?>;border-color:<?php echo $si['cor']; ?>">
             <div class="status-label" style="color:<?php echo $si['cor']; ?>"><?php echo $si['label']; ?></div>
             <div class="status-desc" style="color:<?php echo $si['cor']; ?>"><?php echo $si['desc']; ?></div>
@@ -289,7 +281,6 @@ $show_detalhe_pgto   = $show_pos_aprovacao && !empty($pagamento_aprovado);
         <?php if ($show_pos_aprovacao): ?>
         <div class="pix-endereco-box">
             <div class="pix-endereco-titulo">Informações para pagamento e entrega</div>
-
             <?php if ($show_detalhe_pgto):
                 $fp   = $pagamento_aprovado['forma_pagamento'] ?? '';
                 $vf   = (float)($pagamento_aprovado['valor_final'] ?? 0);
@@ -305,9 +296,7 @@ $show_detalhe_pgto   = $show_pos_aprovacao && !empty($pagamento_aprovado);
             </div>
             <div class="pix-row">
                 <span class="pix-row-lbl">Valor total</span>
-                <span class="pix-row-val" style="font-size:18px">
-                    R$ <?php echo number_format($vf,2,',','.'); ?>
-                </span>
+                <span class="pix-row-val" style="font-size:18px">R$ <?php echo number_format($vf,2,',','.'); ?></span>
             </div>
             <?php if ($is_pix): ?>
             <div class="pix-row">
@@ -331,7 +320,6 @@ $show_detalhe_pgto   = $show_pos_aprovacao && !empty($pagamento_aprovado);
             <?php endif; ?>
             <div style="border-top:1px dashed #b2dfdb;margin:14px 0"></div>
             <?php endif; ?>
-
             <div class="pix-row" style="border-bottom:none;padding-bottom:4px">
                 <span class="pix-row-lbl">Chave PIX</span>
                 <span class="pix-row-val" id="chave-pix-bloco"><?php echo ADONIS_PIX; ?></span>
@@ -340,7 +328,6 @@ $show_detalhe_pgto   = $show_pos_aprovacao && !empty($pagamento_aprovado);
             <div style="margin-top:12px;font-size:12px;color:#555;background:#e0f2f1;border-radius:6px;padding:12px 16px;line-height:1.7">
                 Após realizar o pagamento, envie o comprovante via WhatsApp para confirmarmos o recebimento.
             </div>
-
             <div style="border-top:1px dashed #b2dfdb;margin-top:16px;padding-top:16px">
                 <div style="font-size:12px;font-weight:700;color:#00695c;text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">Endereço para entrega do instrumento</div>
                 <div style="font-size:14px;color:#333;font-weight:500"><?php echo ADONIS_ENDERECO; ?></div>
@@ -354,19 +341,15 @@ $show_detalhe_pgto   = $show_pos_aprovacao && !empty($pagamento_aprovado);
             <div class="card-title">Forma de Pagamento &amp; Aprovação</div>
             <div class="pgto-opcoes">
                 <button class="pgto-btn" onclick="selecionarPgto('pix')" id="btn-pix">
-                    <div class="pgto-nome">PIX / Dinheiro</div>
-                    <div class="pgto-sub">5% de desconto</div>
+                    <div class="pgto-nome">PIX / Dinheiro</div><div class="pgto-sub">5% de desconto</div>
                 </button>
                 <button class="pgto-btn" onclick="selecionarPgto('entrada')" id="btn-entrada">
-                    <div class="pgto-nome">Entrada + Retirada</div>
-                    <div class="pgto-sub">50% + 50%</div>
+                    <div class="pgto-nome">Entrada + Retirada</div><div class="pgto-sub">50% + 50%</div>
                 </button>
                 <button class="pgto-btn" onclick="selecionarPgto('cartao')" id="btn-cartao">
-                    <div class="pgto-nome">Cartão de Crédito</div>
-                    <div class="pgto-sub">até 10x</div>
+                    <div class="pgto-nome">Cartão de Crédito</div><div class="pgto-sub">até 10x</div>
                 </button>
             </div>
-
             <div class="pgto-resultado" id="res-pix">
                 <div class="pgto-res-titulo">PIX ou Dinheiro — à vista</div>
                 <div class="pgto-linha"><span class="lbl">Valor do orçamento</span><span class="val" id="pix-original"></span></div>
@@ -379,7 +362,6 @@ $show_detalhe_pgto   = $show_pos_aprovacao && !empty($pagamento_aprovado);
                 </div>
                 <div style="margin-top:12px;font-size:12px;color:#555;line-height:1.6">Após pagar, envie o comprovante via WhatsApp para confirmarmos o recebimento.</div>
             </div>
-
             <div class="pgto-resultado" id="res-entrada">
                 <div class="pgto-res-titulo">Entrada + Pagamento na Retirada</div>
                 <div class="pgto-linha"><span class="lbl">Valor total</span><span class="val" id="ent-total"></span></div>
@@ -392,7 +374,6 @@ $show_detalhe_pgto   = $show_pos_aprovacao && !empty($pagamento_aprovado);
                 </div>
                 <div style="margin-top:12px;font-size:12px;color:#555;line-height:1.6">Envie o comprovante via WhatsApp após o pagamento da entrada. O restante (50%) será cobrado na retirada.</div>
             </div>
-
             <div class="pgto-resultado" id="res-cartao">
                 <div class="pgto-res-titulo">Cartão de Crédito</div>
                 <div style="font-size:12px;color:#999;margin-bottom:12px">Selecione a quantidade de parcelas:</div>
@@ -405,13 +386,11 @@ $show_detalhe_pgto   = $show_pos_aprovacao && !empty($pagamento_aprovado);
                     O pagamento no cartão será realizado na retirada do instrumento.
                 </div>
             </div>
-
             <div style="margin-top:6px;padding:16px;background:#f0f4ff;border-radius:6px;border-left:3px solid #1565c0">
                 <div style="font-size:12px;font-weight:700;color:#1565c0;text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">Onde entregar o instrumento</div>
                 <div style="font-size:13px;color:#333;font-weight:500;margin-bottom:6px"><?php echo ADONIS_ENDERECO; ?></div>
                 <a class="maps-link" href="<?php echo ADONIS_MAPS; ?>" target="_blank" rel="noopener">Ver no Google Maps</a>
             </div>
-
             <div class="acoes">
                 <button class="btn-aprovar" id="btn-aprovar" onclick="confirmarAprovacao()" disabled>Selecione a forma de pagamento</button>
                 <button class="btn-reprovar" onclick="abrirReprovacao()">Não aprovar</button>
