@@ -5,7 +5,6 @@ require_once '../config/Database.php';
 $db   = new Database();
 $conn = $db->getConnection();
 
-// Cria tabela de histórico se não existir
 try {
     $conn->exec("
         CREATE TABLE IF NOT EXISTS `insumos_precos_historico` (
@@ -27,7 +26,7 @@ define('ML_SITE',      'MLB');
 define('ML_LIMIT',     50);
 define('MIN_VARIACAO', 3.0);
 define('MAX_VARIACAO', 50.0);
-define('ML_TIMEOUT',   10);
+define('ML_TIMEOUT',   12);
 
 try {
     $conn->query('SELECT 1 FROM insumos_precos_historico LIMIT 1');
@@ -52,10 +51,9 @@ function medianaIQR(array $precos): ?float {
 }
 
 /**
- * Busca preços no ML usando a API pública de anúncios.
- * Sem token — endpoint público /sites/MLB/search.
- * Parâmetros: buying_mode=buy_it_now (apenas preço fixo, sem leilão)
- *             condition=new (apenas itens novos)
+ * Busca preços na API pública do ML (/sites/MLB/search).
+ * Tenta primeiro cURL; se falhar (ex: HostGator bloqueado), tenta file_get_contents.
+ * Retorna ['precos' => [...], 'total' => N] ou ['error' => 'mensagem', 'debug' => '...'].
  */
 function mlBuscarPrecos(string $query): array {
     $params = http_build_query([
@@ -66,35 +64,86 @@ function mlBuscarPrecos(string $query): array {
     ]);
     $url = 'https://api.mercadolibre.com/sites/' . ML_SITE . '/search?' . $params;
 
-    $ch = curl_init($url);
-    curl_setopt_array($ch, [
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_TIMEOUT        => ML_TIMEOUT,
-        CURLOPT_SSL_VERIFYPEER => false,
-        CURLOPT_USERAGENT      => 'Mozilla/5.0',
-        CURLOPT_HTTPHEADER     => ['Accept: application/json'],
-    ]);
-    $resp = curl_exec($ch);
-    $err  = curl_error($ch);
-    curl_close($ch);
+    $resp  = false;
+    $debug = [];
 
-    if ($err || !$resp) return ['error' => 'Falha na API ML: ' . $err];
+    // --- Tentativa 1: cURL ---
+    if (function_exists('curl_init')) {
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT        => ML_TIMEOUT,
+            CURLOPT_SSL_VERIFYPEER => false,
+            CURLOPT_SSL_VERIFYHOST => false,
+            CURLOPT_USERAGENT      => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_MAXREDIRS      => 3,
+            CURLOPT_HTTPHEADER     => [
+                'Accept: application/json',
+                'Accept-Language: pt-BR,pt;q=0.9',
+            ],
+        ]);
+        $raw   = curl_exec($ch);
+        $errno = curl_errno($ch);
+        $err   = curl_error($ch);
+        $http  = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        $debug[] = "cURL: http={$http} errno={$errno} err={$err}";
+
+        if ($errno === 0 && $http === 200 && $raw) {
+            $resp = $raw;
+        }
+    }
+
+    // --- Tentativa 2: file_get_contents ---
+    if (!$resp && ini_get('allow_url_fopen')) {
+        $ctx = stream_context_create(['http' => [
+            'method'         => 'GET',
+            'header'         => "Accept: application/json\r\nUser-Agent: Mozilla/5.0\r\n",
+            'timeout'        => ML_TIMEOUT,
+            'ignore_errors'  => true,
+        ], 'ssl' => [
+            'verify_peer'       => false,
+            'verify_peer_name'  => false,
+        ]]);
+        $raw2  = @file_get_contents($url, false, $ctx);
+        $debug[] = 'file_get_contents: ' . ($raw2 !== false ? strlen($raw2) . ' bytes' : 'falhou');
+        if ($raw2 !== false && strlen($raw2) > 10) {
+            $resp = $raw2;
+        }
+    }
+
+    if (!$resp) {
+        return [
+            'error' => 'Sem acesso à API ML (cURL e file_get_contents falharam)',
+            'debug' => implode(' | ', $debug),
+        ];
+    }
 
     $data = json_decode($resp, true);
-    if (empty($data['results'])) return ['error' => 'Nenhum resultado para: ' . $query];
+    if (json_last_error() !== JSON_ERROR_NONE) {
+        return ['error' => 'JSON inválido: ' . json_last_error_msg(), 'debug' => substr($resp, 0, 200)];
+    }
+    if (empty($data['results'])) {
+        $total = $data['paging']['total'] ?? 0;
+        return ['error' => "Nenhum resultado (total={$total}) para: {$query}", 'debug' => implode(' | ', $debug)];
+    }
 
     $precos = array_values(array_filter(array_column($data['results'], 'price'), fn($p) => $p > 0));
-    if (empty($precos)) return ['error' => 'Resultados sem preço válido'];
+    if (empty($precos)) {
+        return ['error' => 'Resultados sem preço válido', 'debug' => implode(' | ', $debug)];
+    }
 
     return ['precos' => $precos, 'total' => $data['paging']['total'] ?? count($precos)];
 }
 
-// ── API: atualizar (AJAX) ──────────────────────────────────────────────────
+// ── API: atualizar (AJAX) ─────────────────────────────────────────────
 if (isset($_POST['action']) && $_POST['action'] === 'atualizar') {
     header('Content-Type: application/json');
 
     if (!$historico_existe) {
-        echo json_encode(['ok' => false, 'erro' => 'Tabela de histórico não encontrada. Crie via phpMyAdmin.']);
+        echo json_encode(['ok' => false, 'erro' => 'Tabela de histórico não encontrada.']);
         exit;
     }
 
@@ -111,7 +160,11 @@ if (isset($_POST['action']) && $_POST['action'] === 'atualizar') {
 
     $resultado = mlBuscarPrecos($query);
     if (isset($resultado['error'])) {
-        echo json_encode(['ok' => false, 'erro' => $resultado['error']]);
+        echo json_encode([
+            'ok'    => false,
+            'erro'  => $resultado['error'],
+            'debug' => $resultado['debug'] ?? '',
+        ]);
         exit;
     }
 
@@ -158,7 +211,7 @@ if (isset($_POST['action']) && $_POST['action'] === 'atualizar') {
     exit;
 }
 
-// ── API: histórico ─────────────────────────────────────────────────────────
+// ── API: histórico ────────────────────────────────────────────────────
 if (isset($_GET['action']) && $_GET['action'] === 'historico') {
     header('Content-Type: application/json');
     if (!$historico_existe) { echo json_encode([]); exit; }
@@ -175,7 +228,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'historico') {
     exit;
 }
 
-// ── Carrega insumos ────────────────────────────────────────────────────────
+// ── Carrega insumos ───────────────────────────────────────────────────
 try {
     if ($historico_existe) {
         $insumos = $conn->query('
@@ -266,6 +319,7 @@ include '_sidebar_data.php';
     .variacao-neg { color:#dc2626; font-weight:600; }
     .cron-box { background:#1e1e2e; color:#cdd6f4; font-family:monospace; padding:16px; border-radius:8px; font-size:13px; white-space:pre; overflow-x:auto; }
     .aviso-tabela { background:#fef9c3; border:1px solid #fcd34d; border-radius:8px; padding:12px 16px; font-size:13px; color:#92400e; margin-bottom:16px; }
+    .debug-info { font-size:10px; color:#94a3b8; font-family:monospace; margin-top:2px; }
     </style>
 </head>
 <body>
@@ -288,9 +342,12 @@ include '_sidebar_data.php';
                 </h1>
                 <div class="page-subtitle">Busca preços de referência no Mercado Livre e atualiza automaticamente</div>
             </div>
-            <button class="btn btn-primary" id="btn-atualizar-todos" onclick="atualizarTodos()" <?php echo !$historico_existe ? 'disabled title="Crie a tabela de histórico primeiro"' : ''; ?>>
-                <span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle">sync</span> Atualizar Todos
-            </button>
+            <div style="display:flex;gap:8px;align-items:center">
+                <a href="ml-diagnostico.php" class="btn btn-secondary" style="font-size:12px" target="_blank">🔍 Diagnóstico</a>
+                <button class="btn btn-primary" id="btn-atualizar-todos" onclick="atualizarTodos()" <?php echo !$historico_existe ? 'disabled title="Crie a tabela de histórico primeiro"' : ''; ?>>
+                    <span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle">sync</span> Atualizar Todos
+                </button>
+            </div>
         </div>
 
         <?php if (!$historico_existe): ?>
@@ -340,6 +397,7 @@ include '_sidebar_data.php';
                     <?php echo htmlspecialchars($ins['unidade']); ?>
                     <?php if ($ultima): ?> • <span style="color:var(--g-blue)">Última ML: <?php echo $ultima; ?></span><?php endif; ?>
                 </div>
+                <div class="debug-info" id="debug-<?php echo $ins['id']; ?>"></div>
             </div>
             <div class="preco-valor" id="val-<?php echo $ins['id']; ?>">
                 R$ <?php echo number_format((float)$ins['valorunitario'], 2, ',', '.'); ?>
@@ -416,6 +474,7 @@ async function atualizarInsumo(id, confirmado = false) {
     const card   = document.getElementById('card-' + id);
     const status = document.getElementById('status-' + id);
     const val    = document.getElementById('val-' + id);
+    const dbg    = document.getElementById('debug-' + id);
     status.className = 'preco-status buscando'; status.textContent = 'Buscando...';
     try {
         const fd = new FormData();
@@ -423,6 +482,7 @@ async function atualizarInsumo(id, confirmado = false) {
         if (confirmado) fd.append('confirmado', '1');
         const r    = await fetch('atualizar-precos.php', { method: 'POST', body: fd });
         const data = await r.json();
+        if (data.debug) dbg.textContent = data.debug;
         if (!data.ok) {
             status.className = 'preco-status falhou'; status.textContent = 'Erro';
             card.classList.add('erro'); card.title = data.erro; statErros++;
