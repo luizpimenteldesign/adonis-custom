@@ -5,15 +5,6 @@ require_once '../config/Database.php';
 $db   = new Database();
 $conn = $db->getConnection();
 
-// Garante coluna query_ml na tabela insumos
-try {
-    $conn->query('SELECT query_ml FROM insumos LIMIT 1');
-} catch (Exception $e) {
-    try {
-        $conn->exec('ALTER TABLE insumos ADD COLUMN query_ml VARCHAR(200) NULL DEFAULT NULL');
-    } catch (Exception $e2) { /* sem permissão ou já existe */ }
-}
-
 // Cria tabela de histórico se não existir
 try {
     $conn->exec("
@@ -32,12 +23,12 @@ try {
     ");
 } catch (Exception $e) { /* ignora */ }
 
-// ── CONFIGURAÇÕES ───────────────────────────────────────────
-define('ML_SITE',        'MLB');
-define('ML_LIMIT',       20);
-define('MIN_VARIACAO',   3.0);
-define('MAX_VARIACAO',   50.0);  // acima disso bloqueia atualização automática
-define('ML_TIMEOUT',     8);
+// ── CONFIGURAÇÕES ────────────────────────────────────────────
+define('ML_SITE',      'MLB');
+define('ML_LIMIT',     20);
+define('MIN_VARIACAO', 3.0);
+define('MAX_VARIACAO', 50.0);
+define('ML_TIMEOUT',   8);
 
 // Verifica se tabela de histórico existe
 try {
@@ -47,13 +38,13 @@ try {
     $historico_existe = false;
 }
 
-// ── HELPER: mediana com filtro IQR ───────────────────────────
+// ── HELPER: mediana com filtro IQR ────────────────────────────
 function medianaIQR(array $precos): ?float {
     if (empty($precos)) return null;
     sort($precos);
-    $n  = count($precos);
-    $q1 = $precos[intval($n * 0.25)];
-    $q3 = $precos[intval($n * 0.75)];
+    $n   = count($precos);
+    $q1  = $precos[intval($n * 0.25)];
+    $q3  = $precos[intval($n * 0.75)];
     $iqr = $q3 - $q1;
     $filtrados = array_values(array_filter($precos, fn($p) => $p >= ($q1 - 1.5 * $iqr) && $p <= ($q3 + 1.5 * $iqr)));
     if (empty($filtrados)) $filtrados = $precos;
@@ -63,23 +54,7 @@ function medianaIQR(array $precos): ?float {
         : $filtrados[intval($nf/2)], 2);
 }
 
-// ── API: salvar query_ml de um insumo ───────────────────────
-if (isset($_POST['action']) && $_POST['action'] === 'salvar_query') {
-    header('Content-Type: application/json');
-    $id    = (int)($_POST['insumo_id'] ?? 0);
-    $query = trim($_POST['query_ml'] ?? '');
-    if (!$id) { echo json_encode(['ok' => false, 'erro' => 'ID inválido']); exit; }
-    try {
-        $conn->prepare('UPDATE insumos SET query_ml = ? WHERE id = ?')
-             ->execute([$query ?: null, $id]);
-        echo json_encode(['ok' => true]);
-    } catch (Exception $e) {
-        echo json_encode(['ok' => false, 'erro' => $e->getMessage()]);
-    }
-    exit;
-}
-
-// ── API: executar atualização (AJAX) ────────────────────────
+// ── API: executar atualização (AJAX) ─────────────────────────
 if (isset($_POST['action']) && $_POST['action'] === 'atualizar') {
     header('Content-Type: application/json');
 
@@ -92,7 +67,7 @@ if (isset($_POST['action']) && $_POST['action'] === 'atualizar') {
     if (!$insumo_id) { echo json_encode(['ok' => false, 'erro' => 'ID inválido']); exit; }
 
     try {
-        $stmt = $conn->prepare('SELECT id, nome, valorunitario, query_ml FROM insumos WHERE id = ? AND ativo = 1');
+        $stmt = $conn->prepare('SELECT id, nome, valorunitario FROM insumos WHERE id = ? AND ativo = 1');
         $stmt->execute([$insumo_id]);
         $ins = $stmt->fetch(PDO::FETCH_ASSOC);
     } catch (Exception $e) {
@@ -102,18 +77,7 @@ if (isset($_POST['action']) && $_POST['action'] === 'atualizar') {
 
     if (!$ins) { echo json_encode(['ok' => false, 'erro' => 'Insumo não encontrado']); exit; }
 
-    // Usa query_ml salva, ou o que veio no POST, ou o nome do insumo como último recurso
-    $query = trim(
-        $_POST['query'] ?? ''
-        ?: $ins['query_ml'] ?? ''
-        ?: $ins['nome']
-    );
-
-    if (empty($query)) {
-        echo json_encode(['ok' => false, 'erro' => 'Nenhuma query definida para este insumo']);
-        exit;
-    }
-
+    $query       = trim($_POST['query'] ?? $ins['nome']);
     $preco_atual = (float)$ins['valorunitario'];
 
     // Busca na API ML
@@ -141,23 +105,21 @@ if (isset($_POST['action']) && $_POST['action'] === 'atualizar') {
         exit;
     }
 
-    $precos = array_filter(array_column($data['results'], 'price'), fn($p) => $p > 0);
+    $precos = array_values(array_filter(array_column($data['results'], 'price'), fn($p) => $p > 0));
     if (empty($precos)) {
         echo json_encode(['ok' => false, 'erro' => 'Resultados sem preço válido']);
         exit;
     }
 
-    $mediana = medianaIQR(array_values($precos));
+    $mediana = medianaIQR($precos);
     $n       = count($precos);
 
     $variacao_pct = $preco_atual > 0
         ? round((($mediana - $preco_atual) / $preco_atual) * 100, 2)
         : 100.0;
 
-    // Verifica se variação é suspeita (acima do limite)
-    $suspeito = abs($variacao_pct) > MAX_VARIACAO && $preco_atual > 0;
-
-    // Se veio confirmado pelo modal, força atualização mesmo se suspeito
+    // Variação suspeita — pede confirmação
+    $suspeito   = abs($variacao_pct) > MAX_VARIACAO && $preco_atual > 0;
     $confirmado = isset($_POST['confirmado']) && $_POST['confirmado'] === '1';
 
     $atualizado = false;
@@ -199,7 +161,7 @@ if (isset($_POST['action']) && $_POST['action'] === 'atualizar') {
     exit;
 }
 
-// ── API: buscar histórico ────────────────────────────────────
+// ── API: buscar histórico ─────────────────────────────────────
 if (isset($_GET['action']) && $_GET['action'] === 'historico') {
     header('Content-Type: application/json');
     if (!$historico_existe) { echo json_encode([]); exit; }
@@ -220,11 +182,11 @@ if (isset($_GET['action']) && $_GET['action'] === 'historico') {
     exit;
 }
 
-// ── CARREGA INSUMOS ──────────────────────────────────────────
+// ── CARREGA INSUMOS ───────────────────────────────────────────
 try {
     if ($historico_existe) {
         $insumos = $conn->query('
-            SELECT i.id, i.nome, i.unidade, i.valorunitario, i.query_ml,
+            SELECT i.id, i.nome, i.unidade, i.valorunitario,
                    MAX(h.atualizado_em) as ultima_atualizacao
             FROM insumos i
             LEFT JOIN insumos_precos_historico h ON h.insumo_id = i.id AND h.fonte = "mercadolivre"
@@ -233,12 +195,9 @@ try {
             ORDER BY i.nome
         ')->fetchAll(PDO::FETCH_ASSOC);
     } else {
-        $insumos = $conn->query('
-            SELECT id, nome, unidade, valorunitario, query_ml, NULL as ultima_atualizacao
-            FROM insumos
-            WHERE ativo = 1
-            ORDER BY nome
-        ')->fetchAll(PDO::FETCH_ASSOC);
+        $insumos = $conn->query(
+            'SELECT id, nome, unidade, valorunitario, NULL as ultima_atualizacao FROM insumos WHERE ativo = 1 ORDER BY nome'
+        )->fetchAll(PDO::FETCH_ASSOC);
     }
 } catch (Exception $e) {
     $insumos = [];
@@ -263,9 +222,9 @@ include '_sidebar_data.php';
     <style>
     .preco-card {
         display:grid;
-        grid-template-columns: 1fr auto auto auto auto;
+        grid-template-columns: 1fr auto auto auto;
         align-items:center;
-        gap:10px;
+        gap:12px;
         padding:12px 16px;
         border:1px solid var(--g-border);
         border-radius:10px;
@@ -273,48 +232,34 @@ include '_sidebar_data.php';
         margin-bottom:8px;
         transition:border-color .2s;
     }
-    .preco-card:hover { border-color:var(--color-primary,#7c3aed); }
+    .preco-card:hover       { border-color:var(--color-primary,#7c3aed); }
     .preco-card.atualizado  { border-color:#22c55e; background:#f0fdf4; }
     .preco-card.erro        { border-color:#ef4444; background:#fef2f2; }
     .preco-card.suspeito    { border-color:#f59e0b; background:#fffbeb; }
     .preco-card.sem-variacao { opacity:.7; }
-    .preco-card.sem-query   { opacity:.55; }
     .preco-nome  { font-size:13px; font-weight:600; }
     .preco-meta  { font-size:11px; color:var(--g-text-3); margin-top:2px; }
-    .preco-query {
-        font-size:10px; margin-top:3px;
-        color:var(--color-primary,#7c3aed);
-        font-style:italic;
-    }
-    .preco-sem-query {
-        font-size:10px; margin-top:3px;
-        color:#94a3b8;
-        font-style:italic;
-    }
     .preco-valor {
         font-size:15px; font-weight:700;
         color:var(--color-primary,#7c3aed);
-        white-space:nowrap;
-        min-width:90px;
-        text-align:right;
+        white-space:nowrap; min-width:90px; text-align:right;
     }
     .preco-status {
         font-size:11px; padding:3px 8px; border-radius:12px;
         white-space:nowrap; min-width:80px; text-align:center;
     }
     .preco-status.aguardando { background:var(--g-border); color:var(--g-text-2); }
-    .preco-status.nao-rastreado { background:#f1f5f9; color:#94a3b8; }
     .preco-status.buscando   { background:#fef9c3; color:#854d0e; }
     .preco-status.ok         { background:#dcfce7; color:#166534; }
     .preco-status.unchanged  { background:#f1f5f9; color:#64748b; }
     .preco-status.falhou     { background:#fee2e2; color:#991b1b; }
     .preco-status.alerta     { background:#fef3c7; color:#92400e; }
-    .btn-icon {
+    .btn-hist {
         padding:4px 8px; border-radius:6px; border:1px solid var(--g-border);
         background:transparent; cursor:pointer; font-size:12px;
         color:var(--g-text-2); display:flex; align-items:center; gap:3px;
     }
-    .btn-icon:hover { background:var(--g-hover); }
+    .btn-hist:hover { background:var(--g-hover); }
     .progress-bar-wrap { height:6px; background:var(--g-border); border-radius:4px; overflow:hidden; margin:8px 0; }
     .progress-bar      { height:100%; background:var(--color-primary,#7c3aed); border-radius:4px; transition:width .4s; width:0%; }
     .stats-row { display:flex; gap:12px; flex-wrap:wrap; margin-bottom:20px; }
@@ -328,9 +273,6 @@ include '_sidebar_data.php';
     .variacao-neg { color:#dc2626; font-weight:600; }
     .cron-box { background:#1e1e2e; color:#cdd6f4; font-family:monospace; padding:16px; border-radius:8px; font-size:13px; white-space:pre; overflow-x:auto; }
     .aviso-tabela { background:#fef9c3; border:1px solid #fcd34d; border-radius:8px; padding:12px 16px; font-size:13px; color:#92400e; margin-bottom:16px; }
-    /* Modal query */
-    .modal-query-form { display:flex; gap:8px; margin-top:12px; }
-    .modal-query-form input { flex:1; padding:8px 10px; border:1px solid var(--g-border); border-radius:6px; font-size:13px; }
     </style>
 </head>
 <body>
@@ -354,7 +296,7 @@ include '_sidebar_data.php';
                 <div class="page-subtitle">Busca preços de referência no Mercado Livre e atualiza automaticamente</div>
             </div>
             <button class="btn btn-primary" id="btn-atualizar-todos" onclick="atualizarTodos()" <?php echo !$historico_existe ? 'disabled title="Crie a tabela de histórico primeiro"' : ''; ?>>
-                <span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle">sync</span> Atualizar Rastreados
+                <span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle">sync</span> Atualizar Todos
             </button>
         </div>
 
@@ -372,9 +314,7 @@ include '_sidebar_data.php';
   `atualizado_em` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   KEY `idx_insumo_id` (`insumo_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-ALTER TABLE `insumos` ADD COLUMN IF NOT EXISTS `query_ml` VARCHAR(200) NULL DEFAULT NULL;</pre>
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;</pre>
         </div>
         <?php endif; ?>
 
@@ -385,15 +325,15 @@ ALTER TABLE `insumos` ADD COLUMN IF NOT EXISTS `query_ml` VARCHAR(200) NULL DEFA
         <!-- Estatísticas -->
         <div class="stats-row">
             <div class="stat-box"><div class="val" id="stat-total"><?php echo count($insumos); ?></div><div class="lbl">Total de Insumos</div></div>
-            <div class="stat-box"><div class="val" id="stat-rastreados"><?php echo count(array_filter($insumos, fn($i) => !empty($i['query_ml']))); ?></div><div class="lbl">Com query ML</div></div>
             <div class="stat-box"><div class="val" id="stat-atualizados">0</div><div class="lbl">Atualizados agora</div></div>
+            <div class="stat-box"><div class="val" id="stat-sem-variacao">0</div><div class="lbl">Sem variação</div></div>
             <div class="stat-box"><div class="val" id="stat-erros">0</div><div class="lbl">Erros / Suspeitos</div></div>
         </div>
 
         <!-- Barra de progresso -->
         <div id="progress-wrap" style="display:none">
             <div style="font-size:12px;color:var(--g-text-2);margin-bottom:4px">
-                Processando <span id="prog-atual">0</span> de <span id="prog-total">0</span> insumos rastreados...
+                Processando <span id="prog-atual">0</span> de <span id="prog-total">0</span> insumos...
             </div>
             <div class="progress-bar-wrap"><div class="progress-bar" id="progress-bar"></div></div>
         </div>
@@ -401,33 +341,21 @@ ALTER TABLE `insumos` ADD COLUMN IF NOT EXISTS `query_ml` VARCHAR(200) NULL DEFA
         <!-- Lista de insumos -->
         <div id="lista-insumos">
         <?php foreach ($insumos as $ins):
-            $tem_query = !empty($ins['query_ml']);
-            $ultima    = !empty($ins['ultima_atualizacao']) ? date('d/m/Y H:i', strtotime($ins['ultima_atualizacao'])) : null;
+            $ultima = !empty($ins['ultima_atualizacao']) ? date('d/m/Y H:i', strtotime($ins['ultima_atualizacao'])) : null;
         ?>
-        <div class="preco-card <?php echo $tem_query ? '' : 'sem-query'; ?>" id="card-<?php echo $ins['id']; ?>" data-id="<?php echo $ins['id']; ?>" data-tem-query="<?php echo $tem_query ? '1' : '0'; ?>">
+        <div class="preco-card" id="card-<?php echo $ins['id']; ?>" data-id="<?php echo $ins['id']; ?>">
             <div>
                 <div class="preco-nome"><?php echo htmlspecialchars($ins['nome']); ?></div>
                 <div class="preco-meta">
                     <?php echo htmlspecialchars($ins['unidade']); ?>
                     <?php if ($ultima): ?> • <span style="color:var(--g-blue)">Última ML: <?php echo $ultima; ?></span><?php endif; ?>
                 </div>
-                <?php if ($tem_query): ?>
-                <div class="preco-query" id="qshow-<?php echo $ins['id']; ?>">🔍 <?php echo htmlspecialchars($ins['query_ml']); ?></div>
-                <?php else: ?>
-                <div class="preco-sem-query" id="qshow-<?php echo $ins['id']; ?>">Sem query — clique ✏️ para definir</div>
-                <?php endif; ?>
             </div>
             <div class="preco-valor" id="val-<?php echo $ins['id']; ?>">
                 R$ <?php echo number_format((float)$ins['valorunitario'], 2, ',', '.'); ?>
             </div>
-            <span class="preco-status <?php echo $tem_query ? 'aguardando' : 'nao-rastreado'; ?>" id="status-<?php echo $ins['id']; ?>">
-                <?php echo $tem_query ? 'Aguardando' : 'Não rastr.'; ?>
-            </span>
-            <button class="btn-icon" onclick="editarQuery(<?php echo $ins['id']; ?>, '<?php echo htmlspecialchars(addslashes($ins['query_ml'] ?? '')); ?>')"
-                title="Editar query de busca">
-                <span class="material-symbols-outlined" style="font-size:14px">edit</span>
-            </button>
-            <button class="btn-icon" onclick="verHistorico(<?php echo $ins['id']; ?>, '<?php echo htmlspecialchars(addslashes($ins['nome'])); ?>')"
+            <span class="preco-status aguardando" id="status-<?php echo $ins['id']; ?>">Aguardando</span>
+            <button class="btn-hist" onclick="verHistorico(<?php echo $ins['id']; ?>, '<?php echo htmlspecialchars(addslashes($ins['nome'])); ?>')"
                 title="Ver histórico" <?php echo !$historico_existe ? 'disabled' : ''; ?>>
                 <span class="material-symbols-outlined" style="font-size:14px">history</span>
             </button>
@@ -455,28 +383,6 @@ echo "0 2 * * 0   /usr/bin/php /home/luizpi39/public_html/backend/admin/cron-atu
         </div>
     </div>
 </main>
-</div>
-
-<!-- MODAL: Editar Query -->
-<div class="modal-overlay" id="modal-query">
-    <div class="modal-box" style="max-width:480px">
-        <div class="modal-drag"></div>
-        <div class="modal-title">Editar Query de Busca</div>
-        <div style="font-size:13px;color:var(--g-text-2);margin-bottom:4px">
-            Termo usado para buscar este insumo no Mercado Livre.
-            Deixe vazio para desativar o rastreamento.
-        </div>
-        <div class="modal-query-form">
-            <input type="text" id="input-query" placeholder="ex: titebond original madeira 473ml" />
-            <button class="btn btn-primary" onclick="salvarQuery()">Salvar</button>
-        </div>
-        <div style="margin-top:8px;font-size:11px;color:var(--g-text-3)">
-            Dica: use termos em português ou inglês que os vendedores do ML usam, com marca/modelo quando possível.
-        </div>
-        <div class="modal-actions" style="margin-top:16px">
-            <button class="btn btn-secondary" onclick="fecharModalQuery()">Cancelar</button>
-        </div>
-    </div>
 </div>
 
 <!-- MODAL: Confirmar variação suspeita -->
@@ -514,14 +420,9 @@ echo "0 2 * * 0   /usr/bin/php /home/luizpi39/public_html/backend/admin/cron-atu
 <script src="assets/js/sidebar.js?v=<?php echo $v; ?>"></script>
 <script>
 let statAtualizados = 0;
+let statSemVariacao = 0;
 let statErros       = 0;
-
-// Apenas IDs de insumos COM query_ml
-const ids = [<?php
-    echo implode(',', array_map(fn($i) => $i['id'], array_filter($insumos, fn($i) => !empty($i['query_ml']))));
-?>];
-
-// Estado para modal de confirmação
+const ids = [<?php echo implode(',', array_column($insumos, 'id')); ?>];
 let _pendingConfirm = null;
 
 async function atualizarInsumo(id, confirmado = false) {
@@ -544,7 +445,6 @@ async function atualizarInsumo(id, confirmado = false) {
             card.title = data.erro;
             statErros++;
         } else if (data.suspeito) {
-            // Variação acima de 50% — pede confirmação
             status.className   = 'preco-status alerta';
             status.textContent = '⚠️ Suspeito';
             card.classList.add('suspeito');
@@ -555,7 +455,7 @@ async function atualizarInsumo(id, confirmado = false) {
                 `Preço atual: <strong>R$ ${_fmt(data.preco_antes)}</strong><br>` +
                 `ML sugere: <strong>R$ ${_fmt(data.preco_novo)}</strong><br>` +
                 `Variação: <strong class="${data.variacao_pct > 0 ? 'variacao-pos' : 'variacao-neg'}">${sinal}${data.variacao_pct.toFixed(1)}%</strong><br>` +
-                `<span style="font-size:11px;color:#94a3b8">${data.n_resultados} resultados • query: "${data.query}"</span>`;
+                `<span style="font-size:11px;color:#94a3b8">${data.n_resultados} resultados analisados</span>`;
             document.getElementById('modal-confirmar').classList.add('aberto');
             statErros++;
         } else if (data.atualizado) {
@@ -563,21 +463,22 @@ async function atualizarInsumo(id, confirmado = false) {
             val.textContent    = 'R$ ' + _fmt(data.preco_novo);
             status.className   = 'preco-status ok';
             status.textContent = sinal + data.variacao_pct.toFixed(1) + '%';
-            card.classList.remove('suspeito');
             card.classList.add('atualizado');
             statAtualizados++;
         } else {
             status.className   = 'preco-status unchanged';
             status.textContent = '= estável';
             card.classList.add('sem-variacao');
+            statSemVariacao++;
         }
     } catch (e) {
         status.className   = 'preco-status falhou';
         status.textContent = 'Erro';
         statErros++;
     }
-    document.getElementById('stat-atualizados').textContent = statAtualizados;
-    document.getElementById('stat-erros').textContent       = statErros;
+    document.getElementById('stat-atualizados').textContent  = statAtualizados;
+    document.getElementById('stat-sem-variacao').textContent = statSemVariacao;
+    document.getElementById('stat-erros').textContent        = statErros;
 }
 
 async function confirmarAtualizacao() {
@@ -587,17 +488,13 @@ async function confirmarAtualizacao() {
     _pendingConfirm = null;
     await atualizarInsumo(id, true);
 }
-
-function fecharConfirmar() {
-    document.getElementById('modal-confirmar').classList.remove('aberto');
-}
+function fecharConfirmar() { document.getElementById('modal-confirmar').classList.remove('aberto'); }
 
 async function atualizarTodos() {
-    if (!ids.length) { alert('Nenhum insumo com query definida. Use o botão ✏️ para configurar.'); return; }
     const btn = document.getElementById('btn-atualizar-todos');
     btn.disabled  = true;
     btn.innerHTML = '<span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle">hourglass_empty</span> Atualizando...';
-    statAtualizados = 0; statErros = 0;
+    statAtualizados = 0; statSemVariacao = 0; statErros = 0;
     document.getElementById('progress-wrap').style.display = 'block';
     document.getElementById('prog-total').textContent = ids.length;
     for (let i = 0; i < ids.length; i++) {
@@ -609,54 +506,10 @@ async function atualizarTodos() {
     btn.disabled  = false;
     btn.innerHTML = '<span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle">check_circle</span> Concluído!';
     setTimeout(() => {
-        btn.innerHTML = '<span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle">sync</span> Atualizar Rastreados';
+        btn.innerHTML = '<span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle">sync</span> Atualizar Todos';
     }, 4000);
 }
 
-// ── Query ML ────────────────────────────────────────────────
-let _editandoId = null;
-function editarQuery(id, queryAtual) {
-    _editandoId = id;
-    document.getElementById('input-query').value = queryAtual || '';
-    document.getElementById('modal-query').classList.add('aberto');
-    setTimeout(() => document.getElementById('input-query').focus(), 100);
-}
-async function salvarQuery() {
-    const query = document.getElementById('input-query').value.trim();
-    const fd = new FormData();
-    fd.append('action',    'salvar_query');
-    fd.append('insumo_id', _editandoId);
-    fd.append('query_ml',  query);
-    const r    = await fetch('atualizar-precos.php', { method: 'POST', body: fd });
-    const data = await r.json();
-    if (data.ok) {
-        const qshow = document.getElementById('qshow-' + _editandoId);
-        const card  = document.getElementById('card-' + _editandoId);
-        if (query) {
-            qshow.className   = 'preco-query';
-            qshow.textContent = '🔍 ' + query;
-            card.classList.remove('sem-query');
-            card.dataset.temQuery = '1';
-            // Atualiza status
-            const status = document.getElementById('status-' + _editandoId);
-            if (status.textContent === 'Não rastr.') {
-                status.className   = 'preco-status aguardando';
-                status.textContent = 'Aguardando';
-            }
-        } else {
-            qshow.className   = 'preco-sem-query';
-            qshow.textContent = 'Sem query — clique ✏️ para definir';
-            card.classList.add('sem-query');
-            card.dataset.temQuery = '0';
-        }
-    }
-    fecharModalQuery();
-}
-function fecharModalQuery() { document.getElementById('modal-query').classList.remove('aberto'); }
-document.getElementById('modal-query').addEventListener('click', function(e) { if (e.target === this) fecharModalQuery(); });
-document.getElementById('input-query').addEventListener('keydown', e => { if (e.key === 'Enter') salvarQuery(); });
-
-// ── Histórico ───────────────────────────────────────────────
 async function verHistorico(id, nome) {
     document.getElementById('hist-titulo').textContent = 'Histórico — ' + nome;
     document.getElementById('hist-conteudo').innerHTML = '<div style="text-align:center;padding:30px;color:var(--g-text-3)">Carregando...</div>';
@@ -667,11 +520,11 @@ async function verHistorico(id, nome) {
         document.getElementById('hist-conteudo').innerHTML = '<div style="text-align:center;padding:30px;color:var(--g-text-3)">Nenhum histórico ainda.</div>';
         return;
     }
-    let html = '<table class="hist-table"><thead><tr><th>Data</th><th>Antes</th><th>Depois</th><th>Variação</th><th>Query</th></tr></thead><tbody>';
+    let html = '<table class="hist-table"><thead><tr><th>Data</th><th>Antes</th><th>Depois</th><th>Variação</th></tr></thead><tbody>';
     rows.forEach(r => {
         const cls   = r.variacao_pct > 0 ? 'variacao-pos' : (r.variacao_pct < 0 ? 'variacao-neg' : '');
         const sinal = r.variacao_pct > 0 ? '+' : '';
-        html += `<tr><td>${r.atualizado_em}</td><td>R$ ${_fmt(parseFloat(r.preco_anterior))}</td><td><strong>R$ ${_fmt(parseFloat(r.preco_novo))}</strong></td><td class="${cls}">${sinal}${parseFloat(r.variacao_pct).toFixed(2)}%</td><td style="font-size:10px;color:#94a3b8">${r.query_usada || '—'}</td></tr>`;
+        html += `<tr><td>${r.atualizado_em}</td><td>R$ ${_fmt(parseFloat(r.preco_anterior))}</td><td><strong>R$ ${_fmt(parseFloat(r.preco_novo))}</strong></td><td class="${cls}">${sinal}${parseFloat(r.variacao_pct).toFixed(2)}%</td></tr>`;
     });
     html += '</tbody></table>';
     document.getElementById('hist-conteudo').innerHTML = html;

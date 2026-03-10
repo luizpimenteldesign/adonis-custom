@@ -6,9 +6,7 @@
  * Configurar no cPanel > Cron Jobs:
  * 0 2 * * 0   /usr/bin/php /home/luizpi39/public_html/backend/admin/cron-atualizar-precos.php >> /home/luizpi39/logs/precos.log 2>&1
  *
- * Só processa insumos com query_ml definida.
- * Aplica filtro IQR para descartar outliers.
- * Bloqueia atualizações com variação > 50% (registra aviso no log).
+ * Melhorias: ML_LIMIT=20, filtro IQR, bloqueio de variações > 50%.
  */
 
 define('CRON_MODE', true);
@@ -43,11 +41,10 @@ function medianaIQR(array $precos): ?float {
 }
 
 $inicio = date('Y-m-d H:i:s');
-echo "\n[{$inicio}] === Iniciando atualização de preços (apenas rastreados) ===\n";
+echo "\n[{$inicio}] === Iniciando atualização de preços ===\n";
 
-// Busca APENAS insumos com query_ml definida
 $insumos = $conn->query(
-    "SELECT id, nome, valorunitario, query_ml FROM insumos WHERE ativo = 1 AND query_ml IS NOT NULL AND query_ml != '' ORDER BY nome"
+    'SELECT id, nome, valorunitario FROM insumos WHERE ativo = 1 ORDER BY nome'
 )->fetchAll(PDO::FETCH_ASSOC);
 
 $total        = count($insumos);
@@ -56,10 +53,8 @@ $sem_variacao = 0;
 $bloqueados   = 0;
 $erros        = 0;
 
-echo "[INFO] {$total} insumos rastreados encontrados\n";
-
 foreach ($insumos as $ins) {
-    $query       = $ins['query_ml'];
+    $query       = $ins['nome'];
     $preco_atual = (float)$ins['valorunitario'];
 
     $url = 'https://api.mercadolibre.com/sites/' . ML_SITE . '/search?q=' . urlencode($query) . '&limit=' . ML_LIMIT;
@@ -73,28 +68,13 @@ foreach ($insumos as $ins) {
     $resp = curl_exec($ch);
     curl_close($ch);
 
-    if (!$resp) {
-        echo "  [ERRO] {$ins['nome']} — sem resposta da API\n";
-        $erros++;
-        sleep(1);
-        continue;
-    }
+    if (!$resp) { echo "  [ERRO] {$ins['nome']} — sem resposta da API\n"; $erros++; sleep(1); continue; }
 
     $data = json_decode($resp, true);
-    if (empty($data['results'])) {
-        echo "  [SKIP] {$ins['nome']} — nenhum resultado para: {$query}\n";
-        $erros++;
-        sleep(1);
-        continue;
-    }
+    if (empty($data['results'])) { echo "  [SKIP] {$ins['nome']} — sem resultados\n"; $erros++; sleep(1); continue; }
 
     $precos = array_values(array_filter(array_column($data['results'], 'price'), fn($p) => $p > 0));
-    if (empty($precos)) {
-        echo "  [SKIP] {$ins['nome']} — sem preços válidos\n";
-        $erros++;
-        sleep(1);
-        continue;
-    }
+    if (empty($precos)) { echo "  [SKIP] {$ins['nome']} — sem preços válidos\n"; $erros++; sleep(1); continue; }
 
     $mediana = medianaIQR($precos);
     $n       = count($precos);
@@ -103,10 +83,10 @@ foreach ($insumos as $ins) {
         ? round((($mediana - $preco_atual) / $preco_atual) * 100, 2)
         : 100.0;
 
-    // Bloqueia variações suspeitas no cron (requer confirmação manual na tela)
+    // Bloqueia variações suspeitas — requer confirmação manual na tela
     if (abs($variacao_pct) > MAX_VARIACAO && $preco_atual > 0) {
         $sinal = $variacao_pct > 0 ? '+' : '';
-        echo "  [BLOQUADO] {$ins['nome']}: variação {$sinal}{$variacao_pct}% suspeita — revise manualmente\n";
+        echo "  [BLOQUEADO] {$ins['nome']}: {$sinal}{$variacao_pct}% — revise manualmente\n";
         $bloqueados++;
         sleep(1);
         continue;
@@ -136,4 +116,4 @@ foreach ($insumos as $ins) {
 }
 
 $fim = date('Y-m-d H:i:s');
-echo "\n[{$fim}] === Concluído: {$atualizados} atualizados | {$sem_variacao} estáveis | {$bloqueados} bloqueados | {$erros} erros | Total rastreados: {$total} ===\n";
+echo "\n[{$fim}] === Concluído: {$atualizados} atualizados | {$sem_variacao} estáveis | {$bloqueados} bloqueados | {$erros} erros | Total: {$total} ===\n";
