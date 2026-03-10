@@ -1,8 +1,6 @@
 <?php
 require_once 'auth.php';
 require_once '../config/Database.php';
-require_once '../config/ml-config.php';
-require_once '../config/ml-token.php';
 
 $db   = new Database();
 $conn = $db->getConnection();
@@ -24,7 +22,6 @@ try {
     ");
 } catch (Exception $e) { /* ignora */ }
 
-define('ML_SITE',      'MLB');
 define('MIN_VARIACAO', 3.0);
 define('MAX_VARIACAO', 50.0);
 
@@ -50,21 +47,7 @@ function medianaIQR(array $precos): ?float {
         : $filtrados[intval($nf/2)], 2);
 }
 
-// ── API: token para uso no JS ───────────────────────────────────────────────
-// O JS precisa do token para fazer a busca diretamente no ML (contorna bloqueio de IP do servidor)
-if (isset($_GET['action']) && $_GET['action'] === 'get_token') {
-    header('Content-Type: application/json');
-    try {
-        $token = mlGetToken();
-        echo json_encode(['ok' => true, 'token' => $token]);
-    } catch (Exception $e) {
-        echo json_encode(['ok' => false, 'erro' => $e->getMessage()]);
-    }
-    exit;
-}
-
 // ── API: salvar preço calculado pelo JS ──────────────────────────────────────────
-// O JS faz a busca no ML, calcula a mediana e envia aqui apenas os números finais para salvar
 if (isset($_POST['action']) && $_POST['action'] === 'salvar') {
     header('Content-Type: application/json');
 
@@ -73,11 +56,11 @@ if (isset($_POST['action']) && $_POST['action'] === 'salvar') {
         exit;
     }
 
-    $insumo_id  = (int)($_POST['insumo_id']  ?? 0);
-    $preco_novo = (float)($_POST['preco_novo'] ?? 0);
-    $n_res      = (int)($_POST['n_resultados'] ?? 0);
-    $query_usada= trim($_POST['query'] ?? '');
-    $confirmado = ($_POST['confirmado'] ?? '') === '1';
+    $insumo_id   = (int)($_POST['insumo_id']    ?? 0);
+    $preco_novo  = (float)($_POST['preco_novo']  ?? 0);
+    $n_res       = (int)($_POST['n_resultados']  ?? 0);
+    $query_usada = trim($_POST['query']          ?? '');
+    $confirmado  = ($_POST['confirmado']         ?? '') === '1';
 
     if (!$insumo_id || $preco_novo <= 0) {
         echo json_encode(['ok' => false, 'erro' => 'Dados inválidos']);
@@ -124,7 +107,7 @@ if (isset($_POST['action']) && $_POST['action'] === 'salvar') {
     exit;
 }
 
-// ── API: histórico ───────────────────────────────────────────────────
+// ── API: histórico ──────────────────────────────────────────────────
 if (isset($_GET['action']) && $_GET['action'] === 'historico') {
     header('Content-Type: application/json');
     if (!$historico_existe) { echo json_encode([]); exit; }
@@ -141,7 +124,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'historico') {
     exit;
 }
 
-// ── Carrega insumos e token ───────────────────────────────────────────────
+// ── Carrega insumos ─────────────────────────────────────────────────
 try {
     if ($historico_existe) {
         $insumos = $conn->query('
@@ -161,13 +144,6 @@ try {
 } catch (Exception $e) {
     $insumos = [];
     $erro_carregamento = $e->getMessage();
-}
-
-// Token para uso no JS (a busca é feita pelo browser, não pelo servidor)
-try {
-    $ml_token_js = mlGetToken();
-} catch (Exception $e) {
-    $ml_token_js = '';
 }
 
 $current_page = 'atualizar-precos.php';
@@ -217,7 +193,6 @@ include '_sidebar_data.php';
     .variacao-neg { color:#dc2626; font-weight:600; }
     .cron-box { background:#1e1e2e; color:#cdd6f4; font-family:monospace; padding:16px; border-radius:8px; font-size:13px; white-space:pre; overflow-x:auto; }
     .aviso-tabela { background:#fef9c3; border:1px solid #fcd34d; border-radius:8px; padding:12px 16px; font-size:13px; color:#92400e; margin-bottom:16px; }
-    .aviso-token  { background:#fee2e2; border:1px solid #fca5a5; border-radius:8px; padding:12px 16px; font-size:13px; color:#991b1b; margin-bottom:16px; }
     </style>
 </head>
 <body>
@@ -240,7 +215,7 @@ include '_sidebar_data.php';
                 </h1>
                 <div class="page-subtitle">Busca preços de referência no Mercado Livre e atualiza automaticamente</div>
             </div>
-            <button class="btn btn-primary" id="btn-atualizar-todos" onclick="atualizarTodos()" <?php echo (!$historico_existe || empty($ml_token_js)) ? 'disabled' : ''; ?>>
+            <button class="btn btn-primary" id="btn-atualizar-todos" onclick="atualizarTodos()" <?php echo !$historico_existe ? 'disabled' : ''; ?>>
                 <span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle">sync</span> Atualizar Todos
             </button>
         </div>
@@ -260,12 +235,6 @@ include '_sidebar_data.php';
   PRIMARY KEY (`id`),
   KEY `idx_insumo_id` (`insumo_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;</pre>
-        </div>
-        <?php endif; ?>
-
-        <?php if (empty($ml_token_js)): ?>
-        <div class="aviso-token">
-            <strong>❌ Token do Mercado Livre não disponível.</strong> Verifique as configurações em <code>ml-config.php</code>.
         </div>
         <?php endif; ?>
 
@@ -366,92 +335,51 @@ echo "0 2 * * 0   /usr/bin/php /home/luizpi39/public_html/backend/admin/cron-atu
 
 <script src="assets/js/sidebar.js?v=<?php echo $v; ?>"></script>
 <script>
-// ── Token e dados injetados pelo PHP ─────────────────────────────────────────────
-const ML_TOKEN = <?php echo json_encode($ml_token_js); ?>;
-const ML_SITE  = 'MLB';
-const ML_LIMIT = 50;
-const IDS      = [<?php echo implode(',', array_column($insumos, 'id')); ?>];
-const MIN_VAR  = 3.0;
-const MAX_VAR  = 50.0;
+const IDS     = [<?php echo implode(',', array_column($insumos, 'id')); ?>];
+const MIN_VAR = 3.0;
+const MAX_VAR = 50.0;
 
 let statAtualizados = 0, statSemVariacao = 0, statErros = 0;
 let _pendingConfirm = null;
 
-// ── Mediana com filtro IQR (espelha o PHP) ──────────────────────────────────────
 function medianaIQR(arr) {
     if (!arr.length) return null;
-    const s  = [...arr].sort((a, b) => a - b);
-    const n  = s.length;
-    const q1 = s[Math.floor(n * 0.25)];
-    const q3 = s[Math.floor(n * 0.75)];
+    const s   = [...arr].sort((a, b) => a - b);
+    const n   = s.length;
+    const q1  = s[Math.floor(n * 0.25)];
+    const q3  = s[Math.floor(n * 0.75)];
     const iqr = q3 - q1;
     let f = s.filter(p => p >= q1 - 1.5 * iqr && p <= q3 + 1.5 * iqr);
     if (!f.length) f = s;
     const nf = f.length;
-    return nf % 2 === 0
-        ? (f[nf/2 - 1] + f[nf/2]) / 2
-        : f[Math.floor(nf/2)];
+    return nf % 2 === 0 ? (f[nf/2-1] + f[nf/2]) / 2 : f[Math.floor(nf/2)];
 }
 
-// ── Busca preços direto no ML (client-side, sem passar pelo servidor) ────────────
-function renovarToken() {
-    // Busca token fresco do servidor quando necessario
-    return fetch('atualizar-precos.php?action=get_token')
-        .then(r => r.json())
-        .then(d => d.ok ? d.token : null);
-}
-
+// Busca via proxy PHP (evita CORS e IP bloqueado usando o servidor como ponte)
 async function mlBuscarPrecos(query) {
-    let token = ML_TOKEN;
-
-    const params = new URLSearchParams({
-        q: query, limit: ML_LIMIT,
-        buying_mode: 'buy_it_now', condition: 'new',
-    });
-    const url = `https://api.mercadolibre.com/sites/${ML_SITE}/search?${params}`;
-
-    let resp = await fetch(url, {
-        headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/json' }
-    });
-
-    // Token expirado? Renova e tenta de novo
-    if (resp.status === 401) {
-        token = await renovarToken();
-        if (!token) throw new Error('Não foi possível renovar o token ML');
-        resp = await fetch(url, {
-            headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/json' }
-        });
-    }
-
-    if (!resp.ok) {
-        const err = await resp.json().catch(() => ({}));
-        throw new Error(`ML API: HTTP ${resp.status} — ${err.message || ''}`);
-    }
-
-    const data   = await resp.json();
+    const params = new URLSearchParams({ q: query, limit: 50, buying_mode: 'buy_it_now', condition: 'new' });
+    // Proxy PHP repassa para api.mercadolivre.com.br (domínio BR, sem bloqueio de IP no plano compartilhado)
+    const url = 'ml-proxy.php?' + params;
+    const resp = await fetch(url);
+    if (!resp.ok) throw new Error('Proxy HTTP ' + resp.status);
+    const data = await resp.json();
+    if (data.error) throw new Error(data.error);
     const precos = (data.results || []).map(r => r.price).filter(p => p > 0);
     if (!precos.length) throw new Error('Sem resultados para: ' + query);
-
     return { precos, total: data.paging?.total ?? precos.length };
 }
 
-// ── Fluxo principal por insumo ────────────────────────────────────────────────
 async function atualizarInsumo(id, confirmado = false) {
     const card   = document.getElementById('card-' + id);
     const status = document.getElementById('status-' + id);
     const val    = document.getElementById('val-' + id);
     const nome   = card.dataset.nome;
-
     status.className = 'preco-status buscando';
     status.textContent = 'Buscando...';
-
     try {
-        // 1. Busca no ML direto do browser
         const { precos, total } = await mlBuscarPrecos(nome);
         const mediana = medianaIQR(precos);
         const n = precos.length;
-
-        // 2. Envia apenas o resultado ao PHP para salvar
         const fd = new FormData();
         fd.append('action',       'salvar');
         fd.append('insumo_id',    id);
@@ -459,51 +387,36 @@ async function atualizarInsumo(id, confirmado = false) {
         fd.append('n_resultados', n);
         fd.append('query',        nome);
         if (confirmado) fd.append('confirmado', '1');
-
         const r    = await fetch('atualizar-precos.php', { method: 'POST', body: fd });
         const data = await r.json();
-
         if (!data.ok) {
-            status.className = 'preco-status falhou';
-            status.textContent = 'Erro';
-            card.classList.add('erro');
-            card.title = data.erro;
-            statErros++;
+            status.className = 'preco-status falhou'; status.textContent = 'Erro';
+            card.classList.add('erro'); card.title = data.erro; statErros++;
         } else if (data.suspeito) {
-            status.className = 'preco-status alerta';
-            status.textContent = '⚠️ Suspeito';
+            status.className = 'preco-status alerta'; status.textContent = '⚠️ Suspeito';
             card.classList.add('suspeito');
             _pendingConfirm = { id, data };
             const sinal = data.variacao_pct > 0 ? '+' : '';
             document.getElementById('confirmar-texto').innerHTML =
-                `<strong>${data.insumo}</strong><br>` +
-                `Preço atual: <strong>R$ ${_fmt(data.preco_antes)}</strong><br>` +
+                `<strong>${data.insumo}</strong><br>Preço atual: <strong>R$ ${_fmt(data.preco_antes)}</strong><br>` +
                 `ML sugere: <strong>R$ ${_fmt(data.preco_novo)}</strong><br>` +
-                `Variação: <strong class="${data.variacao_pct > 0 ? 'variacao-pos' : 'variacao-neg'}">${sinal}${data.variacao_pct.toFixed(1)}%</strong><br>` +
+                `Variação: <strong class="${data.variacao_pct>0?'variacao-pos':'variacao-neg'}">${sinal}${data.variacao_pct.toFixed(1)}%</strong><br>` +
                 `<span style="font-size:11px;color:#94a3b8">${data.n_resultados} resultados analisados</span>`;
             document.getElementById('modal-confirmar').classList.add('aberto');
             statErros++;
         } else if (data.atualizado) {
             const sinal = data.variacao_pct > 0 ? '+' : '';
             val.textContent = 'R$ ' + _fmt(data.preco_novo);
-            status.className = 'preco-status ok';
-            status.textContent = sinal + data.variacao_pct.toFixed(1) + '%';
-            card.classList.add('atualizado');
-            statAtualizados++;
+            status.className = 'preco-status ok'; status.textContent = sinal + data.variacao_pct.toFixed(1) + '%';
+            card.classList.add('atualizado'); statAtualizados++;
         } else {
-            status.className = 'preco-status unchanged';
-            status.textContent = '= estável';
-            card.classList.add('sem-variacao');
-            statSemVariacao++;
+            status.className = 'preco-status unchanged'; status.textContent = '= estável';
+            card.classList.add('sem-variacao'); statSemVariacao++;
         }
-    } catch (e) {
-        status.className = 'preco-status falhou';
-        status.textContent = 'Erro';
-        card.classList.add('erro');
-        card.title = e.message;
-        statErros++;
+    } catch(e) {
+        status.className = 'preco-status falhou'; status.textContent = 'Erro';
+        card.classList.add('erro'); card.title = e.message; statErros++;
     }
-
     document.getElementById('stat-atualizados').textContent  = statAtualizados;
     document.getElementById('stat-sem-variacao').textContent = statSemVariacao;
     document.getElementById('stat-erros').textContent        = statErros;
@@ -512,8 +425,7 @@ async function atualizarInsumo(id, confirmado = false) {
 async function confirmarAtualizacao() {
     fecharConfirmar();
     if (!_pendingConfirm) return;
-    const { id } = _pendingConfirm;
-    _pendingConfirm = null;
+    const { id } = _pendingConfirm; _pendingConfirm = null;
     await atualizarInsumo(id, true);
 }
 function fecharConfirmar() { document.getElementById('modal-confirmar').classList.remove('aberto'); }
@@ -525,18 +437,15 @@ async function atualizarTodos() {
     statAtualizados = 0; statSemVariacao = 0; statErros = 0;
     document.getElementById('progress-wrap').style.display = 'block';
     document.getElementById('prog-total').textContent = IDS.length;
-
     for (let i = 0; i < IDS.length; i++) {
         document.getElementById('prog-atual').textContent = i + 1;
-        document.getElementById('progress-bar').style.width = ((i + 1) / IDS.length * 100) + '%';
+        document.getElementById('progress-bar').style.width = ((i+1)/IDS.length*100) + '%';
         await atualizarInsumo(IDS[i]);
         await _sleep(600);
     }
     btn.disabled = false;
     btn.innerHTML = '<span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle">check_circle</span> Concluído!';
-    setTimeout(() => {
-        btn.innerHTML = '<span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle">sync</span> Atualizar Todos';
-    }, 4000);
+    setTimeout(() => { btn.innerHTML = '<span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle">sync</span> Atualizar Todos'; }, 4000);
 }
 
 async function verHistorico(id, nome) {
@@ -559,7 +468,7 @@ async function verHistorico(id, nome) {
     document.getElementById('hist-conteudo').innerHTML = html;
 }
 function fecharHistorico() { document.getElementById('modal-historico').classList.remove('aberto'); }
-document.getElementById('modal-historico').addEventListener('click', function(e) { if (e.target === this) fecharHistorico(); });
+document.getElementById('modal-historico').addEventListener('click', e => { if (e.target === this) fecharHistorico(); });
 
 function _fmt(v) { return Number(v).toFixed(2).replace('.', ','); }
 function _sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
