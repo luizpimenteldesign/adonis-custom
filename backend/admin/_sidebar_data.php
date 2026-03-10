@@ -1,8 +1,6 @@
 <?php
 /**
  * _sidebar_data.php
- * Carrega os dados necessários para a sidebar (contagens por status).
- * Incluído antes do HTML em cada página do admin.
  */
 if (!isset($conn)) {
     try {
@@ -82,6 +80,13 @@ $sidebar_nav = [
         ],
     ],
     [
+        'id'    => 'nav-rel',
+        'icon'  => 'bar_chart',
+        'label' => 'Relatórios',
+        'href'  => 'relatorios.php',
+        'tipo'  => 'link',
+    ],
+    [
         'id'    => 'nav-ajuda',
         'icon'  => 'help',
         'label' => 'Ajuda',
@@ -97,7 +102,6 @@ $sidebar_nav = [
     ],
 ];
 
-// Adiciona item Usuários apenas para admins
 if (($_SESSION['admin_tipo'] ?? '') === 'admin') {
     $sidebar_nav[] = [
         'id'    => 'nav-users',
