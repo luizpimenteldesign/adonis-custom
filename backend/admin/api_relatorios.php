@@ -23,7 +23,6 @@ try {
 
         // ── 1. FINANCEIRO ─────────────────────────────────────────
         case 'financeiro':
-            // Receita por mês (pedidos entregues)
             $stmt = $conn->prepare("
                 SELECT
                     DATE_FORMAT(atualizado_em,'%Y-%m') as mes,
@@ -38,15 +37,14 @@ try {
             $stmt->execute([':de'=>$de, ':ate'=>$ateHora]);
             $porMes = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-            // Receita por faixa de valor
             $stmt2 = $conn->prepare("
                 SELECT
                     CASE
-                        WHEN valor_orcamento < 100              THEN 'Até R$ 100'
-                        WHEN valor_orcamento BETWEEN 100 AND 300 THEN 'R$ 100–300'
-                        WHEN valor_orcamento BETWEEN 300 AND 600 THEN 'R$ 300–600'
-                        WHEN valor_orcamento BETWEEN 600 AND 1000 THEN 'R$ 600–1000'
-                        ELSE 'Acima de R$ 1000'
+                        WHEN valor_orcamento < 100               THEN 'Até R\$ 100'
+                        WHEN valor_orcamento BETWEEN 100 AND 300  THEN 'R\$ 100–300'
+                        WHEN valor_orcamento BETWEEN 300 AND 600  THEN 'R\$ 300–600'
+                        WHEN valor_orcamento BETWEEN 600 AND 1000 THEN 'R\$ 600–1000'
+                        ELSE 'Acima de R\$ 1000'
                     END AS faixa,
                     COUNT(*) as qtd,
                     SUM(valor_orcamento) as total
@@ -58,7 +56,6 @@ try {
             $stmt2->execute([':de'=>$de, ':ate'=>$ateHora]);
             $faixas = $stmt2->fetchAll(PDO::FETCH_ASSOC);
 
-            // Totalizador
             $stmt3 = $conn->prepare("
                 SELECT COUNT(*) as qtd, SUM(valor_orcamento) as total, AVG(valor_orcamento) as ticket
                 FROM pre_os
@@ -139,17 +136,20 @@ try {
 
         // ── 5. INSUMOS / ESTOQUE ───────────────────────────────────
         case 'insumos':
+            // usa quantidadeestoque (nome real da coluna no banco)
             $stmt = $conn->query("
-                SELECT nome, categoria, unidade, tipo_insumo,
-                       estoque, valorunitario, estoque_minimo,
-                       (estoque * valorunitario) as valor_total
+                SELECT
+                    nome, categoria, unidade, tipo_insumo,
+                    quantidadeestoque                          AS estoque,
+                    valorunitario,
+                    (quantidadeestoque * valorunitario)        AS valor_total
                 FROM insumos
-                ORDER BY estoque ASC
+                ORDER BY quantidadeestoque ASC
             ");
             $insumos = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-            $zerados  = array_filter($insumos, fn($i)=> (float)$i['estoque'] <= 0);
-            $criticos = array_filter($insumos, fn($i)=> (float)$i['estoque'] > 0 && (float)$i['estoque'] < 5);
+            $zerados  = array_filter($insumos, fn($i) => (float)$i['estoque'] <= 0);
+            $criticos = array_filter($insumos, fn($i) => (float)$i['estoque'] > 0 && (float)$i['estoque'] < 5);
             $valorTotal = array_sum(array_column($insumos, 'valor_total'));
 
             echo json_encode([
